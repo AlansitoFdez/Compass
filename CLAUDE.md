@@ -35,7 +35,7 @@ Explícitamente fuera de alcance — no añadir sin que el usuario lo pida prime
 
 - **Idioma del código:** inglés siempre — nombres de funciones, variables, clases, etc. La documentación (este archivo, `docs/`) va en español.
 - **Variables de entorno:** nunca se lee ni se modifica el `.env` real con datos reales. El archivo de referencia es siempre `.env.example`; cualquier comparación o validación de variables se hace contra ese archivo, no contra el real.
-- **Documentación continua por fases:** cada fase grande del roadmap (ver documento de diseño) tiene su carpeta en `docs/fases/`, y cada subfase dentro de una fase tiene su propio `.md` en esa carpeta. Antes de empezar una subfase se hace una conversación de planificación (qué se va a hacer, qué se va a tocar); el `.md` de esa subfase registra el plan acordado y, según avanza el trabajo, qué se hizo, qué se tocó y por qué.
+- **Documentación continua por fases:** carpeta `docs/phases/`, con una subcarpeta por fase grande del roadmap (`phase1/`, `phase2/`...). Dentro de cada una, un `.md` por subfase con nombre `phaseX.Y.md` (ej. `docs/phases/phase1/phase1.1.md`, `phase1.2.md`...). Antes de empezar una subfase se hace una conversación de planificación (qué se va a hacer, qué se va a tocar); el `.md` de esa subfase registra el plan acordado y, según avanza el trabajo, qué se hizo, qué se tocó y por qué.
 
 ## Trabajando en este repo
 
