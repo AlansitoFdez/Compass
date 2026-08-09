@@ -36,7 +36,13 @@ Plan completo de implementación en `C:\Users\Alan\.claude\plans\perfecto-pues-t
 
 
 
-### Paso 3 — Módulos de la app (pendiente)
+### Paso 3 — Módulos de la app (completado)
+
+- `api/routes/health.py` — `APIRouter` con `GET /health` → `{"status": "ok"}`.
+- `api/router.py` — agregador único (`api_router`) que incluye `health.router`. Los endpoints futuros (1.10 → `tenders.py`) se registran aquí sin tocar `main.py`.
+- `core/config.py` — `Settings(BaseSettings)` con `app_env`/`log_level`, más `get_settings()` cacheado con `@lru_cache`.
+- `main.py` — patrón application factory (`create_app()`), llama a `get_settings()` para fallar rápido si `.env` está mal formado, incluye `api_router`. Expone `app` a nivel de módulo como punto de entrada ASGI para Uvicorn.
+- Todavía sin probar en caliente — se verifica en el paso de verificación final (tests + servidor).
 
 
 
