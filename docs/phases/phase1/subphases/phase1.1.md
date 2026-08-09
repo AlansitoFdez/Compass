@@ -28,7 +28,11 @@ Plan completo de implementación en `C:\Users\Alan\.claude\plans\perfecto-pues-t
 
 
 
-### Paso 2 — Dependencias de producción y dev (pendiente)
+### Paso 2 — Dependencias de producción y dev (completado)
+
+- Producción: `uv add fastapi "uvicorn[standard]" pydantic-settings` → fastapi 0.141.1, uvicorn 0.52.1, pydantic-settings 2.15.0 (y transitivas: pydantic 2.13.4, starlette, anyio, etc.).
+- Dev: `uv add --dev ruff pytest httpx` → ruff 0.16.2, pytest 9.1.1, httpx 0.28.1. `httpx` es necesario porque `TestClient` de FastAPI/Starlette lo requiere y no viene arrastrado por `fastapi` solo.
+- `uv` creó el entorno virtual en `backend/.venv` y generó `backend/uv.lock` (se commitea, ver plan).
 
 
 
