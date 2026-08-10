@@ -4,7 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado del proyecto
 
-Compass está en fase de pre-implementación: el repo contiene únicamente el documento de diseño (`docs/compass-radar-licitaciones.md`) y el scaffolding inicial. Todavía no hay código de aplicación, sistema de build ni tests — no asumas comandos como `npm run build` o `pytest` hasta que existan de verdad. Cuando existan, actualiza esta sección con los comandos reales.
+Compass tiene un backend FastAPI mínimo en `backend/` (subfase 1.1 completada): esqueleto de la app con patrón de routers agregados, un health check y un primer test real. Todavía falta toda la infraestructura (PostgreSQL+pgvector, Redis, Celery — subfases 1.2 y 1.9) y el primer endpoint de dominio (`GET /tenders`, subfase 1.10). El frontend Next.js no existe todavía (Fase 5).
+
+Comandos reales, ejecutados desde `backend/`:
+
+- `uv sync` — instala dependencias.
+- `uv run uvicorn compass.main:app --reload` — servidor de desarrollo (`GET /health`, `GET /docs`).
+- `uv run pytest` — tests.
+- `uv run ruff check .` / `uv run ruff format .` — lint y formato.
 
 ## Qué es Compass
 
