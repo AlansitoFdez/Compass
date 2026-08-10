@@ -66,6 +66,10 @@ Plan completo de implementación en `C:\Users\Alan\.claude\plans\perfecto-pues-t
 
 
 
+### Paso 7 — `.gitignore` raíz (completado, adelantado)
+
+Adelantado respecto al orden del plan: al ejecutar los tests se generó `backend/tests/__pycache__/*.pyc`, y como el `.gitignore` raíz todavía no tenía reglas de Python, el commit anterior (`test(backend): ...`) los trackeó por error. Corregido: añadido el bloque `# Python / uv (backend/)` al final de `.gitignore` (`__pycache__/`, `*.py[cod]`, `.venv/`, `.ruff_cache/`, `.pytest_cache/`, `.mypy_cache/`, `*.egg-info/`, `.coverage`, `htmlcov/`) y destrackeados los `.pyc` con `git rm -r --cached`. El bloque dotenv existente (líneas 68-71) ya cubría `backend/.env`/`backend/.env.example` sin cambios — los patrones sin `/` inicial aplican a cualquier profundidad.
+
 ### Paso 6 — `.env.example` (pendiente)
 
 
