@@ -46,7 +46,14 @@ Plan completo de implementación en `C:\Users\Alan\.claude\plans\perfecto-pues-t
 
 
 
-### Paso 4 — Configuración de ruff y pytest (pendiente)
+### Paso 4 — Configuración de ruff y pytest (completado)
+
+- `[tool.ruff]`: `line-length = 100`, `target-version = "py313"`.
+- `[tool.ruff.lint]`: `select = [E, W, F, I, UP, B, C4, SIM]` — errores/estilo básico, imports ordenados, sintaxis moderna, bugs comunes, comprensiones y simplificaciones.
+- `[tool.ruff.lint.isort]`: `known-first-party = ["compass"]` para separar imports propios de terceros.
+- `[tool.ruff.format]`: `quote-style = "double"`.
+- `[tool.pytest.ini_options]`: `testpaths = ["tests"]`, `addopts = "-ra"`.
+- Verificado: `uv run ruff check .` y `uv run ruff format --check .` pasan sin avisos sobre el código existente (paso 3).
 
 
 
