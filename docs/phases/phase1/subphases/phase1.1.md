@@ -67,4 +67,14 @@ Adelantado respecto al orden del plan: al ejecutar los tests se generó `backend
 
 - Sección "Estado del proyecto" actualizada: ya no dice "no asumas comandos", ahora documenta el estado real (backend mínimo en `backend/`, qué falta) y los comandos reales verificados (`uv sync`, `uv run uvicorn compass.main:app --reload`, `uv run pytest`, `uv run ruff check .` / `ruff format .`).
 
-### Paso 9 — Verificación final (pendiente)
+### Paso 9 — Verificación final (completado)
+
+- `uv run ruff check .` → sin avisos.
+- `uv run ruff format --check .` → sin cambios pendientes.
+- `uv run pytest -v` → 1 test, PASSED.
+- Servidor real arrancado (`uv run uvicorn compass.main:app --port 8000`), no solo `TestClient` en memoria:
+  - `GET /health` → `200 {"status":"ok"}`.
+  - `GET /docs` → `200` (Swagger UI).
+  - Servidor parado correctamente al terminar.
+
+Subfase 1.1 completada.
