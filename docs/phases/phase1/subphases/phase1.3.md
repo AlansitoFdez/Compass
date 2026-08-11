@@ -40,7 +40,10 @@ Más `created_at`/`updated_at` técnicos (default del servidor), para depurar la
 
 ## Progreso
 
-### Paso 1 — Dependencias: `sqlalchemy`, `alembic` (pendiente)
+### Paso 1 — Dependencias: `sqlalchemy`, `alembic` (completado)
+
+- `uv add sqlalchemy alembic` → SQLAlchemy 2.0.51, Alembic 1.19.1. Dependencias de producción (las migraciones se aplican en cualquier entorno, no son solo una herramienta de dev).
+- `greenlet` se instaló como transitiva de SQLAlchemy — es lo que usa por debajo su extensión asyncio.
 
 ### Paso 2 — `core/db.py`: engine async, sessionmaker, Base declarativa (pendiente)
 
