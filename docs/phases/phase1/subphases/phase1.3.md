@@ -54,7 +54,12 @@ Más `created_at`/`updated_at` técnicos (default del servidor), para depurar la
 - Sin dependencia de FastAPI (`get_db()`) todavía — no hay endpoint que la consuma hasta la 1.10.
 - Verificado: `uv run python -c "from compass.core.db import engine..."` construye el engine correctamente, con el dialecto `postgresql+psycopg` y el puerto `5433` de `.env`. La URL impresa enmascara la contraseña automáticamente.
 
-### Paso 3 — `tenders/models.py` y `tenders/schemas.py` (pendiente)
+### Paso 3 — `tenders/models.py` y `tenders/schemas.py` (completado)
+
+- `tenders/enums.py`: `ContractType` y `TenderStatus` (`StrEnum`, conjuntos cerrados según el documento de diseño). **`procedure_type` se deja como `str` plano, no Enum**: el documento lo lista con "..." (conjunto abierto — la ley de contratos públicos define más procedimientos de los nombrados); forzar un Enum rompería la ingesta real (1.6) en cuanto el feed traiga un procedimiento legítimo no anticipado.
+- `tenders/models.py`: modelo `Tender(Base)` con las 19 columnas (17 de negocio + `created_at`/`updated_at` técnicos). Decisiones: importes como `Decimal` (nunca `float` para dinero — precisión en coma flotante), `cpv_codes` como `ARRAY(String)`, enums con `native_enum=False` (implementados como `VARCHAR`+`CHECK`, más fáciles de evolucionar que un `ENUM` nativo de Postgres), `created_at`/`updated_at` con `server_default=func.now()`/`onupdate=func.now()`.
+- `tenders/schemas.py`: `TenderSchema` (Pydantic), refleja los 17 campos de negocio — deliberadamente **sin** `created_at`/`updated_at` (son de la capa de persistencia, no del CODICE). `ConfigDict(from_attributes=True)` permite construirlo desde un objeto ORM `Tender`, no solo desde un dict.
+- Verificado: `Base.metadata.tables` registra `tenders` con las 19 columnas esperadas; los tres módulos importan sin errores.
 
 ### Paso 4 — Alembic init (plantilla async) + `env.py` conectado a `Settings`/`Base` (pendiente)
 
