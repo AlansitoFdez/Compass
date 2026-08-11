@@ -34,7 +34,9 @@ Decisiones tomadas en la conversación de planificación:
 - **Efecto observado**: al no tener el usuario todavía un `backend/.env` real con estos dos campos, `uv run pytest` empezó a fallar incluso en `test_health.py` (que no toca la base de datos), porque `Settings` se valida como bloque único al crear la app. Comportamiento esperado y correcto — confirma que el fail-fast funciona.
 - El usuario creó su `backend/.env` local (nunca tocado por el asistente, siguiendo la convención de `CLAUDE.md`) con los mismos valores no sensibles de `.env.example`. Verificado: `uv run pytest -v` vuelve a pasar.
 
-### Paso 4 — Dependencias: `psycopg[binary]`, `redis` (pendiente)
+### Paso 4 — Dependencias: `psycopg[binary]`, `redis` (completado)
+
+- `uv add "psycopg[binary]" redis` → psycopg 3.3.4 (con el extra binario, sin necesidad de cabeceras de desarrollo de Postgres en la máquina), redis-py 8.1.0. Dependencias de producción, no de dev.
 
 ### Paso 5 — Test de conectividad real (pendiente)
 
