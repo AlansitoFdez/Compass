@@ -16,7 +16,10 @@ Decisiones tomadas en la conversación de planificación:
 
 ## Progreso
 
-### Paso 1 — Verificar Docker disponible (pendiente)
+### Paso 1 — Verificar Docker disponible (completado)
+
+- `docker --version` → Docker 28.5.1. `docker compose version` → v2.40.0-desktop.1 (plugin integrado, no el binario standalone `docker-compose`).
+- Docker Desktop no estaba arrancado en el primer intento (`docker info` falló al conectar con `dockerDesktopLinuxEngine`); una vez arrancado por el usuario, `docker info` responde correctamente.
 
 ### Paso 2 — `docker-compose.yml` (pendiente)
 
