@@ -21,7 +21,11 @@ Decisiones tomadas en la conversación de planificación:
 - `docker --version` → Docker 28.5.1. `docker compose version` → v2.40.0-desktop.1 (plugin integrado, no el binario standalone `docker-compose`).
 - Docker Desktop no estaba arrancado en el primer intento (`docker info` falló al conectar con `dockerDesktopLinuxEngine`); una vez arrancado por el usuario, `docker info` responde correctamente.
 
-### Paso 2 — `docker-compose.yml` (pendiente)
+### Paso 2 — `docker-compose.yml` (completado)
+
+- `docker-compose.yml` en la raíz con dos servicios: `db` (`pgvector/pgvector:0.8.6-pg17`, credenciales `compass`/`compass`/`compass`, puerto `5432`, volumen nombrado `compass_db_data`) y `redis` (`redis:8-alpine`, puerto `6379`, sin volumen).
+- Healthchecks: `pg_isready -U compass` en `db`, `redis-cli ping` en `redis`.
+- Validado con `docker compose config` (sin levantar contenedores) — sintaxis correcta, nombres de red/volumen resueltos con el prefijo `compass_` del proyecto.
 
 ### Paso 3 — `DATABASE_URL`/`REDIS_URL` en `.env.example` y `core/config.py` (pendiente)
 
