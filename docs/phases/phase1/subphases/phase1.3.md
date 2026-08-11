@@ -61,7 +61,12 @@ Más `created_at`/`updated_at` técnicos (default del servidor), para depurar la
 - `tenders/schemas.py`: `TenderSchema` (Pydantic), refleja los 17 campos de negocio — deliberadamente **sin** `created_at`/`updated_at` (son de la capa de persistencia, no del CODICE). `ConfigDict(from_attributes=True)` permite construirlo desde un objeto ORM `Tender`, no solo desde un dict.
 - Verificado: `Base.metadata.tables` registra `tenders` con las 19 columnas esperadas; los tres módulos importan sin errores.
 
-### Paso 4 — Alembic init (plantilla async) + `env.py` conectado a `Settings`/`Base` (pendiente)
+### Paso 4 — Alembic init (plantilla async) + `env.py` conectado a `Settings`/`Base` (completado)
+
+- `uv run alembic init -t async alembic` (desde `backend/`) → `alembic.ini`, `alembic/env.py`, `alembic/script.py.mako`, `alembic/versions/`. Commiteado en bruto antes de tocarlo, igual que con `uv init` en la 1.1.
+- `env.py`: `target_metadata` apuntado a `Base.metadata` (antes `None`), importando `compass.tenders.models` para que `Tender` se registre. La construcción del engine (`async_engine_from_config` leyendo `alembic.ini`) se sustituyó por reutilizar directamente `compass.core.db.engine` — una sola fuente de verdad para la conexión, en vez de mantener la URL sincronizada en dos sitios.
+- `alembic.ini`: comentada la línea `sqlalchemy.url = driver://user:pass@localhost/dbname` (placeholder sin usar ya, para no confundir a quien lea el archivo pensando que falta configurar algo real ahí).
+- Verificado con `ruff check`/`format --check` (sin avisos). La verificación de extremo a extremo (que de verdad conecte y funcione) se deja para el paso 5, cuando haga falta Docker arriba.
 
 ### Paso 5 — Primera migración autogenerada (crear tabla `tenders`) + aplicarla (pendiente)
 
