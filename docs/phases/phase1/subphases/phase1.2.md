@@ -38,6 +38,10 @@ Decisiones tomadas en la conversación de planificación:
 
 - `uv add "psycopg[binary]" redis` → psycopg 3.3.4 (con el extra binario, sin necesidad de cabeceras de desarrollo de Postgres en la máquina), redis-py 8.1.0. Dependencias de producción, no de dev.
 
-### Paso 5 — Test de conectividad real (pendiente)
+### Paso 5 — Test de conectividad real (completado)
+
+- `tests/test_infra_connectivity.py`: `test_postgres_is_reachable` (`psycopg.connect` + `SELECT 1`) y `test_redis_is_reachable` (`redis.from_url` + `.ping()`). No pasa por la app FastAPI, conecta directo a los servicios de `docker-compose.yml`.
+- `ruff check`/`format --check` en verde (una línea de docstring superaba `line-length = 100`, acortada).
+- Ejecución real contra los contenedores levantados: pendiente para el paso 6 (verificación final).
 
 ### Paso 6 — Verificación final: levantar Docker, correr tests, parar Docker (pendiente)
