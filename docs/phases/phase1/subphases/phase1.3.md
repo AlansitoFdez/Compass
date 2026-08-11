@@ -45,7 +45,14 @@ Más `created_at`/`updated_at` técnicos (default del servidor), para depurar la
 - `uv add sqlalchemy alembic` → SQLAlchemy 2.0.51, Alembic 1.19.1. Dependencias de producción (las migraciones se aplican en cualquier entorno, no son solo una herramienta de dev).
 - `greenlet` se instaló como transitiva de SQLAlchemy — es lo que usa por debajo su extensión asyncio.
 
-### Paso 2 — `core/db.py`: engine async, sessionmaker, Base declarativa (pendiente)
+### Paso 2 — `core/db.py`: engine async, sessionmaker, Base declarativa (completado)
+
+- `Base(DeclarativeBase)` — clase base para los modelos ORM; su `metadata` es lo que Alembic leerá para `autogenerate` (paso 5).
+- `_async_database_url()` — transforma `postgresql://` (formato plano de `.env`, el que ya usa `psycopg.connect()` en el test de la 1.2) a `postgresql+psycopg://` (dialecto explícito que SQLAlchemy necesita para usar psycopg3 en vez de asumir psycopg2, que no está instalado). La transformación vive aquí, no en la variable de entorno, para no romper el test de conectividad de la 1.2.
+- `engine` — `create_async_engine`, construido a partir de `get_settings()` (fail-fast si `.env` no tiene `DATABASE_URL`, mismo patrón que `main.py`).
+- `async_session_factory` — `async_sessionmaker` con `expire_on_commit=False` (recomendación oficial de SQLAlchemy para uso async: evita que acceder a atributos tras un `commit` dispare una recarga perezosa, que no funciona bien en async sin manejo especial).
+- Sin dependencia de FastAPI (`get_db()`) todavía — no hay endpoint que la consuma hasta la 1.10.
+- Verificado: `uv run python -c "from compass.core.db import engine..."` construye el engine correctamente, con el dialecto `postgresql+psycopg` y el puerto `5433` de `.env`. La URL impresa enmascara la contraseña automáticamente.
 
 ### Paso 3 — `tenders/models.py` y `tenders/schemas.py` (pendiente)
 
