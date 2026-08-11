@@ -44,4 +44,17 @@ Decisiones tomadas en la conversación de planificación:
 - `ruff check`/`format --check` en verde (una línea de docstring superaba `line-length = 100`, acortada).
 - Ejecución real contra los contenedores levantados: pendiente para el paso 6 (verificación final).
 
-### Paso 6 — Verificación final: levantar Docker, correr tests, parar Docker (pendiente)
+### Paso 6 — Verificación final: levantar Docker, correr tests, parar Docker (completado)
+
+- `docker compose up -d --wait`: ambos servicios `(healthy)`.
+- `uv run ruff check .` / `ruff format --check .` → sin avisos.
+- **Bug real encontrado**: `test_postgres_is_reachable` falló con `password authentication failed for user "compass"`, a pesar de que el log del contenedor mostraba una inicialización nueva (`PostgreSQL init process complete`) con las credenciales correctas. Diagnóstico:
+  1. Descartado volumen reciclado de otro proyecto (`docker volume ls` solo mostraba `compass_compass_db_data`, recién creado).
+  2. Descartado problema de parseo de `.env`: el mismo fallo se reproducía con un DSN literal hardcodeado (`uv run python -c "psycopg.connect('postgresql://compass:compass@localhost:5432/compass')..."`), sin pasar por `Settings`.
+  3. El propio log del contenedor (`docker compose logs db`) no mostraba ningún intento de autenticación fallido — señal de que la conexión ni siquiera llegaba a nuestro Postgres.
+  4. `netstat -ano | findstr :5432` reveló **dos procesos** escuchando en el puerto 5432 del host: `com.docker.backend.exe` (el proxy de Docker Desktop) y **`postgres.exe`** (un PostgreSQL nativo de Windows corriendo como servicio, ajeno a este proyecto). Las conexiones a `localhost:5432` estaban cayendo en el Postgres nativo, que no tiene el rol `compass`.
+  - **Fix**: cambiado el puerto publicado del contenedor de `5432:5432` a `5433:5432` en `docker-compose.yml` (el puerto interno del contenedor sigue siendo 5432, solo cambia el mapeo al host). Actualizado `DATABASE_URL` en `.env.example` a puerto `5433`, con un comentario explicando por qué no es el puerto por defecto. El usuario actualizó su `.env` real igual. Decisión tomada con el usuario: cambiar el puerto de nuestro lado en vez de tocar el servicio nativo de Windows (que podría estar en uso por otra cosa) — la opción no invasiva.
+- Tras el fix: `docker compose up -d --wait` recreó `db` con el nuevo puerto, `uv run pytest -v` → **3 passed** (health check + conectividad real a Postgres y Redis).
+- `docker compose down`: contenedores parados y eliminados, volumen `compass_compass_db_data` persiste (sin `-v`).
+
+Subfase 1.2 completada.
