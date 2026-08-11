@@ -10,6 +10,8 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     log_level: str = "INFO"
+    database_url: str
+    redis_url: str
 
 
 @lru_cache
