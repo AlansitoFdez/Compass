@@ -77,6 +77,14 @@ Más `created_at`/`updated_at` técnicos (default del servidor), para depurar la
 - `uv run alembic upgrade head` → aplicada sin errores.
 - Verificado contra la base de datos real (`docker exec compass-db-1 psql -U compass -d compass -c "\d tenders"`): las 19 columnas presentes, tipos correctos, `PRIMARY KEY` en `expediente`.
 
-### Paso 6 — Tests: persistencia real (insert/query async) + validación del schema Pydantic (pendiente)
+### Paso 6 — Tests: persistencia real (insert/query async) + validación del schema Pydantic (completado)
+
+- `uv add --dev pytest-asyncio` + `asyncio_mode = "auto"` en `pyproject.toml` (evita el decorador `@pytest.mark.asyncio` en cada test).
+- `tests/conftest.py`: fixture `db_session` — sesión real, transaccional: el test hace `flush()` (no `commit()`) y la fixture hace `rollback()` al terminar, así ningún test deja datos permanentes ni colisiona con expedientes repetidos entre ejecuciones.
+- **Bug real #3 — mismo problema de Windows, sitio distinto**: al ejecutar el primer test async de verdad, aparece otra vez `Psycopg cannot use the 'ProactorEventLoop'` — esta vez no en Alembic, sino en el propio event loop que crea `pytest-asyncio` para correr los tests. Arreglado en `conftest.py` con `asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())` a nivel de todo el proceso de test (acotado a Windows). Confirma que este fix habrá que aplicarlo en un tercer sitio más adelante: cuando la app real (`uvicorn`) toque la BD de forma async por primera vez (probablemente 1.10).
+- `tests/test_tender_model.py`: `test_tender_persists_and_round_trips` — inserta un `Tender`, lo relee con `select()`, comprueba que los enums vuelven como el tipo Python correcto (no como string), y que `TenderSchema.model_validate(fetched)` (el puente `from_attributes`) funciona contra un objeto real.
+- `tests/test_tender_schema.py`: `test_tender_schema_accepts_valid_data` y `test_tender_schema_rejects_invalid_status` (Pydantic, sin base de datos).
+- Verificado manualmente que el rollback funciona: `docker exec compass-db-1 psql ... "SELECT count(*) FROM tenders;"` → `0` filas tras correr los tests.
+- 6 tests en verde: health check, conectividad (1.2), persistencia y schema (1.3).
 
 ### Paso 7 — Verificación final: Docker arriba, migración aplicada, tests en verde, Docker abajo (pendiente)
