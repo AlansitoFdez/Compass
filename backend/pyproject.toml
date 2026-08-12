@@ -25,6 +25,7 @@ build-backend = "uv_build"
 dev = [
     "httpx2>=2.10.0",
     "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
     "ruff>=0.16.2",
 ]
 
@@ -53,3 +54,4 @@ quote-style = "double"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+asyncio_mode = "auto"
