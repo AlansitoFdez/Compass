@@ -68,7 +68,14 @@ Más `created_at`/`updated_at` técnicos (default del servidor), para depurar la
 - `alembic.ini`: comentada la línea `sqlalchemy.url = driver://user:pass@localhost/dbname` (placeholder sin usar ya, para no confundir a quien lea el archivo pensando que falta configurar algo real ahí).
 - Verificado con `ruff check`/`format --check` (sin avisos). La verificación de extremo a extremo (que de verdad conecte y funcione) se deja para el paso 5, cuando haga falta Docker arriba.
 
-### Paso 5 — Primera migración autogenerada (crear tabla `tenders`) + aplicarla (pendiente)
+### Paso 5 — Primera migración autogenerada (crear tabla `tenders`) + aplicarla (completado)
+
+- **Bug real #1 — Windows/asyncio**: `uv run alembic revision --autogenerate` falló con `psycopg.InterfaceError: Psycopg cannot use the 'ProactorEventLoop' to run in async mode`. Es un problema conocido de psycopg en modo async sobre Windows (necesita un event loop basado en selector; `ProactorEventLoop` es el por defecto de asyncio en Windows). **No afecta a producción** (Linux no tiene este problema). Arreglado acotado a `alembic/env.py::run_migrations_online()`: en Windows, `asyncio.run(..., loop_factory=asyncio.SelectorEventLoop)`; en cualquier otro sistema, sin cambios. No se tocó `main.py` — la app todavía no abre ninguna conexión async real (ningún endpoint toca la BD), así que no está roto ahí todavía; habrá que aplicar el mismo tipo de fix cuando sí lo esté (probablemente 1.10).
+- **Bug real #2 — enum names vs. values**: revisando la migración autogenerada antes de aplicarla (nunca hay que fiarse a ciegas de `autogenerate`), `sa.Enum('SERVICES', 'SUPPLIES', 'WORKS', ...)` usaba los **nombres** de los miembros de los enums de Python, no los **valores** (`'services'`, `'supplies'`, `'works'`) — comportamiento por defecto de SQLAlchemy al mapear un `Enum` de Python. Funcionaría igual a través del ORM, pero cualquiera mirando la tabla con `psql` directamente vería mayúsculas inconsistentes con el resto del proyecto. Arreglado con `values_callable=lambda enum_cls: [e.value for e in enum_cls]` en ambas columnas Enum de `models.py`, antes de aplicar nada (sin coste, no había datos todavía).
+- **Mejora de tooling**: activados los `post_write_hooks` de `alembic.ini` (comentados por defecto) para que `ruff check --fix` + `ruff format` corran automáticamente sobre cada migración generada — el autogenerate de Alembic no sigue nuestro estilo (comillas simples, `Union` en vez de `X | Y`, líneas largas) y así no hay que arreglarlo a mano cada vez.
+- `uv run alembic revision --autogenerate -m "create tenders table"` (con Docker arriba) → detecta correctamente la tabla nueva, genera la migración ya limpia gracias a los hooks.
+- `uv run alembic upgrade head` → aplicada sin errores.
+- Verificado contra la base de datos real (`docker exec compass-db-1 psql -U compass -d compass -c "\d tenders"`): las 19 columnas presentes, tipos correctos, `PRIMARY KEY` en `expediente`.
 
 ### Paso 6 — Tests: persistencia real (insert/query async) + validación del schema Pydantic (pendiente)
 
