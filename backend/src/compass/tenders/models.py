@@ -23,9 +23,21 @@ class Tender(Base):
     budget_without_vat: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     estimated_value: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
 
-    contract_type: Mapped[ContractType] = mapped_column(SqlEnum(ContractType, native_enum=False))
+    contract_type: Mapped[ContractType] = mapped_column(
+        SqlEnum(
+            ContractType,
+            native_enum=False,
+            values_callable=lambda enum_cls: [e.value for e in enum_cls],
+        )
+    )
     procedure_type: Mapped[str] = mapped_column(String)
-    status: Mapped[TenderStatus] = mapped_column(SqlEnum(TenderStatus, native_enum=False))
+    status: Mapped[TenderStatus] = mapped_column(
+        SqlEnum(
+            TenderStatus,
+            native_enum=False,
+            values_callable=lambda enum_cls: [e.value for e in enum_cls],
+        )
+    )
 
     submission_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     location: Mapped[str | None] = mapped_column(String)
