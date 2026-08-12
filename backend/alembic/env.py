@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from logging.config import fileConfig
 
 from sqlalchemy.engine import Connection
@@ -69,7 +70,13 @@ async def run_async_migrations() -> None:
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
 
-    asyncio.run(run_async_migrations())
+    if sys.platform == "win32":
+        # psycopg's async mode requires a selector-based event loop; Windows'
+        # default ProactorEventLoop is incompatible with it. Not a concern in
+        # production (Linux containers use a selector-based loop already).
+        asyncio.run(run_async_migrations(), loop_factory=asyncio.SelectorEventLoop)
+    else:
+        asyncio.run(run_async_migrations())
 
 
 if context.is_offline_mode():
