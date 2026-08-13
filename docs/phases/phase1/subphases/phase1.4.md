@@ -28,6 +28,11 @@ Fuentes: [CPV Codes for IT Services — Jorpex](https://jorpex.com/guides/cpv-co
 - `matches_it_vertical()` — `any(is_it_services_cpv(code) for code in cpv_codes)` sobre la lista completa de CPV de una licitación; `any()` sobre una lista vacía da `False` de forma natural (licitación sin CPV no coincide).
 - Verificado con `ruff check`/`format --check` — sin avisos.
 
-### Paso 2 — Tests (pendiente)
+### Paso 2 — Tests (completado)
+
+- `tests/test_tender_vertical.py`: 7 tests, uno por cada caso listado en el plan (normalización con/sin dígito de control, código suelto que coincide/no coincide, lista con alguno/ninguno que coincide, lista vacía).
+- Estilo: `assert not x` en vez de `assert x is False` para las funciones que devuelven `bool` — más idiomático, y la regla `SIM` de ruff ya activada marcaría la comparación explícita como redundante.
+- Cada función testeada por separado (incluida `normalize_cpv_code`, aunque las otras dos la usan por dentro): si algo falla, el nombre del test que falla ya dice qué pieza fue, sin tener que investigar.
+- Ejecutados en aislamiento (`pytest tests/test_tender_vertical.py`, no la suite completa) porque Docker no estaba levantado en ese momento y estos tests no lo necesitan — la ejecución de la suite completa junto con los tests que sí requieren Postgres/Redis se deja para el paso 3 (verificación final).
 
 ### Paso 3 — Verificación final: ruff + pytest (pendiente)
