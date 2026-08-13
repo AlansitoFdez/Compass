@@ -87,4 +87,10 @@ Más `created_at`/`updated_at` técnicos (default del servidor), para depurar la
 - Verificado manualmente que el rollback funciona: `docker exec compass-db-1 psql ... "SELECT count(*) FROM tenders;"` → `0` filas tras correr los tests.
 - 6 tests en verde: health check, conectividad (1.2), persistencia y schema (1.3).
 
-### Paso 7 — Verificación final: Docker arriba, migración aplicada, tests en verde, Docker abajo (pendiente)
+### Paso 7 — Verificación final: Docker arriba, migración aplicada, tests en verde, Docker abajo (completado)
+
+Verificación desde cero, no solo con lo que ya había: `docker compose down -v` (borra también el volumen — solo tenía datos de prueba vacíos, nada real) → `docker compose up -d --wait` (contenedores y volumen nuevos) → confirmado `\dt` sin tablas → `uv run alembic upgrade head` aplica la migración sobre la base de datos vacía → `ruff check`/`format --check` sin avisos → `uv run pytest -v` → **6 passed**. `docker compose down` para cerrar.
+
+Esto prueba que alguien que clone el repo hoy puede reproducir todo el pipeline (infra + esquema + tests) desde cero, no solo que "funcionaba en mi entorno ya levantado".
+
+Subfase 1.3 completada. Tres bugs reales encontrados y documentados por el camino: incompatibilidad de psycopg async con `ProactorEventLoop` en Windows (Alembic y pytest-asyncio, dos sitios distintos — pendiente un tercero cuando la app toque la BD en un endpoint real), y enums de SQLAlchemy guardando `.name` en vez de `.value` por defecto.
