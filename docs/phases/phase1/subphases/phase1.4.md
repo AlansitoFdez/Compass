@@ -20,7 +20,13 @@ Fuentes: [CPV Codes for IT Services — Jorpex](https://jorpex.com/guides/cpv-co
 
 ## Progreso
 
-### Paso 1 — `tenders/vertical.py`: constante, normalización y funciones de matching (pendiente)
+### Paso 1 — `tenders/vertical.py`: constante, normalización y funciones de matching (completado)
+
+- `IT_SERVICES_CPV_DIVISION = "72"` — constante nombrada en vez de un `"72"` mágico repetido por el código.
+- `normalize_cpv_code()` — quita el dígito de control opcional (`"72212730-0"` → `"72212730"`) vía `.split("-")[0].strip()`. Funciona igual con o sin dígito de control, sin necesidad de un `if` aparte.
+- `is_it_services_cpv()` — normaliza y comprueba `.startswith("72")` para un único código.
+- `matches_it_vertical()` — `any(is_it_services_cpv(code) for code in cpv_codes)` sobre la lista completa de CPV de una licitación; `any()` sobre una lista vacía da `False` de forma natural (licitación sin CPV no coincide).
+- Verificado con `ruff check`/`format --check` — sin avisos.
 
 ### Paso 2 — Tests (pendiente)
 
