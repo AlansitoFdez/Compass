@@ -22,7 +22,10 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): fetch del feed PLACS
 
 ## Progreso
 
-### Paso 1 — `httpx2` a dependencia de producción (pendiente)
+### Paso 1 — `httpx2` a dependencia de producción (completado)
+
+- `uv remove --dev httpx2` + `uv add httpx2` → pasa de `[dependency-groups] dev` a `[project.dependencies]`. Necesario porque `uv sync --no-dev` (instalación de producción) se saltaría las dependencias de dev, y el cliente ATOM lo va a usar en tiempo de ejecución real.
+- Verificado: `ruff check`/`format --check` sin avisos, `test_health.py` (que usa `TestClient`, apoyado en `httpx2` por debajo) sigue en verde.
 
 ### Paso 2 — `core/redis_client.py`: cliente Redis compartido (pendiente)
 
