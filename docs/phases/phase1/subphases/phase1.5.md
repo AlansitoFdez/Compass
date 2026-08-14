@@ -44,7 +44,13 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): fetch del feed PLACS
 - `fetch_atom_page(url, client)` recibe el cliente `httpx2.Client` como parámetro (no lo crea dentro): permite mockearlo en tests, y reutilizar la misma conexión TCP entre páginas sucesivas en el iterador del paso 5.
 - Verificado con un XML ATOM mínimo hecho a mano (no parte de la suite, solo sanity check manual): 2 `entry` encontrados, `next_url` extraído correctamente.
 
-### Paso 4 — Checkpoint: leer/escribir el último punto procesado en Redis (pendiente)
+### Paso 4 — Checkpoint: leer/escribir el último punto procesado en Redis (completado)
+
+- `ingestion/checkpoint.py`: `get_last_processed_atom_url()` / `set_last_processed_atom_url()`.
+- Clave `"ingestion:atom:last_processed_url"` — convención de Redis de separar por `:` para simular jerarquía (Redis no tiene carpetas); prefijo `ingestion:atom:` para no chocar con las claves propias de Celery cuando Redis sea también su broker (1.9).
+- Nombres específicos (no genéricos `get_checkpoint()`/`set_checkpoint()`) pensando en que la 1.8 probablemente necesite otro tipo de checkpoint distinto (progreso del histórico) — evita ambigüedad de "¿checkpoint de qué?" cuando haya un segundo.
+- Sin TTL/caducidad al escribir: es un marcador de progreso durable, no una caché temporal.
+- Verificado contra Redis real (Docker arriba): `None` antes de escribir, valor correcto después de `set`. Clave de prueba limpiada al terminar.
 
 ### Paso 5 — Iterador principal: sigue `next` hasta agotar el feed, actualizando el checkpoint tras cada página (pendiente)
 
