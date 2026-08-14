@@ -10,6 +10,7 @@ requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.19.1",
     "fastapi>=0.141.1",
+    "httpx2>=2.10.0",
     "psycopg[binary]>=3.3.4",
     "pydantic-settings>=2.15.0",
     "redis>=8.1.0",
@@ -23,7 +24,6 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "httpx2>=2.10.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.16.2",
