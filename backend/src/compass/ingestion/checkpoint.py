@@ -11,3 +11,8 @@ def get_last_processed_atom_url() -> str | None:
 
 def set_last_processed_atom_url(url: str) -> None:
     get_redis_client().set(CHECKPOINT_KEY, url)
+
+
+def clear_last_processed_atom_url() -> None:
+    """Called once the feed is fully drained — the next run starts fresh, it doesn't resume."""
+    get_redis_client().delete(CHECKPOINT_KEY)
