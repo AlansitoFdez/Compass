@@ -35,4 +35,11 @@ Fuentes: [CPV Codes for IT Services — Jorpex](https://jorpex.com/guides/cpv-co
 - Cada función testeada por separado (incluida `normalize_cpv_code`, aunque las otras dos la usan por dentro): si algo falla, el nombre del test que falla ya dice qué pieza fue, sin tener que investigar.
 - Ejecutados en aislamiento (`pytest tests/test_tender_vertical.py`, no la suite completa) porque Docker no estaba levantado en ese momento y estos tests no lo necesitan — la ejecución de la suite completa junto con los tests que sí requieren Postgres/Redis se deja para el paso 3 (verificación final).
 
-### Paso 3 — Verificación final: ruff + pytest (pendiente)
+### Paso 3 — Verificación final: ruff + pytest (completado)
+
+- `docker compose up -d --wait` → ambos servicios `(healthy)`, con el volumen y la migración persistidos del cierre de la 1.3.
+- `ruff check`/`format --check` sin avisos.
+- `uv run pytest -v` → **13 passed** (los 6 de subfases anteriores + los 7 nuevos del filtro de vertical).
+- `docker compose down` para cerrar.
+
+Subfase 1.4 completada. Sin bugs nuevos esta vez — subfase más ligera (funciones puras, sin Docker en los pasos 1-2).
