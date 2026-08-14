@@ -34,7 +34,15 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): fetch del feed PLACS
 - `decode_responses=True` — Redis es "binary-safe" y por defecto `redis-py` devuelve `bytes`; como solo vamos a guardar texto plano (la URL del checkpoint), esto evita tener que decodificar a mano en cada lectura.
 - Verificado: el cliente se construye sin conectar de verdad (`redis.Redis.from_url()` es perezoso), con los parámetros correctos leídos de `.env` (`host=localhost`, `port=6379`, `db=0`).
 
-### Paso 3 — `ingestion/atom_client.py`: fetch de una página + parseo de `entry`/`next` (pendiente)
+### Paso 3 — `ingestion/atom_client.py`: fetch de una página + parseo de `entry`/`next` (completado)
+
+- Nuevo paquete `compass/ingestion/`, separado de `tenders/` (esta subfase es sobre "cómo traer los datos", no sobre la entidad `Tender`).
+- `parse_atom_page(xml_content: bytes) -> AtomPage` — función **pura**, sin red, separada deliberadamente de `fetch_atom_page` para poder testear todo el parseo con un fixture XML local (paso 6), sin mockear HTTP.
+- Manejo de namespace ATOM (`{http://www.w3.org/2005/Atom}`): `ElementTree` antepone el namespace entre llaves a cada etiqueta al parsear (`<entry>` → `"{...}entry"`); buscar solo `"entry"` sin el prefijo no encuentra nada.
+- `AtomPage` como `@dataclass` (campos con nombre: `.entries`, `.next_url`) en vez de una tupla posicional — autoexplicativo.
+- `next(generador, None)` para encontrar el `<link rel="next">`: recorre el generador y devuelve el primer resultado, o `None` si no hay ninguno (última página del feed) — sin lanzar excepción.
+- `fetch_atom_page(url, client)` recibe el cliente `httpx2.Client` como parámetro (no lo crea dentro): permite mockearlo en tests, y reutilizar la misma conexión TCP entre páginas sucesivas en el iterador del paso 5.
+- Verificado con un XML ATOM mínimo hecho a mano (no parte de la suite, solo sanity check manual): 2 `entry` encontrados, `next_url` extraído correctamente.
 
 ### Paso 4 — Checkpoint: leer/escribir el último punto procesado en Redis (pendiente)
 
