@@ -52,10 +52,13 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): fetch del feed PLACS
 - Sin TTL/caducidad al escribir: es un marcador de progreso durable, no una caché temporal.
 - Verificado contra Redis real (Docker arriba): `None` antes de escribir, valor correcto después de `set`. Clave de prueba limpiada al terminar.
 
-### Paso 5 — Iterador principal: sigue `next` hasta agotar el feed, actualizando el checkpoint tras cada página (en progreso)
+### Paso 5 — Iterador principal: sigue `next` hasta agotar el feed, actualizando el checkpoint tras cada página (completado)
 
 - **Decisión de diseño discutida antes de escribir el bucle**: al terminar de recorrer el feed (`next_url` llega a `None`), el checkpoint se **borra**, no se deja apuntando a la última página. Razón: el feed raíz de PLACSP cambia de contenido cada día ("se publican diariamente las actualizaciones producidas el día anterior"); dejar el checkpoint fijo en la última página de hoy haría que mañana se intentara reanudar desde una URL de un feed ya obsoleto. El checkpoint solo tiene sentido para sobrevivir a un fallo *dentro* de una misma pasada, no entre pasadas de días distintos.
 - `checkpoint.py`: añadida `clear_last_processed_atom_url()` (usa `DEL` de Redis, no `SET`), en vez de forzar `set_...(None)` en una función pensada para `str`.
+- **Ejercicio de comprobación**: antes de escribir el código, se le pidió al usuario que diseñara el bucle en pseudocódigo. Reveló una confusión real entre `get_last_processed_atom_url()` (se llama **una sola vez**, al arrancar, para decidir la URL de partida) y `page.next_url` (el valor que gobierna cada vuelta del bucle y decide cuándo actualizar/borrar el checkpoint) — corregido con una traza vuelta-a-vuelta sobre el código real.
+- `ingestion/feed_reader.py`: `ingest_atom_feed(client) -> Iterator[Element]`. `url` arranca en `get_last_processed_atom_url() or FEED_URL` (respaldo si no hay checkpoint aún); el bucle usa la variable local `url` (actualizada cada vuelta desde `page.next_url`), sin volver a leer Redis; escribe el checkpoint (`set_...` o `clear_...` según si `next_url` es o no `None`) **después** de entregar (`yield from`) las entradas de la página, nunca antes.
+- Verificado: importa sin errores. El comportamiento real (paginación multi-página, checkpoint tras fallo simulado) se prueba a fondo en el paso 6, con HTTP mockeado.
 
 ### Paso 6 — Tests con HTTP mockeado (pendiente)
 
