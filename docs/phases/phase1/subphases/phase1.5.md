@@ -27,7 +27,12 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): fetch del feed PLACS
 - `uv remove --dev httpx2` + `uv add httpx2` → pasa de `[dependency-groups] dev` a `[project.dependencies]`. Necesario porque `uv sync --no-dev` (instalación de producción) se saltaría las dependencias de dev, y el cliente ATOM lo va a usar en tiempo de ejecución real.
 - Verificado: `ruff check`/`format --check` sin avisos, `test_health.py` (que usa `TestClient`, apoyado en `httpx2` por debajo) sigue en verde.
 
-### Paso 2 — `core/redis_client.py`: cliente Redis compartido (pendiente)
+### Paso 2 — `core/redis_client.py`: cliente Redis compartido (completado)
+
+- **Decisión explicitada en esta conversación** (antes implícita): toda la tubería de ingesta (1.5-1.9) usa clientes **síncronos**, no async — corre dentro de tareas de Celery (procesos worker independientes, paralelismo por múltiples procesos), no dentro del event loop de FastAPI. A diferencia de `psycopg`/SQLAlchemy (donde la misma URL sirve para modo síncrono o async según qué función se llame), `redis-py` expone dos clases completamente separadas (`redis.Redis` vs `redis.asyncio.Redis`) — se elige una explícitamente, sin detección automática.
+- `get_redis_client()` — mismo patrón `@lru_cache` que `get_settings()`: se construye una vez, se reutiliza la misma instancia después.
+- `decode_responses=True` — Redis es "binary-safe" y por defecto `redis-py` devuelve `bytes`; como solo vamos a guardar texto plano (la URL del checkpoint), esto evita tener que decodificar a mano en cada lectura.
+- Verificado: el cliente se construye sin conectar de verdad (`redis.Redis.from_url()` es perezoso), con los parámetros correctos leídos de `.env` (`host=localhost`, `port=6379`, `db=0`).
 
 ### Paso 3 — `ingestion/atom_client.py`: fetch de una página + parseo de `entry`/`next` (pendiente)
 
