@@ -52,7 +52,10 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): fetch del feed PLACS
 - Sin TTL/caducidad al escribir: es un marcador de progreso durable, no una caché temporal.
 - Verificado contra Redis real (Docker arriba): `None` antes de escribir, valor correcto después de `set`. Clave de prueba limpiada al terminar.
 
-### Paso 5 — Iterador principal: sigue `next` hasta agotar el feed, actualizando el checkpoint tras cada página (pendiente)
+### Paso 5 — Iterador principal: sigue `next` hasta agotar el feed, actualizando el checkpoint tras cada página (en progreso)
+
+- **Decisión de diseño discutida antes de escribir el bucle**: al terminar de recorrer el feed (`next_url` llega a `None`), el checkpoint se **borra**, no se deja apuntando a la última página. Razón: el feed raíz de PLACSP cambia de contenido cada día ("se publican diariamente las actualizaciones producidas el día anterior"); dejar el checkpoint fijo en la última página de hoy haría que mañana se intentara reanudar desde una URL de un feed ya obsoleto. El checkpoint solo tiene sentido para sobrevivir a un fallo *dentro* de una misma pasada, no entre pasadas de días distintos.
+- `checkpoint.py`: añadida `clear_last_processed_atom_url()` (usa `DEL` de Redis, no `SET`), en vez de forzar `set_...(None)` en una función pensada para `str`.
 
 ### Paso 6 — Tests con HTTP mockeado (pendiente)
 
