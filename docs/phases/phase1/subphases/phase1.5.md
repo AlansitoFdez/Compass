@@ -75,4 +75,10 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): fetch del feed PLACS
   - Los otros dos tests: drenado completo (todas las entradas, checkpoint borrado al final) y reanudación desde un checkpoint ya existente (arranca en la página 2, nunca toca la página 1).
 - Suite completa: **23 tests pasan** (4 atom_client + 3 checkpoint + 3 feed_reader + los de subfases anteriores).
 
-### Paso 7 — Verificación final: Docker (Redis), ruff, pytest (pendiente)
+### Paso 7 — Verificación final: Docker (Redis), ruff, pytest (completado)
+
+- Docker arriba (Postgres+Redis sanos), `ruff check`/`format --check` sin avisos, `uv run pytest -v` → **23 passed**.
+- Comprobación manual adicional contra el **servidor real de PLACSP** (no mockeado): `fetch_atom_page(FEED_URL, client)` con un cliente `httpx2` de verdad → 159 entradas en la primera página, `next_url` real apuntando a la siguiente. Confirma que todo el módulo funciona de extremo a extremo contra el feed en producción, no solo contra los fixtures de test.
+- Docker abajo para cerrar.
+
+Subfase 1.5 completada. Además de las tres piezas construidas (cliente ATOM, checkpoint en Redis, iterador principal), esta subfase incluyó dos ejercicios de comprobación activa del usuario (diseño del bucle en pseudocódigo, limpieza de tests con Redis) y una corrección de diseño propia a mitad de la implementación de los tests (el intento inicial de comprobar el checkpoint "a mitad" con `next()` no funcionaba, corregido simulando un fallo real de página).
