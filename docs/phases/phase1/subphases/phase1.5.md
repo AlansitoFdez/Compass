@@ -60,7 +60,7 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): fetch del feed PLACS
 - `ingestion/feed_reader.py`: `ingest_atom_feed(client) -> Iterator[Element]`. `url` arranca en `get_last_processed_atom_url() or FEED_URL` (respaldo si no hay checkpoint aún); el bucle usa la variable local `url` (actualizada cada vuelta desde `page.next_url`), sin volver a leer Redis; escribe el checkpoint (`set_...` o `clear_...` según si `next_url` es o no `None`) **después** de entregar (`yield from`) las entradas de la página, nunca antes.
 - Verificado: importa sin errores. El comportamiento real (paginación multi-página, checkpoint tras fallo simulado) se prueba a fondo en el paso 6, con HTTP mockeado.
 
-### Paso 6 — Tests con HTTP mockeado (en progreso)
+### Paso 6 — Tests con HTTP mockeado (completado)
 
 - `httpx2.MockTransport(handler)`: sustituye la red por una función propia (`handler(request) -> Response`) — el cliente cree que habla con un servidor real, pero lee de un diccionario que controlamos.
 - `tests/test_atom_client.py` (4 tests, sin red real):
