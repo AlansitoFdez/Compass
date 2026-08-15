@@ -1,0 +1,663 @@
+<ns0:entry xmlns:ns0="http://www.w3.org/2005/Atom" xmlns:ns1="urn:dgpe:names:draft:codice-place-ext:schema:xsd:CommonAggregateComponents-2" xmlns:ns2="urn:dgpe:names:draft:codice:schema:xsd:CommonBasicComponents-2" xmlns:ns3="urn:dgpe:names:draft:codice-place-ext:schema:xsd:CommonBasicComponents-2" xmlns:ns4="urn:dgpe:names:draft:codice:schema:xsd:CommonAggregateComponents-2">
+        <ns0:id>https://contrataciondelestado.es/sindicacion/licitacionesPerfilContratante/20303122</ns0:id>
+        <ns0:link href="https://contrataciondelestado.es/wps/poc?uri=deeplink:detalle_licitacion&amp;idEvl=A4ivp4zit%2BasNfRW6APEDw%3D%3D" />
+        <ns0:summary type="text">Id licitación: CS2026/94; Órgano de Contratación: Junta de Gobierno del Ayuntamiento de Oviedo; Importe: 82210 EUR; Estado: PUB</ns0:summary>
+        <ns0:title>Suministro tecnológico para servicios innovadores Cuidas, con destino al Centro Social Integrado de Ventanielles.</ns0:title>
+        <ns0:updated>2026-08-15T19:54:09.593+02:00</ns0:updated>
+        <ns1:ContractFolderStatus>
+            <ns2:ContractFolderID>CS2026/94</ns2:ContractFolderID>
+            <ns3:ContractFolderStatusCode languageID="es" listURI="https://contrataciondelestado.es/codice/cl/2.04/SyndicationContractFolderStatusCode-2.04.gc">PUB</ns3:ContractFolderStatusCode>
+            <ns1:LocatedContractingParty>
+                <ns2:ContractingPartyTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.10/ContractingAuthorityCode-2.10.gc">3</ns2:ContractingPartyTypeCode>
+                <ns2:ActivityCode listURI="http://contrataciondelestado.es/codice/cl/2.10/ContractingAuthorityActivityCode-2.10.gc">1</ns2:ActivityCode>
+                <ns2:BuyerProfileURIID>https://contrataciondelestado.es/wps/poc?uri=deeplink:perfilContratante&amp;idBp=lkXTXSLe9JoQK2TEfXGy%2BA%3D%3D</ns2:BuyerProfileURIID>
+                <ns4:Party>
+                    <ns2:WebsiteURI>http://www.oviedo.es</ns2:WebsiteURI>
+                    <ns4:PartyIdentification>
+                        <ns2:ID schemeName="DIR3">L01330447</ns2:ID>
+                    </ns4:PartyIdentification>
+                    <ns4:PartyIdentification>
+                        <ns2:ID schemeName="NIF">P3304400I</ns2:ID>
+                    </ns4:PartyIdentification>
+                    <ns4:PartyIdentification>
+                        <ns2:ID schemeName="ID_PLATAFORMA">30458850083225</ns2:ID>
+                    </ns4:PartyIdentification>
+                    <ns4:PartyName>
+                        <ns2:Name>Junta de Gobierno del Ayuntamiento de Oviedo</ns2:Name>
+                    </ns4:PartyName>
+                    <ns4:PostalAddress>
+                        <ns2:CityName>Oviedo</ns2:CityName>
+                        <ns2:PostalZone>33071</ns2:PostalZone>
+                        <ns4:AddressLine>
+                            <ns2:Line>Plaza de la Constitución S/N</ns2:Line>
+                        </ns4:AddressLine>
+                        <ns4:Country>
+                            <ns2:IdentificationCode listURI="http://contrataciondelestado.es/codice/cl/2.08/CountryIdentificationCode-2.08.gc">ES</ns2:IdentificationCode>
+                            <ns2:Name>España</ns2:Name>
+                        </ns4:Country>
+                    </ns4:PostalAddress>
+                    <ns4:Contact>
+                        <ns2:Name>Junta de Gobierno del Ayuntamiento de Oviedo</ns2:Name>
+                        <ns2:Telephone>985981869</ns2:Telephone>
+                        <ns2:Telefax>985204371</ns2:Telefax>
+                        <ns2:ElectronicMail>seccioncontratacion@oviedo.es</ns2:ElectronicMail>
+                    </ns4:Contact>
+                </ns4:Party>
+                <ns1:ParentLocatedParty>
+                    <ns4:PartyName>
+                        <ns2:Name>Oviedo</ns2:Name>
+                    </ns4:PartyName>
+                    <ns1:ParentLocatedParty>
+                        <ns4:PartyName>
+                            <ns2:Name>Ayuntamientos</ns2:Name>
+                        </ns4:PartyName>
+                        <ns1:ParentLocatedParty>
+                            <ns4:PartyName>
+<ns2:Name>Asturias</ns2:Name>
+                            </ns4:PartyName>
+                            <ns1:ParentLocatedParty>
+<ns4:PartyName>
+    <ns2:Name>ENTIDADES LOCALES</ns2:Name>
+</ns4:PartyName>
+<ns1:ParentLocatedParty>
+    <ns4:PartyName>
+        <ns2:Name>Sector Público</ns2:Name>
+    </ns4:PartyName>
+</ns1:ParentLocatedParty>
+                            </ns1:ParentLocatedParty>
+                        </ns1:ParentLocatedParty>
+                    </ns1:ParentLocatedParty>
+                </ns1:ParentLocatedParty>
+            </ns1:LocatedContractingParty>
+            <ns4:ProcurementProject>
+                <ns2:Name>Suministro tecnológico para servicios innovadores Cuidas, con destino al Centro Social Integrado de Ventanielles.</ns2:Name>
+                <ns2:TypeCode listURI="http://contrataciondelestado.es/codice/cl/2.08/ContractCode-2.08.gc">1</ns2:TypeCode>
+                <ns2:SubTypeCode listURI="http://contrataciondelestado.es/codice/cl/1.04/GoodsContractCode-1.04.gc">2</ns2:SubTypeCode>
+                <ns2:MixContractIndicator>true</ns2:MixContractIndicator>
+                <ns4:BudgetAmount>
+                    <ns2:EstimatedOverallContractAmount currencyID="EUR">89406</ns2:EstimatedOverallContractAmount>
+                    <ns2:TotalAmount currencyID="EUR">99474.1</ns2:TotalAmount>
+                    <ns2:TaxExclusiveAmount currencyID="EUR">82210</ns2:TaxExclusiveAmount>
+                </ns4:BudgetAmount>
+                <ns4:RequiredCommodityClassification>
+                    <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231320</ns2:ItemClassificationCode>
+                </ns4:RequiredCommodityClassification>
+                <ns4:RequiredCommodityClassification>
+                    <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">39162100</ns2:ItemClassificationCode>
+                </ns4:RequiredCommodityClassification>
+                <ns4:RequiredCommodityClassification>
+                    <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">48180000</ns2:ItemClassificationCode>
+                </ns4:RequiredCommodityClassification>
+                <ns4:RequiredCommodityClassification>
+                    <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30195200</ns2:ItemClassificationCode>
+                </ns4:RequiredCommodityClassification>
+                <ns4:RequiredCommodityClassification>
+                    <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">38652120</ns2:ItemClassificationCode>
+                </ns4:RequiredCommodityClassification>
+                <ns4:RequiredCommodityClassification>
+                    <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30213200</ns2:ItemClassificationCode>
+                </ns4:RequiredCommodityClassification>
+                <ns4:RequiredCommodityClassification>
+                    <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231300</ns2:ItemClassificationCode>
+                </ns4:RequiredCommodityClassification>
+                <ns4:RequiredCommodityClassification>
+                    <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">32322000</ns2:ItemClassificationCode>
+                </ns4:RequiredCommodityClassification>
+                <ns4:RequiredCommodityClassification>
+                    <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">33155000</ns2:ItemClassificationCode>
+                </ns4:RequiredCommodityClassification>
+                <ns4:RealizedLocation>
+                    <ns2:CountrySubentity>Asturias</ns2:CountrySubentity>
+                    <ns2:CountrySubentityCode listURI="http://contrataciondelestado.es/codice/cl/2.08/NUTS-2021.gc">ES120</ns2:CountrySubentityCode>
+                    <ns4:Address>
+                        <ns4:Country>
+                            <ns2:IdentificationCode listURI="http://contrataciondelestado.es/codice/cl/2.08/CountryIdentificationCode-2.08.gc">ES</ns2:IdentificationCode>
+                            <ns2:Name>España</ns2:Name>
+                        </ns4:Country>
+                    </ns4:Address>
+                </ns4:RealizedLocation>
+                <ns4:PlannedPeriod>
+                    <ns2:DurationMeasure unitCode="DAY">45</ns2:DurationMeasure>
+                </ns4:PlannedPeriod>
+            </ns4:ProcurementProject>
+            <ns4:ProcurementProjectLot>
+                <ns2:ID schemeName="ID_LOTE">1</ns2:ID>
+                <ns4:TenderingTerms>
+                    <ns4:AwardingTerms>
+                        <ns4:AwardingCriteria>
+                            <ns2:AwardingCriteriaTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.0/AwardingCriteriaCode-2.0.gc">OBJ</ns2:AwardingCriteriaTypeCode>
+                            <ns2:Description>Oferta económica</ns2:Description>
+                            <ns2:AwardingCriteriaSubTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.09/AwardingCriteriaAutomaticallyEvaluatedSubTypeCode-2.09.gc">1</ns2:AwardingCriteriaSubTypeCode>
+                            <ns2:WeightNumeric>60</ns2:WeightNumeric>
+                        </ns4:AwardingCriteria>
+                        <ns4:AwardingCriteria>
+                            <ns2:AwardingCriteriaTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.0/AwardingCriteriaCode-2.0.gc">SUBJ</ns2:AwardingCriteriaTypeCode>
+                            <ns2:Description>Otros aspectos a valorar sujetos a juicio de valor</ns2:Description>
+                            <ns2:AwardingCriteriaSubTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.09/AwardingCriteriaNotAutomaticallyEvaluatedSubTypeCode-2.09.gc">99</ns2:AwardingCriteriaSubTypeCode>
+                            <ns2:WeightNumeric>34</ns2:WeightNumeric>
+                        </ns4:AwardingCriteria>
+                    </ns4:AwardingTerms>
+                </ns4:TenderingTerms>
+                <ns4:ProcurementProject>
+                    <ns2:Name>LOTE1- Pantalla interactiva para entrenamiento memoria</ns2:Name>
+                    <ns4:BudgetAmount>
+                        <ns2:TotalAmount currencyID="EUR">16335</ns2:TotalAmount>
+                        <ns2:TaxExclusiveAmount currencyID="EUR">13500</ns2:TaxExclusiveAmount>
+                    </ns4:BudgetAmount>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231320</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">33155000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231300</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">38652120</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30195200</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">32322000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30213200</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">39162100</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">48180000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RealizedLocation>
+                        <ns2:CountrySubentity>Asturias</ns2:CountrySubentity>
+                        <ns2:CountrySubentityCode listURI="http://contrataciondelestado.es/codice/cl/2.08/NUTS-2021.gc">ES120</ns2:CountrySubentityCode>
+                        <ns4:Address>
+                            <ns4:Country>
+<ns2:IdentificationCode listURI="http://contrataciondelestado.es/codice/cl/2.08/CountryIdentificationCode-2.08.gc">ES</ns2:IdentificationCode>
+<ns2:Name>España</ns2:Name>
+                            </ns4:Country>
+                        </ns4:Address>
+                    </ns4:RealizedLocation>
+                </ns4:ProcurementProject>
+            </ns4:ProcurementProjectLot>
+            <ns4:ProcurementProjectLot>
+                <ns2:ID schemeName="ID_LOTE">2</ns2:ID>
+                <ns4:TenderingTerms>
+                    <ns4:AwardingTerms>
+                        <ns4:AwardingCriteria>
+                            <ns2:AwardingCriteriaTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.0/AwardingCriteriaCode-2.0.gc">SUBJ</ns2:AwardingCriteriaTypeCode>
+                            <ns2:Description>Otros aspectos a valorar sujetos a juicio de valor lote 2</ns2:Description>
+                            <ns2:AwardingCriteriaSubTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.09/AwardingCriteriaNotAutomaticallyEvaluatedSubTypeCode-2.09.gc">99</ns2:AwardingCriteriaSubTypeCode>
+                            <ns2:WeightNumeric>20</ns2:WeightNumeric>
+                        </ns4:AwardingCriteria>
+                        <ns4:AwardingCriteria>
+                            <ns2:AwardingCriteriaTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.0/AwardingCriteriaCode-2.0.gc">OBJ</ns2:AwardingCriteriaTypeCode>
+                            <ns2:Description>Oferta económica lotes 2 y 6</ns2:Description>
+                            <ns2:AwardingCriteriaSubTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.09/AwardingCriteriaAutomaticallyEvaluatedSubTypeCode-2.09.gc">1</ns2:AwardingCriteriaSubTypeCode>
+                            <ns2:WeightNumeric>74</ns2:WeightNumeric>
+                        </ns4:AwardingCriteria>
+                    </ns4:AwardingTerms>
+                </ns4:TenderingTerms>
+                <ns4:ProcurementProject>
+                    <ns2:Name>LOTE 2 Proyector interactivo para estimulación sensorial terapéutica</ns2:Name>
+                    <ns4:BudgetAmount>
+                        <ns2:TotalAmount currencyID="EUR">12705</ns2:TotalAmount>
+                        <ns2:TaxExclusiveAmount currencyID="EUR">10500</ns2:TaxExclusiveAmount>
+                    </ns4:BudgetAmount>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231320</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">33155000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">39162100</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30195200</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">32322000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30213200</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">38652120</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">48180000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231300</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RealizedLocation>
+                        <ns2:CountrySubentity>Asturias</ns2:CountrySubentity>
+                        <ns2:CountrySubentityCode listURI="http://contrataciondelestado.es/codice/cl/2.08/NUTS-2021.gc">ES120</ns2:CountrySubentityCode>
+                        <ns4:Address>
+                            <ns4:Country>
+<ns2:IdentificationCode listURI="http://contrataciondelestado.es/codice/cl/2.08/CountryIdentificationCode-2.08.gc">ES</ns2:IdentificationCode>
+<ns2:Name>España</ns2:Name>
+                            </ns4:Country>
+                        </ns4:Address>
+                    </ns4:RealizedLocation>
+                </ns4:ProcurementProject>
+            </ns4:ProcurementProjectLot>
+            <ns4:ProcurementProjectLot>
+                <ns2:ID schemeName="ID_LOTE">3</ns2:ID>
+                <ns4:TenderingTerms>
+                    <ns4:AwardingTerms>
+                        <ns4:AwardingCriteria>
+                            <ns2:AwardingCriteriaTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.0/AwardingCriteriaCode-2.0.gc">SUBJ</ns2:AwardingCriteriaTypeCode>
+                            <ns2:Description>Otros aspectos a valorar sujetos a juicio de valor</ns2:Description>
+                            <ns2:AwardingCriteriaSubTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.09/AwardingCriteriaNotAutomaticallyEvaluatedSubTypeCode-2.09.gc">99</ns2:AwardingCriteriaSubTypeCode>
+                            <ns2:WeightNumeric>34</ns2:WeightNumeric>
+                        </ns4:AwardingCriteria>
+                        <ns4:AwardingCriteria>
+                            <ns2:AwardingCriteriaTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.0/AwardingCriteriaCode-2.0.gc">OBJ</ns2:AwardingCriteriaTypeCode>
+                            <ns2:Description>Oferta económica</ns2:Description>
+                            <ns2:AwardingCriteriaSubTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.09/AwardingCriteriaAutomaticallyEvaluatedSubTypeCode-2.09.gc">1</ns2:AwardingCriteriaSubTypeCode>
+                            <ns2:WeightNumeric>60</ns2:WeightNumeric>
+                        </ns4:AwardingCriteria>
+                    </ns4:AwardingTerms>
+                </ns4:TenderingTerms>
+                <ns4:ProcurementProject>
+                    <ns2:Name>LOTE 3 Suelo interactivo (proyector)</ns2:Name>
+                    <ns4:BudgetAmount>
+                        <ns2:TotalAmount currencyID="EUR">12100</ns2:TotalAmount>
+                        <ns2:TaxExclusiveAmount currencyID="EUR">10000</ns2:TaxExclusiveAmount>
+                    </ns4:BudgetAmount>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231320</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">33155000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30213200</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">48180000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">39162100</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30195200</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231300</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">32322000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">38652120</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RealizedLocation>
+                        <ns2:CountrySubentity>Asturias</ns2:CountrySubentity>
+                        <ns2:CountrySubentityCode listURI="http://contrataciondelestado.es/codice/cl/2.08/NUTS-2021.gc">ES120</ns2:CountrySubentityCode>
+                        <ns4:Address>
+                            <ns4:Country>
+<ns2:IdentificationCode listURI="http://contrataciondelestado.es/codice/cl/2.08/CountryIdentificationCode-2.08.gc">ES</ns2:IdentificationCode>
+<ns2:Name>España</ns2:Name>
+                            </ns4:Country>
+                        </ns4:Address>
+                    </ns4:RealizedLocation>
+                </ns4:ProcurementProject>
+            </ns4:ProcurementProjectLot>
+            <ns4:ProcurementProjectLot>
+                <ns2:ID schemeName="ID_LOTE">4</ns2:ID>
+                <ns4:TenderingTerms>
+                    <ns4:AwardingTerms>
+                        <ns4:AwardingCriteria>
+                            <ns2:AwardingCriteriaTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.0/AwardingCriteriaCode-2.0.gc">SUBJ</ns2:AwardingCriteriaTypeCode>
+                            <ns2:Description>Otros aspectos a valorar sujetos a juicio de valor lote 4</ns2:Description>
+                            <ns2:AwardingCriteriaSubTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.09/AwardingCriteriaNotAutomaticallyEvaluatedSubTypeCode-2.09.gc">99</ns2:AwardingCriteriaSubTypeCode>
+                            <ns2:WeightNumeric>40</ns2:WeightNumeric>
+                        </ns4:AwardingCriteria>
+                        <ns4:AwardingCriteria>
+                            <ns2:AwardingCriteriaTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.0/AwardingCriteriaCode-2.0.gc">OBJ</ns2:AwardingCriteriaTypeCode>
+                            <ns2:Description>Oferta económica lote 4</ns2:Description>
+                            <ns2:AwardingCriteriaSubTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.09/AwardingCriteriaAutomaticallyEvaluatedSubTypeCode-2.09.gc">1</ns2:AwardingCriteriaSubTypeCode>
+                            <ns2:WeightNumeric>54</ns2:WeightNumeric>
+                        </ns4:AwardingCriteria>
+                    </ns4:AwardingTerms>
+                </ns4:TenderingTerms>
+                <ns4:ProcurementProject>
+                    <ns2:Name>LOTE 4 Visores y plataforma de realidad virtual</ns2:Name>
+                    <ns4:BudgetAmount>
+                        <ns2:TotalAmount currencyID="EUR">43535.8</ns2:TotalAmount>
+                        <ns2:TaxExclusiveAmount currencyID="EUR">35980</ns2:TaxExclusiveAmount>
+                    </ns4:BudgetAmount>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231320</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">38652120</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">32322000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">33155000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30195200</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">39162100</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231300</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">48180000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30213200</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RealizedLocation>
+                        <ns2:CountrySubentity>Asturias</ns2:CountrySubentity>
+                        <ns2:CountrySubentityCode listURI="http://contrataciondelestado.es/codice/cl/2.08/NUTS-2021.gc">ES120</ns2:CountrySubentityCode>
+                        <ns4:Address>
+                            <ns4:Country>
+<ns2:IdentificationCode listURI="http://contrataciondelestado.es/codice/cl/2.08/CountryIdentificationCode-2.08.gc">ES</ns2:IdentificationCode>
+<ns2:Name>España</ns2:Name>
+                            </ns4:Country>
+                        </ns4:Address>
+                    </ns4:RealizedLocation>
+                </ns4:ProcurementProject>
+            </ns4:ProcurementProjectLot>
+            <ns4:ProcurementProjectLot>
+                <ns2:ID schemeName="ID_LOTE">5</ns2:ID>
+                <ns4:TenderingTerms>
+                    <ns4:AwardingTerms>
+                        <ns4:AwardingCriteria>
+                            <ns2:AwardingCriteriaTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.0/AwardingCriteriaCode-2.0.gc">SUBJ</ns2:AwardingCriteriaTypeCode>
+                            <ns2:Description>Otros aspectos a valorar sujetos a juicio de valor</ns2:Description>
+                            <ns2:AwardingCriteriaSubTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.09/AwardingCriteriaNotAutomaticallyEvaluatedSubTypeCode-2.09.gc">99</ns2:AwardingCriteriaSubTypeCode>
+                            <ns2:WeightNumeric>34</ns2:WeightNumeric>
+                        </ns4:AwardingCriteria>
+                        <ns4:AwardingCriteria>
+                            <ns2:AwardingCriteriaTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.0/AwardingCriteriaCode-2.0.gc">OBJ</ns2:AwardingCriteriaTypeCode>
+                            <ns2:Description>Oferta económica</ns2:Description>
+                            <ns2:AwardingCriteriaSubTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.09/AwardingCriteriaAutomaticallyEvaluatedSubTypeCode-2.09.gc">1</ns2:AwardingCriteriaSubTypeCode>
+                            <ns2:WeightNumeric>60</ns2:WeightNumeric>
+                        </ns4:AwardingCriteria>
+                    </ns4:AwardingTerms>
+                </ns4:TenderingTerms>
+                <ns4:ProcurementProject>
+                    <ns2:Name>LOTE 5 Mesa interactiva táctil</ns2:Name>
+                    <ns4:BudgetAmount>
+                        <ns2:TotalAmount currencyID="EUR">5263</ns2:TotalAmount>
+                        <ns2:TaxExclusiveAmount currencyID="EUR">4350</ns2:TaxExclusiveAmount>
+                    </ns4:BudgetAmount>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231320</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30195200</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">32322000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">33155000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30213200</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">38652120</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">48180000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231300</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">39162100</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RealizedLocation>
+                        <ns2:CountrySubentity>Asturias</ns2:CountrySubentity>
+                        <ns2:CountrySubentityCode listURI="http://contrataciondelestado.es/codice/cl/2.08/NUTS-2021.gc">ES120</ns2:CountrySubentityCode>
+                        <ns4:Address>
+                            <ns4:Country>
+<ns2:IdentificationCode listURI="http://contrataciondelestado.es/codice/cl/2.08/CountryIdentificationCode-2.08.gc">ES</ns2:IdentificationCode>
+<ns2:Name>España</ns2:Name>
+                            </ns4:Country>
+                        </ns4:Address>
+                    </ns4:RealizedLocation>
+                </ns4:ProcurementProject>
+            </ns4:ProcurementProjectLot>
+            <ns4:ProcurementProjectLot>
+                <ns2:ID schemeName="ID_LOTE">6</ns2:ID>
+                <ns4:TenderingTerms>
+                    <ns4:AwardingTerms>
+                        <ns4:AwardingCriteria>
+                            <ns2:AwardingCriteriaTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.0/AwardingCriteriaCode-2.0.gc">OBJ</ns2:AwardingCriteriaTypeCode>
+                            <ns2:Description>Oferta económica lotes 2 y 6</ns2:Description>
+                            <ns2:AwardingCriteriaSubTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.09/AwardingCriteriaAutomaticallyEvaluatedSubTypeCode-2.09.gc">1</ns2:AwardingCriteriaSubTypeCode>
+                            <ns2:WeightNumeric>74</ns2:WeightNumeric>
+                        </ns4:AwardingCriteria>
+                    </ns4:AwardingTerms>
+                </ns4:TenderingTerms>
+                <ns4:ProcurementProject>
+                    <ns2:Name>LOTE 6 Pizarra PDI para aula de formación informática</ns2:Name>
+                    <ns4:BudgetAmount>
+                        <ns2:TotalAmount currencyID="EUR">5299.8</ns2:TotalAmount>
+                        <ns2:TaxExclusiveAmount currencyID="EUR">4380</ns2:TaxExclusiveAmount>
+                    </ns4:BudgetAmount>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231320</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30213200</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">38652120</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">32322000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">48180000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231300</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">33155000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">39162100</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30195200</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RealizedLocation>
+                        <ns2:CountrySubentity>Asturias</ns2:CountrySubentity>
+                        <ns2:CountrySubentityCode listURI="http://contrataciondelestado.es/codice/cl/2.08/NUTS-2021.gc">ES120</ns2:CountrySubentityCode>
+                        <ns4:Address>
+                            <ns4:Country>
+<ns2:IdentificationCode listURI="http://contrataciondelestado.es/codice/cl/2.08/CountryIdentificationCode-2.08.gc">ES</ns2:IdentificationCode>
+<ns2:Name>España</ns2:Name>
+                            </ns4:Country>
+                        </ns4:Address>
+                    </ns4:RealizedLocation>
+                </ns4:ProcurementProject>
+            </ns4:ProcurementProjectLot>
+            <ns4:ProcurementProjectLot>
+                <ns2:ID schemeName="ID_LOTE">7</ns2:ID>
+                <ns4:TenderingTerms>
+                    <ns4:AwardingTerms>
+                        <ns4:AwardingCriteria>
+                            <ns2:AwardingCriteriaTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.0/AwardingCriteriaCode-2.0.gc">OBJ</ns2:AwardingCriteriaTypeCode>
+                            <ns2:Description>Oferta económica lote 7</ns2:Description>
+                            <ns2:AwardingCriteriaSubTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.09/AwardingCriteriaAutomaticallyEvaluatedSubTypeCode-2.09.gc">1</ns2:AwardingCriteriaSubTypeCode>
+                            <ns2:WeightNumeric>94</ns2:WeightNumeric>
+                        </ns4:AwardingCriteria>
+                    </ns4:AwardingTerms>
+                </ns4:TenderingTerms>
+                <ns4:ProcurementProject>
+                    <ns2:Name>Lote 7 Tablets</ns2:Name>
+                    <ns4:BudgetAmount>
+                        <ns2:TotalAmount currencyID="EUR">4235</ns2:TotalAmount>
+                        <ns2:TaxExclusiveAmount currencyID="EUR">3500</ns2:TaxExclusiveAmount>
+                    </ns4:BudgetAmount>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231320</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">38652120</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">48180000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">39162100</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">32322000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30195200</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">33155000</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30231300</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RequiredCommodityClassification>
+                        <ns2:ItemClassificationCode listURI="http://contrataciondelestado.es/codice/cl/2.04/CPV2008-2.04.gc">30213200</ns2:ItemClassificationCode>
+                    </ns4:RequiredCommodityClassification>
+                    <ns4:RealizedLocation>
+                        <ns2:CountrySubentity>Asturias</ns2:CountrySubentity>
+                        <ns2:CountrySubentityCode listURI="http://contrataciondelestado.es/codice/cl/2.08/NUTS-2021.gc">ES120</ns2:CountrySubentityCode>
+                        <ns4:Address>
+                            <ns4:Country>
+<ns2:IdentificationCode listURI="http://contrataciondelestado.es/codice/cl/2.08/CountryIdentificationCode-2.08.gc">ES</ns2:IdentificationCode>
+<ns2:Name>España</ns2:Name>
+                            </ns4:Country>
+                        </ns4:Address>
+                    </ns4:RealizedLocation>
+                </ns4:ProcurementProject>
+            </ns4:ProcurementProjectLot>
+            <ns4:TenderingTerms>
+                <ns2:RequiredCurriculaIndicator>false</ns2:RequiredCurriculaIndicator>
+                <ns2:FundingProgramCode name="No hay financiación con fondos de la UE" listURI="http://contrataciondelestado.es/codice/cl/2.08/FundingProgramCode-2.08.gc">NO-EU</ns2:FundingProgramCode>
+                <ns2:ProcurementNationalLegislationCode listURI="https://contrataciondelestado.es/codice/cl/2.08/ProcurementNationalLegislationCode-2.08.gc">3</ns2:ProcurementNationalLegislationCode>
+                <ns4:RequiredFinancialGuarantee>
+                    <ns2:GuaranteeTypeCode listURI="http://contrataciondelestado.es/codice/cl/1.04/GuaranteeTypeCode-1.04.gc">2</ns2:GuaranteeTypeCode>
+                    <ns2:AmountRate>5</ns2:AmountRate>
+                </ns4:RequiredFinancialGuarantee>
+                <ns4:ProcurementLegislationDocumentReference>
+                    <ns2:ID>N/A</ns2:ID>
+                </ns4:ProcurementLegislationDocumentReference>
+                <ns4:TendererQualificationRequest>
+                    <ns4:FinancialEvaluationCriteria>
+                        <ns2:EvaluationCriteriaTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.0/FinancialCapabilityTypeCode-2.0.gc">5</ns2:EvaluationCriteriaTypeCode>
+                        <ns2:Description>Se aportará según el modelo de la plantilla que se anexa</ns2:Description>
+                    </ns4:FinancialEvaluationCriteria>
+                    <ns4:SpecificTendererRequirement>
+                        <ns2:RequirementTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.08/DeclarationTypeCode-2.08.gc">1</ns2:RequirementTypeCode>
+                        <ns2:Description>Capacidad de obrar</ns2:Description>
+                    </ns4:SpecificTendererRequirement>
+                </ns4:TendererQualificationRequest>
+                <ns4:ContractExecutionRequirement>
+                    <ns2:Name>Consideraciones de tipo medioambiental</ns2:Name>
+                    <ns2:ExecutionRequirementCode listURI="https://contrataciondelestado.es/codice/cl/2.08/ExecutionRequirementCode-2.08.gc">1</ns2:ExecutionRequirementCode>
+                    <ns2:Description>Conforme lo dispuesto en la cláusula 21 del Anexo I del PCAP</ns2:Description>
+                </ns4:ContractExecutionRequirement>
+                <ns4:AwardingTerms>
+                    <ns4:AwardingCriteria>
+                        <ns2:AwardingCriteriaTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.0/AwardingCriteriaCode-2.0.gc">OBJ</ns2:AwardingCriteriaTypeCode>
+                        <ns2:Description>Ampliación plazo de garantía</ns2:Description>
+                        <ns2:AwardingCriteriaSubTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.09/AwardingCriteriaAutomaticallyEvaluatedSubTypeCode-2.09.gc">2</ns2:AwardingCriteriaSubTypeCode>
+                        <ns2:WeightNumeric>6</ns2:WeightNumeric>
+                    </ns4:AwardingCriteria>
+                </ns4:AwardingTerms>
+                <ns4:TenderRecipientParty>
+                    <ns2:EndpointID>https://contrataciondelestado.es</ns2:EndpointID>
+                </ns4:TenderRecipientParty>
+                <ns4:Language>
+                    <ns2:ID>es</ns2:ID>
+                </ns4:Language>
+            </ns4:TenderingTerms>
+            <ns4:TenderingProcess>
+                <ns2:ProcedureCode listURI="https://contrataciondelestado.es/codice/cl/2.07/SyndicationTenderingProcessCode-2.07.gc">1</ns2:ProcedureCode>
+                <ns2:UrgencyCode listURI="http://contrataciondelestado.es/codice/cl/1.04/DiligenceTypeCode-1.04.gc">2</ns2:UrgencyCode>
+                <ns2:PartPresentationCode name="A uno o varios lotes" listURI="http://contrataciondelestado.es/codice/cl/1.04/TenderPresentationCode-1.04.gc">3</ns2:PartPresentationCode>
+                <ns2:ContractingSystemCode listURI="http://contrataciondelestado.es/codice/cl/2.08/ContractingSystemTypeCode-2.08.gc">0</ns2:ContractingSystemCode>
+                <ns2:SubmissionMethodCode listURI="http://contrataciondelestado.es/codice/cl/1.04/TenderDeliveryCode-1.04.gc">1</ns2:SubmissionMethodCode>
+                <ns2:MaximumLotPresentationQuantity>7</ns2:MaximumLotPresentationQuantity>
+                <ns2:MaximumTendererAwardedLotsQuantity>7</ns2:MaximumTendererAwardedLotsQuantity>
+                <ns2:OverThresholdIndicator>false</ns2:OverThresholdIndicator>
+                <ns4:TenderSubmissionDeadlinePeriod>
+                    <ns2:EndDate>2026-08-31</ns2:EndDate>
+                    <ns2:EndTime>23:59:00</ns2:EndTime>
+                </ns4:TenderSubmissionDeadlinePeriod>
+            </ns4:TenderingProcess>
+            <ns4:LegalDocumentReference>
+                <ns2:ID>CS2026094 PCAP.PDF</ns2:ID>
+                <ns4:Attachment>
+                    <ns4:ExternalReference>
+                        <ns2:URI>https://contrataciondelestado.es/FileSystem/servlet/GetDocumentByIdServlet?cifrado=QUC1GjXXSiLkydRHJBmbpw%3D%3D&amp;DocumentIdParam=pIDympQK7AJ5J11vYDRZTpxOAwem8LPUWQw2F0ztxLDZB3TKX/G4QinBLWhnz3233fhR41Hk81VtPn8we2hBCTGAIvT8vvkxkALcAqnEhi%2BCx2e6p7hqtlp2aFupgHMr</ns2:URI>
+                        <ns2:DocumentHash>fW1KMpufCxTOStrSwebq2vGwYCU=</ns2:DocumentHash>
+                    </ns4:ExternalReference>
+                </ns4:Attachment>
+            </ns4:LegalDocumentReference>
+            <ns4:TechnicalDocumentReference>
+                <ns2:ID>CS2026094 PPT.PDF</ns2:ID>
+                <ns4:Attachment>
+                    <ns4:ExternalReference>
+                        <ns2:URI>https://contrataciondelestado.es/FileSystem/servlet/GetDocumentByIdServlet?cifrado=QUC1GjXXSiLkydRHJBmbpw%3D%3D&amp;DocumentIdParam=TG9Vb6mIx9SyFeKtQsGy2BVZ%2BhSMloDzxf0vsNOeOUW%2B3s8fj8nt89pa36FzMVQ/WCMgk3dOOIqljxUhJMy4N5t4hSAZ66Bi31Ve%2BcaUH6c//q7NB2iMZvNyf0xrJmjt</ns2:URI>
+                        <ns2:DocumentHash>/AxQPWwjEtDSA/FhRdpd3VFmcwU=</ns2:DocumentHash>
+                    </ns4:ExternalReference>
+                </ns4:Attachment>
+            </ns4:TechnicalDocumentReference>
+            <ns4:AdditionalDocumentReference>
+                <ns2:ID>CS2026094 CERTIFICADO JGL.PDF</ns2:ID>
+                <ns4:Attachment>
+                    <ns4:ExternalReference>
+                        <ns2:URI>https://contrataciondelestado.es/FileSystem/servlet/GetDocumentByIdServlet?cifrado=QUC1GjXXSiLkydRHJBmbpw%3D%3D&amp;DocumentIdParam=cX5SLGY9mazusr4/jc996Cwy84lWFmxBs51YlUFHPJfxUQ0urJ5no34S/vKb0/c1nLCNQmQYqphTdDx0pt9d5rsW2M9fQGPBYwDdUIDBQBL6CYyL7SIrUOBFfNf52ZqA</ns2:URI>
+                        <ns2:DocumentHash>ZM2uxZkfSaiGT3gtc6w957Zhz/A=</ns2:DocumentHash>
+                    </ns4:ExternalReference>
+                </ns4:Attachment>
+            </ns4:AdditionalDocumentReference>
+            <ns4:AdditionalDocumentReference>
+                <ns2:ID>CS2026094 MEMORIA.PDF</ns2:ID>
+                <ns4:Attachment>
+                    <ns4:ExternalReference>
+                        <ns2:URI>https://contrataciondelestado.es/FileSystem/servlet/GetDocumentByIdServlet?cifrado=QUC1GjXXSiLkydRHJBmbpw%3D%3D&amp;DocumentIdParam=D9fqg%2BD5mZ3tBlJ%2B9L8YXnyu3jWSGAb0/y/L7q21gOczQ/mAL5rnCI/DeyEbDrEeJCajlSCv40NGYGAOmd0lCQHr4zzrRld1gAkvJbQvdbTVTD3T98KC0nSgQFM0q%2B5s</ns2:URI>
+                        <ns2:DocumentHash>NZZCtnvLAHQVWkB61MZ4SVLnlDw=</ns2:DocumentHash>
+                    </ns4:ExternalReference>
+                </ns4:Attachment>
+            </ns4:AdditionalDocumentReference>
+            <ns1:ValidNoticeInfo>
+                <ns3:NoticeTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.11/TenderingNoticeTypeCode-2.11.gc">DOC_CD</ns3:NoticeTypeCode>
+                <ns1:AdditionalPublicationStatus>
+                    <ns3:PublicationMediaName>Perfil del contratante</ns3:PublicationMediaName>
+                    <ns1:AdditionalPublicationDocumentReference>
+                        <ns2:IssueDate>2026-08-15</ns2:IssueDate>
+                    </ns1:AdditionalPublicationDocumentReference>
+                </ns1:AdditionalPublicationStatus>
+            </ns1:ValidNoticeInfo>
+            <ns1:ValidNoticeInfo>
+                <ns3:NoticeTypeCode listURI="http://contrataciondelestado.es/codice/cl/2.11/TenderingNoticeTypeCode-2.11.gc">DOC_CN</ns3:NoticeTypeCode>
+                <ns1:AdditionalPublicationStatus>
+                    <ns3:PublicationMediaName>Perfil del contratante</ns3:PublicationMediaName>
+                    <ns1:AdditionalPublicationDocumentReference>
+                        <ns2:IssueDate>2026-08-15</ns2:IssueDate>
+                    </ns1:AdditionalPublicationDocumentReference>
+                </ns1:AdditionalPublicationStatus>
+            </ns1:ValidNoticeInfo>
+        </ns1:ContractFolderStatus>
+    </ns0:entry>
+    
