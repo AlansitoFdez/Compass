@@ -129,6 +129,11 @@ Se hicieron juntos: mismo tipo de arreglo (enums incompletos frente a las tablas
 - `parse_codice_entry(entry) -> TenderSchema` construye el schema completo con los 17 campos de negocio, usando `get_contract_type()`/`get_status()`/`get_procedure_type_label()` de `codice_codes.py` para los tres campos codificados.
 - **Verificado de extremo a extremo contra el fixture real** (`tests/fixtures/codice_entry_sample.xml`): los 17 campos parsearon correctamente a la primera — expediente, importes, CPV (solo los 9 del `ProcurementProject` de nivel superior, confirmando que el desglose por lote se ignora correctamente), `contract_type=supplies` (coherente con el título "Suministro tecnológico..."), zona horaria del plazo correcta (`+02:00`), URLs de PCAP/PPT, y la codificación UTF-8 de los acentos verificada programáticamente (no solo a ojo, la consola de Windows la muestra mal pero el dato en sí está bien).
 
-### Paso 5 — Tests con el fixture real guardado (pendiente)
+### Paso 5 — Tests con el fixture real guardado (completado)
+
+- `tests/test_codice_codes.py` (6 tests): camino feliz + camino de error (`pytest.raises(ValueError, match="...")`, comprueba también el mensaje, no solo el tipo) para las tres funciones de `codice_codes.py` — no tenían tests formales todavía, solo la comprobación manual del paso 3.
+- `tests/test_codice_parser.py` (1 test, comprensivo): parsea el fixture real completo y verifica los 17 campos de negocio de una vez — es un check de integración sobre un documento real, no 17 unidades de comportamiento independientes, así que un único test bien organizado tiene más sentido que fragmentarlo.
+- `Path(__file__).parent / "fixtures" / "..."`: ruta al fixture relativa a la ubicación del propio archivo de test, no al directorio de ejecución de `pytest`.
+- 7 tests nuevos, todos en verde.
 
 ### Paso 6 — Verificación final: Docker, ruff, pytest (pendiente)
