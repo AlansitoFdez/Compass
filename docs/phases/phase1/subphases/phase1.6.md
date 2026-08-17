@@ -115,7 +115,11 @@ Se hicieron juntos: mismo tipo de arreglo (enums incompletos frente a las tablas
 - Migración `364d5b8e1271` aplicada: `contract_type` de `VARCHAR(8)` a `VARCHAR(28)`.
 - Verificado de extremo a extremo con un insert real (rollback después, sin dejar datos): `contract_type=PUBLIC_PRIVATE_COLLABORATION` y `status=CANCELLED` se guardan y leen correctamente a través del ORM.
 
-### Paso 3 — `ingestion/codice_codes.py`: las tres tablas de códigos (pendiente)
+### Paso 3 — `ingestion/codice_codes.py`: las tres tablas de códigos (completado)
+
+- Tres diccionarios (`CONTRACT_TYPE_CODES`, `STATUS_CODES`, `PROCEDURE_TYPE_LABELS`) con las fuentes oficiales citadas en el docstring del módulo.
+- Tres funciones wrapper (`get_contract_type`, `get_status`, `get_procedure_type_label`) que capturan el `KeyError` de un código no reconocido y relanzan un `ValueError` con mensaje claro (`raise ... from None` para no encadenar el `KeyError` original, que no aporta nada más) — evita un `KeyError` desnudo y difícil de rastrear en medio del parseo de cientos de licitaciones.
+- Verificado manualmente: los tres códigos de ejemplo del fixture real (`'2'`, `'PUB'`, `'1'`) resuelven a los valores esperados, y un código inventado (`'XYZ'`) lanza el error claro esperado.
 
 ### Paso 4 — `ingestion/codice_parser.py`: mapeo campo a campo a `TenderSchema` (pendiente)
 
