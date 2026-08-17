@@ -30,7 +30,12 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): script que descarga 
 - `recent_months(count, today=None)` — `today` como parámetro opcional inyectable (no `date.today()` escondido dentro), para que los tests puedan fijar una fecha concreta y determinista en vez de depender de cuándo se ejecuten. Devuelve tuplas `(año, mes)` de más antiguo a más reciente, manejando el cruce de año (retroceder desde enero cae en diciembre del año anterior).
 - Verificado manualmente: `recent_months(3, today=date(2026, 8, 17))` → `[(2026,6), (2026,7), (2026,8)]`; con `today=date(2026, 1, 15)` → `[(2025,11), (2025,12), (2026,1)]` (cruce de año correcto).
 
-### Paso 2 — Descarga a fichero temporal + iteración de entradas del ZIP (pendiente)
+### Paso 2 — Descarga a fichero temporal + iteración de entradas del ZIP (completado)
+
+- `download_archive(url, client)` — `client.stream("GET", url)` + `response.iter_bytes()` escritos a un `tempfile.NamedTemporaryFile(delete=False)`: nunca carga los ~200 MB enteros en memoria de golpe, y `delete=False` porque el fichero tiene que sobrevivir al `with` para poder abrirlo luego con `zipfile`.
+- `iter_entries_from_zip(zip_path)` — reutiliza `parse_atom_page()` (1.5) para cada fichero `.atom` dentro del ZIP; ignora cualquier fichero que no termine en `.atom` (defensivo).
+- `iter_entries_from_url(url, client)` — une descarga + lectura en un `try/finally` que borra el fichero temporal pase lo que pase, incluso si algo falla a mitad de la lectura del ZIP.
+- Verificado con un ZIP sintético construido en memoria (2 ficheros `.atom` + 1 `.txt` que debe ignorarse): 3 entradas encontradas correctamente, el `.txt` ignorado. La descarga real de un mes completo se deja para la verificación final (paso 5), para no repetir una descarga de 191 MB varias veces en la misma sesión.
 
 ### Paso 3 — Orquestación: parsear → filtrar vertical → upsert (pendiente)
 
