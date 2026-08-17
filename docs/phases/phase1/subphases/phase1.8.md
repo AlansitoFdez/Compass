@@ -37,7 +37,12 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): script que descarga 
 - `iter_entries_from_url(url, client)` — une descarga + lectura en un `try/finally` que borra el fichero temporal pase lo que pase, incluso si algo falla a mitad de la lectura del ZIP.
 - Verificado con un ZIP sintético construido en memoria (2 ficheros `.atom` + 1 `.txt` que debe ignorarse): 3 entradas encontradas correctamente, el `.txt` ignorado. La descarga real de un mes completo se deja para la verificación final (paso 5), para no repetir una descarga de 191 MB varias veces en la misma sesión.
 
-### Paso 3 — Orquestación: parsear → filtrar vertical → upsert (pendiente)
+### Paso 3 — Orquestación: parsear → filtrar vertical → upsert (completado)
+
+- `load_month(year, month, client, session)` — descarga, itera entradas, parsea con `parse_codice_entry()` (1.6), filtra con `matches_it_vertical()` (1.4), persiste con `upsert_tender()` (1.7) solo si coincide. Devuelve cuántas se guardaron. **No hace `commit()`** — deja el control de la transacción a quien la llama, para que sea testeable con el patrón habitual de rollback.
+- `_main()` + bloque `if __name__ == "__main__":` — el script en sí, invocable con `uv run python -m compass.ingestion.historical_loader`. Recorre `recent_months(3)` y hace `commit()` **después de cada mes completo** — ni tan fino como cada fila (overhead innecesario) ni tan grueso como solo al final (perdería todo el progreso si falla tarde en la corrida).
+- Import de `async_session_factory` diferido dentro de `_main()`, no a nivel de módulo: las funciones de librería (`load_month`, `recent_months`...) no necesitan saber cómo se construye una sesión real, la reciben como parámetro — solo el script en sí la necesita.
+- Verificado manualmente (HTTP mockeado + Postgres real, sin descarga real todavía): un ZIP simulado conteniendo la entrada real del fixture (1.6) — que está fuera de nuestro vertical, CPV de las divisiones 30/39/48 — resultó correctamente en **0 persistidas**. Prueba que toda la cadena funciona de extremo a extremo para el caso "se filtra".
 
 ### Paso 4 — Tests con ZIP sintético (pendiente)
 
