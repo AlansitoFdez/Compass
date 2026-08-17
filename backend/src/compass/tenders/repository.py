@@ -13,7 +13,9 @@ async def upsert_tender(session: AsyncSession, tender: TenderSchema) -> None:
 
     stmt = pg_insert(Tender).values(**values)
     update_values = {key: getattr(stmt.excluded, key) for key in values if key != "expediente"}
-    update_values["updated_at"] = func.now()
+    # clock_timestamp(), not now(): now() is frozen at transaction start and
+    # would give the same value for every upsert in the same transaction.
+    update_values["updated_at"] = func.clock_timestamp()
 
     stmt = stmt.on_conflict_do_update(index_elements=[Tender.expediente], set_=update_values)
     await session.execute(stmt)
