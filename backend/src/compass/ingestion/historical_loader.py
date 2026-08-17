@@ -8,8 +8,12 @@ from pathlib import Path
 from xml.etree.ElementTree import Element
 
 import httpx2
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from compass.ingestion.atom_client import parse_atom_page
+from compass.ingestion.codice_parser import parse_codice_entry
+from compass.tenders.repository import upsert_tender
+from compass.tenders.vertical import matches_it_vertical
 
 BASE_URL = "https://contrataciondelsectorpublico.gob.es/sindicacion/sindicacion_643"
 
@@ -60,3 +64,41 @@ def iter_entries_from_url(url: str, client: httpx2.Client) -> Iterator[Element]:
         yield from iter_entries_from_zip(zip_path)
     finally:
         zip_path.unlink()
+
+
+async def load_month(year: int, month: int, client: httpx2.Client, session: AsyncSession) -> int:
+    """Downloads and processes one month's archive. Does not commit — caller controls that.
+
+    Returns how many tenders matched the IT vertical and were persisted.
+    """
+    url = monthly_archive_url(year, month)
+    persisted = 0
+
+    for entry in iter_entries_from_url(url, client):
+        tender = parse_codice_entry(entry)
+        if not matches_it_vertical(tender.cpv_codes):
+            continue
+        await upsert_tender(session, tender)
+        persisted += 1
+
+    return persisted
+
+
+async def _main() -> None:
+    from compass.core.db import async_session_factory
+
+    async with async_session_factory() as session, httpx2.Client(timeout=60) as client:
+        for year, month in recent_months(3):
+            count = await load_month(year, month, client, session)
+            await session.commit()
+            print(f"{year:04d}-{month:02d}: {count} licitaciones del vertical guardadas")
+
+
+if __name__ == "__main__":
+    import asyncio
+    import sys
+
+    if sys.platform == "win32":
+        asyncio.run(_main(), loop_factory=asyncio.SelectorEventLoop)
+    else:
+        asyncio.run(_main())
