@@ -121,7 +121,13 @@ Se hicieron juntos: mismo tipo de arreglo (enums incompletos frente a las tablas
 - Tres funciones wrapper (`get_contract_type`, `get_status`, `get_procedure_type_label`) que capturan el `KeyError` de un código no reconocido y relanzan un `ValueError` con mensaje claro (`raise ... from None` para no encadenar el `KeyError` original, que no aporta nada más) — evita un `KeyError` desnudo y difícil de rastrear en medio del parseo de cientos de licitaciones.
 - Verificado manualmente: los tres códigos de ejemplo del fixture real (`'2'`, `'PUB'`, `'1'`) resuelven a los valores esperados, y un código inventado (`'XYZ'`) lanza el error claro esperado.
 
-### Paso 4 — `ingestion/codice_parser.py`: mapeo campo a campo a `TenderSchema` (pendiente)
+### Paso 4 — `ingestion/codice_parser.py`: mapeo campo a campo a `TenderSchema` (completado)
+
+- Verificado antes de construir el archivo entero: un diccionario de namespaces de `ElementTree` con prefijos con guión (`"cac-place-ext"`) funciona sin problema — no se había usado así antes en el proyecto.
+- `_text()` envuelve `findtext(path, namespaces=NS)` para no repetir el argumento en cada llamada.
+- `submission_deadline` combina `EndDate` + `EndTime` (vienen como dos elementos XML separados, sin offset de zona horaria) y les aplica `zoneinfo.ZoneInfo("Europe/Madrid")` explícitamente — gestiona el cambio CET/CEST automáticamente. Asumir UTC a secas habría desplazado la hora real 1-2 horas, algo que sí importa para un plazo de presentación de ofertas.
+- `parse_codice_entry(entry) -> TenderSchema` construye el schema completo con los 17 campos de negocio, usando `get_contract_type()`/`get_status()`/`get_procedure_type_label()` de `codice_codes.py` para los tres campos codificados.
+- **Verificado de extremo a extremo contra el fixture real** (`tests/fixtures/codice_entry_sample.xml`): los 17 campos parsearon correctamente a la primera — expediente, importes, CPV (solo los 9 del `ProcurementProject` de nivel superior, confirmando que el desglose por lote se ignora correctamente), `contract_type=supplies` (coherente con el título "Suministro tecnológico..."), zona horaria del plazo correcta (`+02:00`), URLs de PCAP/PPT, y la codificación UTF-8 de los acentos verificada programáticamente (no solo a ojo, la consola de Windows la muestra mal pero el dato en sí está bien).
 
 ### Paso 5 — Tests con el fixture real guardado (pendiente)
 
