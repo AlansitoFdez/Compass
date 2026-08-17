@@ -14,6 +14,14 @@ class ContractType(StrEnum):
     SERVICES = "services"
     SUPPLIES = "supplies"
     WORKS = "works"
+    PUBLIC_SERVICES_MANAGEMENT = "public_services_management"
+    SERVICES_CONCESSION = "services_concession"
+    PUBLIC_WORKS_CONCESSION = "public_works_concession"
+    WORKS_CONCESSION = "works_concession"
+    PUBLIC_PRIVATE_COLLABORATION = "public_private_collaboration"
+    SPECIAL_ADMINISTRATIVE = "special_administrative"
+    PRIVATE = "private"
+    PATRIMONIAL = "patrimonial"
 
 
 class TenderStatus(StrEnum):
@@ -22,3 +30,4 @@ class TenderStatus(StrEnum):
     PENDING_AWARD = "pending_award"
     AWARDED = "awarded"
     RESOLVED = "resolved"
+    CANCELLED = "cancelled"
