@@ -136,4 +136,11 @@ Se hicieron juntos: mismo tipo de arreglo (enums incompletos frente a las tablas
 - `Path(__file__).parent / "fixtures" / "..."`: ruta al fixture relativa a la ubicación del propio archivo de test, no al directorio de ejecución de `pytest`.
 - 7 tests nuevos, todos en verde.
 
-### Paso 6 — Verificación final: Docker, ruff, pytest (pendiente)
+### Paso 6 — Verificación final: Docker, ruff, pytest (completado)
+
+- Verificación desde cero (`docker compose down -v` + `up`): las dos migraciones (`f980a8b5bd7a` crear tabla, `364d5b8e1271` ampliar `contract_type`) se aplican en cadena sin errores sobre una base de datos vacía.
+- `ruff check`/`format --check` sin avisos.
+- `uv run pytest -v` → **30 passed** (los 23 de subfases anteriores + los 7 nuevos de esta).
+- Docker abajo para cerrar.
+
+Subfase 1.6 completada. El hallazgo más importante fue descubrir, investigando contra un `<entry>` real, que tres campos que se asumían "texto" en la 1.3 son en realidad códigos numéricos/alfabéticos con tablas oficiales de traducción — obligó a ampliar dos enums de la 1.3 y corregir una afirmación incorrecta sobre `native_enum=False` documentada entonces. El parser en sí funcionó correctamente a la primera contra datos reales, gracias a haber verificado cada ruta XML antes de escribir código.
