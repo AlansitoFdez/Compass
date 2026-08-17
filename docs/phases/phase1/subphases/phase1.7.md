@@ -27,7 +27,11 @@ Existen **dos mecanismos distintos** en el feed real, no uno:
 
 ## Progreso
 
-### Paso 1 — `tenders/repository.py`: `upsert_tender()` (pendiente)
+### Paso 1 — `tenders/repository.py`: `upsert_tender()` (completado)
+
+- `upsert_tender(session, tender)` — `postgresql.insert().on_conflict_do_update(index_elements=[Tender.expediente], set_=...)`. El `SET` se construye con `stmt.excluded.<campo>` (la fila que se habría insertado) para cada campo salvo `expediente`, sobrescritura completa — incluye poner a `NULL` un campo que ya no viene. `updated_at` forzado explícitamente a `func.now()` en el propio `SET`, sin depender de si el `onupdate=` del modelo se dispara solo dentro de un `ON CONFLICT`. `created_at` nunca se toca porque `TenderSchema` no lo incluye (es de la capa de persistencia, no del CODICE), así que nunca aparece en el `SET`.
+- **Hallazgo real, verificado manualmente antes de los tests formales**: al insertar y luego "actualizar" el mismo expediente dentro de la misma sesión, una relectura mostraba datos **obsoletos** (el `title` viejo, `updated_at` sin cambiar) — no porque el upsert fallara, sino porque el **mapa de identidad** de SQLAlchemy tenía el objeto en caché y no sabía que una sentencia Core cruda (no un `session.add()`/ORM normal) había cambiado la fila por debajo. `session.expire_all()` lo confirma y arregla (fuerza a releer de la base de datos). Decisión: no meter `expire_all()` dentro de `upsert_tender()` (invalidaría toda la sesión, efecto colateral raro para una función llamada en bucle); se resuelve en el punto que necesita releer lo que acaba de escribir — los tests de idempotencia (paso 2).
+- Verificado manualmente contra Postgres real: una sola fila tras dos upserts del mismo expediente, `created_at` estable, `updated_at` cambia, datos reflejan la versión más reciente (una vez resuelto el problema de caché de sesión).
 
 ### Paso 2 — Tests de idempotencia (pendiente)
 
