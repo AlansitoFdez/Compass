@@ -40,4 +40,10 @@ Existen **dos mecanismos distintos** en el feed real, no uno:
 - **Bug real #2 — mapa de identidad de SQLAlchemy, un clásico**: tras el fix anterior, el test seguía fallando. Diagnosticado con un script aparte con una espera real (`asyncio.sleep(0.3)`) entre los dos upserts: los timestamps sí eran distintos en la base de datos, pero la comparación en Python seguía dando igual. Causa: la sesión reutiliza **el mismo objeto Python** para la misma fila (mismo `expediente`) en vez de crear uno nuevo en cada consulta — al releer la fila por segunda vez, muta el objeto ya existente por dentro, así que cualquier variable que apuntara a ese objeto "de antes" (`first`) en realidad ve los datos "de después" (porque `first` y `second` acaban siendo el mismo objeto). Arreglado capturando `first.created_at`/`first.updated_at` como variables sueltas (valores, no referencias al objeto) inmediatamente después de la primera lectura, antes de que la segunda consulta mutara el objeto.
 - Suite completa: **33 tests pasan**.
 
-### Paso 3 — Verificación final: Docker, ruff, pytest (pendiente)
+### Paso 3 — Verificación final: Docker, ruff, pytest (completado)
+
+- `ruff check`/`format --check` sin avisos, `uv run pytest -v` → **33 passed**.
+- Confirmado que no quedó ninguna fila de prueba suelta en la base de datos (`SELECT count(*) FROM tenders` → 0) tras todas las verificaciones manuales de este paso.
+- Docker abajo para cerrar.
+
+Subfase 1.7 completada. Dos bugs reales encontrados y resueltos en los tests de idempotencia: `now()` congelado al inicio de la transacción (corregido a `clock_timestamp()`), y el mapa de identidad de SQLAlchemy mutando un objeto ya capturado en una variable — ambos son de los errores más clásicos y menos intuitivos de trabajar con ORMs, encontrados por verificar de verdad contra Postgres real en vez de asumir que el test estaba bien escrito a la primera. `<at:deleted-entry>` queda documentado como hueco de alcance deliberado, no como olvido.
