@@ -52,4 +52,12 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): script que descarga 
 - 6 tests: URL builder, `recent_months` (mismo año y cruce de año), `iter_entries_from_zip` (ignora no-`.atom`, con `tmp_path` — fixture de pytest para directorio temporal por test), limpieza del fichero temporal (`iter_entries_from_url`), y `load_month` con un ZIP de 2 entradas (una coincide, otra no) — confirma `count == 1` y que la persistida es la correcta, con el CPV correcto.
 - Suite completa: **39 tests pasan**. Confirmado que no quedó ninguna fila de prueba suelta.
 
-### Paso 5 — Verificación final (pendiente, incluye decidir alcance de una corrida real contra PLACSP)
+### Paso 5 — Verificación final (completado)
+
+- **Decisión de alcance**: corrida real de **1 mes** (agosto 2026) contra PLACSP, no los 3 completos — suficiente para probar el pipeline de extremo a extremo contra datos reales; correr los otros 2 meses no añadiría nada nuevo a la *verificación*, sería ya "usar la herramienta" (que queda disponible vía `uv run python -m compass.ingestion.historical_loader` para cuando se quiera el corpus completo de 3 meses).
+- **Bug real en el script de verificación, no en producción**: mezclé `async with` para `httpx2.Client` (síncrono a propósito, decisión de la 1.5) — corregido separando `with` (cliente) de `async with` (sesión).
+- **Corrida real**: `load_month(2026, 8, ...)` → **1.486 licitaciones del vertical procesadas en 52.7s**, pero la tabla `tenders` terminó con **1.174 filas**. Investigado en vez de asumir un bug: la diferencia (312) son licitaciones que aparecieron más de una vez en los datos de agosto (modificadas/republicadas dentro del mismo mes) — confirmado con `WHERE updated_at > created_at + interval '1 second'` → 249 filas claramente tocadas más de una vez. Es la primera prueba del upsert idempotente (1.7) funcionando a escala real, no solo en tests sintéticos: exactamente el escenario que motivó ese diseño ("el feed republica cada licitación en cada modificación").
+- Los 1.174 registros reales **se quedan en la base de datos** — no son datos de prueba a limpiar, es el corpus real que esta subfase existe para construir.
+- `ruff check`/`format --check` sin avisos, `uv run pytest -v` → **39 passed**. Docker abajo (el volumen persiste con los datos reales).
+
+Subfase 1.8 completada — y con ella, la Fase 1 completa: ingesta y normalización sin IA, con datos reales cargados (1.174 licitaciones del vertical de servicios informáticos, de agosto de 2026). El objetivo de la fase ("al terminarla ya tienes algo que se abre y enseña datos reales") está cumplido.
