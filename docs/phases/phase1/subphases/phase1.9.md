@@ -26,7 +26,10 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): app de Celery, tarea
 - `core/celery_app.py`: `Celery("compass", broker=...)`, solo el broker de Redis, sin *result backend*. Alcance mínimo a propósito — la tarea en sí, `include` y `beat_schedule` van en el paso 3, cuando el módulo de la tarea exista de verdad.
 - Verificado: `celery_app.main == "compass"`, `celery_app.conf.broker_url` apunta correctamente a `REDIS_URL` de `.env`.
 
-### Paso 2 — `ingestion/daily_ingestion.py`: orquestación de la ingesta diaria (pendiente)
+### Paso 2 — `ingestion/daily_ingestion.py`: orquestación de la ingesta diaria (completado)
+
+- `run_daily_ingestion(client, session)` — mismo patrón que `load_month()` (1.8): parsear (1.6) → filtrar vertical (1.4) → upsert (1.7), sin `commit()` (lo decide quien llama). Única diferencia real: itera `ingest_atom_feed()` (1.5, con checkpoint de reanudación) en vez de `iter_entries_from_url()` sobre un ZIP.
+- Verificado manualmente (HTTP mockeado con el fixture real fuera del vertical + Postgres real, checkpoint limpiado antes y después): 0 persistidas, como se esperaba.
 
 ### Paso 3 — La tarea de Celery: puente sync→async, logging, `beat_schedule` (pendiente)
 
