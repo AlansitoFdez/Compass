@@ -19,7 +19,12 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): app de Celery, tarea
 
 ## Progreso
 
-### Paso 1 — `core/celery_app.py`: app de Celery + `create_task_engine()` en `core/db.py` (pendiente)
+### Paso 1 — `core/celery_app.py`: app de Celery + `create_task_engine()` en `core/db.py` (completado)
+
+- `uv add celery` → 5.6.3, coincide con la versión investigada. No hizo falta el extra `celery[redis]`: `kombu` (mensajería de Celery) usa el paquete `redis` que ya teníamos instalado desde la 1.2.
+- `core/db.py`: `create_task_engine()` — engine nuevo con `NullPool` en cada llamada, para usar dentro de un único `asyncio.run()` de una tarea Celery, distinto del `engine`/`async_session_factory` compartido (pensado para el event loop único y de larga duración de FastAPI). Verificado: `isinstance(engine.pool, NullPool)` → `True`.
+- `core/celery_app.py`: `Celery("compass", broker=...)`, solo el broker de Redis, sin *result backend*. Alcance mínimo a propósito — la tarea en sí, `include` y `beat_schedule` van en el paso 3, cuando el módulo de la tarea exista de verdad.
+- Verificado: `celery_app.main == "compass"`, `celery_app.conf.broker_url` apunta correctamente a `REDIS_URL` de `.env`.
 
 ### Paso 2 — `ingestion/daily_ingestion.py`: orquestación de la ingesta diaria (pendiente)
 
