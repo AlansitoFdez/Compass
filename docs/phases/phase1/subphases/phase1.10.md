@@ -21,7 +21,12 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): `GET /tenders` con f
 - `api/routes/tenders.py` (nuevo): `TenderListResponse` (sobre de paginación: `items: list[TenderSchema]`, `total`, `limit`, `offset`) y las constantes `DEFAULT_LIMIT = 20` / `MAX_LIMIT = 100`. Router (`APIRouter(prefix="/tenders", ...)`) creado ya con el prefijo, el endpoint en sí llega en el paso 2.
 - Verificado: `ruff check`/`format --check` sin avisos, import manual de ambas piezas correcto.
 
-### Paso 2 — `GET /tenders`: filtros + paginación (pendiente)
+### Paso 2 — `GET /tenders`: filtros + paginación (completado)
+
+- `tenders/repository.py`: nueva `list_tenders()` — construye la lista de filtros (`cpv` vía `cpv_codes.contains([cpv])`, el operador `@>` nativo de Postgres; `status` por igualdad; `min_budget`/`max_budget` como rango sobre `budget_with_vat` — decisión tomada aquí, no en la planificación: es el importe de licitación con IVA, el más habitual como "importe" en contratación pública; `location` por igualdad exacta, ya que el campo se rellena desde `cac:RealizedLocation/cbc:CountrySubentity`, un valor de lista de códigos, no texto libre). Todos combinados con `.where(*filters)` (AND implícito de SQLAlchemy). Dos consultas: un `COUNT(*)` para `total` y un `SELECT` paginado con `ORDER BY published_at DESC` — el orden explícito es imprescindible, sin él `limit`/`offset` no garantiza páginas estables entre llamadas.
+- `api/routes/tenders.py`: `GET /tenders` (ruta `""` bajo el `prefix="/tenders"` del router, para que resuelva a `/tenders` y no `/tenders/`) — parámetros de query opcionales para cada filtro, `limit`/`offset` con `Query(..., ge=, le=)` para los límites acordados (1-100, por defecto 20). Inyecta la sesión vía `Depends(get_db)` (paso 1), delega en `list_tenders()`, envuelve el resultado en `TenderListResponse`.
+- **Ajuste de configuración real, no anticipado**: `ruff` marcó `Depends(get_db)` con B008 ("no llamar funciones en valores por defecto") — a diferencia de `Query(...)`, que ruff sí exime por defecto, `Depends` no está en su lista de exenciones automáticas. Añadido `[tool.ruff.lint.flake8-bugbear] extend-immutable-calls = ["fastapi.Depends"]` en `pyproject.toml`: es justo el patrón que exige la inyección de dependencias de FastAPI, no un descuido.
+- Verificado (sin servidor real todavía, eso es el paso 5): `ruff check`/`format --check` sin avisos, import manual de `router`/`list_tenders`, `[r.path for r in router.routes]` → `['/tenders']`, confirmando que el prefijo se resolvió como se esperaba.
 
 ### Paso 3 — Registrar el router en `api/router.py` (pendiente)
 
