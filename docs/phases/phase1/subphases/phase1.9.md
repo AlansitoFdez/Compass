@@ -38,6 +38,11 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): app de Celery, tarea
 - **Hallazgo real, no un bug**: al importar `celery_app` solo (sin importar `compass.ingestion.tasks`), la tarea no aparecía registrada (`celery_app.tasks` vacío). Investigado: `include=[...]` se procesa cuando arranca un worker/beat de verdad (`celery -A ... worker`, que sí importa esos módulos como parte de su arranque) — no al importar la app en un script suelto. Cualquier código que importe `compass.ingestion.tasks` directamente (tests, o el propio arranque real de Celery) sí la registra correctamente. Confirmado importando el módulo explícitamente.
 - Verificado manualmente (Postgres real, orquestación mockeada con `unittest.mock.patch` + `side_effect` para no tocar el feed real): la tarea completa —engine `NullPool` real, sesión real, commit, dispose— corre de extremo a extremo y devuelve el conteo esperado.
 
-### Paso 4 — Tests (pendiente)
+### Paso 4 — Tests (completado)
+
+- `tests/test_celery_app.py` (3 tests): zona horaria, tarea registrada tras importar `compass.ingestion.tasks` (`# noqa: F401` — import por su efecto secundario, no por un nombre que se use), y contenido del `beat_schedule` (comparación de `crontab` por igualdad, sí funciona como se esperaba).
+- `tests/test_daily_ingestion_task.py` (3 tests): `create_task_engine()` usa `NullPool` y devuelve un engine distinto en cada llamada (`is not`, identidad, no solo igualdad), y la tarea completa corre de extremo a extremo (engine/sesión reales, `run_daily_ingestion` mockeado con `unittest.mock.patch` + `side_effect`).
+- El test de la tarea es `def`, no `async def`: la propia tarea gestiona su event loop con `asyncio.run()` por dentro; si el test fuera async, ya estaría dentro de un event loop (el de `pytest-asyncio`) y `asyncio.run()` fallaría.
+- Suite completa: **45 tests pasan**.
 
 ### Paso 5 — Verificación final (pendiente, incluye decidir si se corre una ingesta real contra el feed en vivo)
