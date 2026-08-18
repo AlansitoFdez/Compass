@@ -15,7 +15,11 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): `GET /tenders` con f
 
 ## Progreso
 
-### Paso 1 — `get_db()` en `core/db.py` + `TenderListResponse` (pendiente)
+### Paso 1 — `get_db()` en `core/db.py` + `TenderListResponse` (completado)
+
+- `core/db.py`: `get_db() -> AsyncIterator[AsyncSession]` — dependencia de FastAPI vía `Depends(get_db)`, un `async_session_factory()` por request (`async with`, cierre automático al terminar el request).
+- `api/routes/tenders.py` (nuevo): `TenderListResponse` (sobre de paginación: `items: list[TenderSchema]`, `total`, `limit`, `offset`) y las constantes `DEFAULT_LIMIT = 20` / `MAX_LIMIT = 100`. Router (`APIRouter(prefix="/tenders", ...)`) creado ya con el prefijo, el endpoint en sí llega en el paso 2.
+- Verificado: `ruff check`/`format --check` sin avisos, import manual de ambas piezas correcto.
 
 ### Paso 2 — `GET /tenders`: filtros + paginación (pendiente)
 
