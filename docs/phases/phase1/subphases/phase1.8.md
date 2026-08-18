@@ -44,6 +44,12 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): script que descarga 
 - Import de `async_session_factory` diferido dentro de `_main()`, no a nivel de módulo: las funciones de librería (`load_month`, `recent_months`...) no necesitan saber cómo se construye una sesión real, la reciben como parámetro — solo el script en sí la necesita.
 - Verificado manualmente (HTTP mockeado + Postgres real, sin descarga real todavía): un ZIP simulado conteniendo la entrada real del fixture (1.6) — que está fuera de nuestro vertical, CPV de las divisiones 30/39/48 — resultó correctamente en **0 persistidas**. Prueba que toda la cadena funciona de extremo a extremo para el caso "se filtra".
 
-### Paso 4 — Tests con ZIP sintético (pendiente)
+### Paso 4 — Tests con ZIP sintético (completado)
+
+- Entrada "coincidente" para tests: el fixture real (1.6) con un CPV cambiado a `72000000` — evita escribir un CODICE completo a mano.
+- **Bug real #1, en el propio test**: `.replace(b"CS2026/94", b"CS2026/94-MATCH", 1)` reemplazó la aparición dentro del `<summary>` del ATOM (texto libre: "Id licitación: CS2026/94; ..."), que aparece **antes** en el documento que el `<ContractFolderID>` real que lee el parser — no el expediente de verdad. Corregido acotando el reemplazo a `>CS2026/94<` (el valor tal cual lo delimitan las etiquetas), que no coincide con el texto libre del summary (ahí va seguido de `;`, no de `<`).
+- **Bug real #2, en el propio test**: usé `spy.spy_return` pensando que era de `unittest.mock` — es de `pytest-mock` (no instalado). Corregido con `side_effect` y una función propia que ejecuta la real y guarda lo que devuelve en una lista aparte — mecanismo íntegramente de la librería estándar.
+- 6 tests: URL builder, `recent_months` (mismo año y cruce de año), `iter_entries_from_zip` (ignora no-`.atom`, con `tmp_path` — fixture de pytest para directorio temporal por test), limpieza del fichero temporal (`iter_entries_from_url`), y `load_month` con un ZIP de 2 entradas (una coincide, otra no) — confirma `count == 1` y que la persistida es la correcta, con el CPV correcto.
+- Suite completa: **39 tests pasan**. Confirmado que no quedó ninguna fila de prueba suelta.
 
 ### Paso 5 — Verificación final (pendiente, incluye decidir alcance de una corrida real contra PLACSP)
