@@ -1,7 +1,13 @@
 """Async database engine, session factory, and declarative base for ORM models."""
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 from compass.core.config import get_settings
 
@@ -19,3 +25,14 @@ engine = create_async_engine(_async_database_url(get_settings().database_url))
 async_session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
     engine, expire_on_commit=False
 )
+
+
+def create_task_engine() -> AsyncEngine:
+    """Fresh NullPool engine for a single asyncio.run() call inside a Celery task.
+
+    `engine` above pools connections for FastAPI's one long-lived event loop.
+    Celery tasks get a brand new event loop per asyncio.run() call — a
+    connection pooled under one event loop is invalid in another — so tasks
+    need their own unpooled engine, built fresh each time, not this shared one.
+    """
+    return create_async_engine(_async_database_url(get_settings().database_url), poolclass=NullPool)
