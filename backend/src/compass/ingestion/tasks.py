@@ -21,9 +21,9 @@ async def _run() -> int:
     try:
         with httpx2.Client(timeout=60) as client:
             async with session_factory() as session:
-                count = await run_daily_ingestion(client, session)
-                await session.commit()
-                return count
+                # run_daily_ingestion commits periodically (and at the end)
+                # by itself now — see its docstring for why.
+                return await run_daily_ingestion(client, session)
     finally:
         await engine.dispose()
 
