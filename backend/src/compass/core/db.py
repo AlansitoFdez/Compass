@@ -1,5 +1,7 @@
 """Async database engine, session factory, and declarative base for ORM models."""
 
+from collections.abc import AsyncIterator
+
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -36,3 +38,9 @@ def create_task_engine() -> AsyncEngine:
     need their own unpooled engine, built fresh each time, not this shared one.
     """
     return create_async_engine(_async_database_url(get_settings().database_url), poolclass=NullPool)
+
+
+async def get_db() -> AsyncIterator[AsyncSession]:
+    """FastAPI dependency: one session per request, via `Depends(get_db)`."""
+    async with async_session_factory() as session:
+        yield session
