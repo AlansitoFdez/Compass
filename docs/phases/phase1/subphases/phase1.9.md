@@ -31,7 +31,12 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): app de Celery, tarea
 - `run_daily_ingestion(client, session)` — mismo patrón que `load_month()` (1.8): parsear (1.6) → filtrar vertical (1.4) → upsert (1.7), sin `commit()` (lo decide quien llama). Única diferencia real: itera `ingest_atom_feed()` (1.5, con checkpoint de reanudación) en vez de `iter_entries_from_url()` sobre un ZIP.
 - Verificado manualmente (HTTP mockeado con el fixture real fuera del vertical + Postgres real, checkpoint limpiado antes y después): 0 persistidas, como se esperaba.
 
-### Paso 3 — La tarea de Celery: puente sync→async, logging, `beat_schedule` (pendiente)
+### Paso 3 — La tarea de Celery: puente sync→async, logging, `beat_schedule` (completado)
+
+- `ingestion/tasks.py`: `_run()` (async, usa `create_task_engine()` del paso 1, hace `commit()` y `engine.dispose()` en `finally`) + `daily_ingestion_task()` (síncrona, `@celery_app.task(name="daily_ingestion")`, puente vía `asyncio.run()` con el fix de `SelectorEventLoop` en Windows — cuarto sitio, tras Alembic, pytest-asyncio y el script de carga histórica). Logging con `logger.info` al empezar/terminar (con conteo y duración) y `logger.exception` + `raise` si falla.
+- `core/celery_app.py`: `include=["compass.ingestion.tasks"]`, `timezone = "Europe/Madrid"` (ver conversación sobre por qué la zona horaria importa más que la hora exacta — mismo principio que `zoneinfo` en la 1.6, aplicado al planificador), `beat_schedule` con `crontab(hour=3, minute=0)` como estimación razonable, no verificada, de cuándo está listo el feed de PLACSP.
+- **Hallazgo real, no un bug**: al importar `celery_app` solo (sin importar `compass.ingestion.tasks`), la tarea no aparecía registrada (`celery_app.tasks` vacío). Investigado: `include=[...]` se procesa cuando arranca un worker/beat de verdad (`celery -A ... worker`, que sí importa esos módulos como parte de su arranque) — no al importar la app en un script suelto. Cualquier código que importe `compass.ingestion.tasks` directamente (tests, o el propio arranque real de Celery) sí la registra correctamente. Confirmado importando el módulo explícitamente.
+- Verificado manualmente (Postgres real, orquestación mockeada con `unittest.mock.patch` + `side_effect` para no tocar el feed real): la tarea completa —engine `NullPool` real, sesión real, commit, dispose— corre de extremo a extremo y devuelve el conteo esperado.
 
 ### Paso 4 — Tests (pendiente)
 
