@@ -1,8 +1,14 @@
 """GET /tenders — list tenders with basic filters and pagination."""
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from decimal import Decimal
 
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from compass.core.db import get_db
+from compass.tenders.enums import TenderStatus
+from compass.tenders.repository import list_tenders
 from compass.tenders.schemas import TenderSchema
 
 router = APIRouter(prefix="/tenders", tags=["tenders"])
@@ -16,3 +22,32 @@ class TenderListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+@router.get("")
+async def get_tenders(
+    cpv: str | None = None,
+    status: TenderStatus | None = None,
+    min_budget: Decimal | None = None,
+    max_budget: Decimal | None = None,
+    location: str | None = None,
+    limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(0, ge=0),
+    session: AsyncSession = Depends(get_db),
+) -> TenderListResponse:
+    items, total = await list_tenders(
+        session,
+        cpv=cpv,
+        status=status,
+        min_budget=min_budget,
+        max_budget=max_budget,
+        location=location,
+        limit=limit,
+        offset=offset,
+    )
+    return TenderListResponse(
+        items=[TenderSchema.model_validate(item) for item in items],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )

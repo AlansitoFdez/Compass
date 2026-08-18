@@ -49,6 +49,12 @@ select = [
 [tool.ruff.lint.isort]
 known-first-party = ["compass"]
 
+[tool.ruff.lint.flake8-bugbear]
+# B008 prohíbe llamadas a función en valores por defecto (mutables por lo
+# general) — pero `Depends(...)` es justo el patrón que exige FastAPI para
+# inyección de dependencias, así que se marca explícitamente como seguro.
+extend-immutable-calls = ["fastapi.Depends"]
+
 [tool.ruff.format]
 quote-style = "double"
 
