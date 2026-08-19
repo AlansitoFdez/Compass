@@ -28,7 +28,11 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): `GET /tenders` con f
 - **Ajuste de configuración real, no anticipado**: `ruff` marcó `Depends(get_db)` con B008 ("no llamar funciones en valores por defecto") — a diferencia de `Query(...)`, que ruff sí exime por defecto, `Depends` no está en su lista de exenciones automáticas. Añadido `[tool.ruff.lint.flake8-bugbear] extend-immutable-calls = ["fastapi.Depends"]` en `pyproject.toml`: es justo el patrón que exige la inyección de dependencias de FastAPI, no un descuido.
 - Verificado (sin servidor real todavía, eso es el paso 5): `ruff check`/`format --check` sin avisos, import manual de `router`/`list_tenders`, `[r.path for r in router.routes]` → `['/tenders']`, confirmando que el prefijo se resolvió como se esperaba.
 
-### Paso 3 — Registrar el router en `api/router.py` (pendiente)
+### Paso 3 — Registrar el router en `api/router.py` (completado)
+
+- `api/router.py`: `api_router.include_router(tenders.router)`, mismo patrón que `health.router` — `main.py` no se toca, tal como se diseñó desde la 1.1.
+- Verificado vía el esquema OpenAPI de la app real (`create_app().openapi()["paths"]`), no vía `app.routes` directamente: en esta versión de FastAPI, `app.routes` no aplana los routers incluidos (aparecen envueltos en un `_IncludedRouter` interno) — un detalle de representación interna, no un fallo de registro. `openapi()["paths"]` → `['/health', '/tenders']`, confirmando ambos endpoints activos en la app real.
+- `ruff check`/`format --check` sin avisos.
 
 ### Paso 4 — Tests (pendiente)
 
