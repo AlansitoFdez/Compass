@@ -35,7 +35,13 @@ La revisión (lectura completa de todo `backend/src/compass`, con verificación 
 
 ## Progreso
 
-### Paso 1 — (pendiente)
+### Paso 1 — Aislar el fallo por entrada en la ingesta (bug 4) (completado)
+
+- `ingestion/codice_parser.py`: `_cpv_codes()` ahora descarta los elementos `<ItemClassificationCode/>` vacíos (`code.text` es `None` para un elemento sin contenido — real, visto en el hallazgo original) en vez de incluirlos como `None`, arreglando la mentira de tipo (`-> list[str]` ahora es cierto de verdad). Nueva `try_parse_codice_entry()`: envuelve `parse_codice_entry()` en un `try/except Exception` amplio y deliberado — captura cualquier fallo de parseo (código desconocido, fecha/número malformado, campo requerido ausente), lo registra con `logger.exception` (traza completa, no se pierde información) junto al expediente si se pudo leer, y devuelve `None` en vez de propagar. Documentado el porqué del `except Exception` tan amplio: es un límite de confianza deliberado ante datos de terceros no controlados (el feed de PLACSP), no un catch-all perezoso — cualquier bug real en nuestro propio código también queda capturado aquí, pero visible en el log con traza completa en vez de silencioso.
+- `ingestion/historical_loader.py` (`load_month`) e `ingestion/daily_ingestion.py` (`run_daily_ingestion`): ambos bucles usan ahora `try_parse_codice_entry()` en vez de `parse_codice_entry()`, con un `if tender is None: continue` antes del filtro de vertical — una entrada malformada se salta, ninguna licitación después de ella en el recorrido se pierde.
+- Verificado reproduciendo primero los dos disparadores originales del bug (elemento CPV vacío, código de estado desconocido) contra el código ya arreglado: `_cpv_codes()` filtra el vacío correctamente, `try_parse_codice_entry()` captura el fallo (`TypeError` en este caso, no `ValueError` — confirma que el `except Exception` amplio era la decisión correcta, un `except ValueError` no lo habría cazado) y devuelve `None` en vez de propagar.
+- Tests nuevos: `test_codice_parser.py` (3 tests: `_cpv_codes` descarta vacíos, `try_parse_codice_entry` devuelve el tender en el caso válido, devuelve `None` ante un código de estado desconocido) + un test de integración por cada orquestador (`test_historical_loader.py`, `test_daily_ingestion.py`) que mezcla una entrada corrupta **antes** de una válida en el mismo archivo/feed y confirma que la válida se persiste igualmente — el test de regresión real del bug (si el fallo hubiera seguido propagando, la entrada válida posterior nunca se habría procesado).
+- Suite completa: **61 passed** (56 previos + 5 nuevos). `ruff check`/`format --check` sin avisos.
 ### Paso 2 — (pendiente)
 ### Paso 3 — (pendiente)
 ### Paso 4 — (pendiente)
