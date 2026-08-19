@@ -27,6 +27,15 @@ def _atom_feed(entries: list[bytes]) -> bytes:
     return XML_HEADER + b'<feed xmlns="http://www.w3.org/2005/Atom">' + body + b"</feed>"
 
 
+def _malformed_entry(suffix: str) -> bytes:
+    """A matching entry whose status code is one PLACSP has never used —
+    parse_codice_entry() raises for it; try_parse_codice_entry() must not.
+    """
+    return _matching_entry(suffix).replace(
+        b">PUB</ns3:ContractFolderStatusCode>", b">ZZZZ</ns3:ContractFolderStatusCode>", 1
+    )
+
+
 @pytest.fixture(autouse=True)
 def _clean_checkpoint():
     clear_last_processed_atom_url()
@@ -69,5 +78,38 @@ async def test_run_daily_ingestion_commits_periodically(db_session: AsyncSession
         event.remove(db_session.sync_session, "after_commit", _on_commit)
         # Ya son commits reales — el rollback de la fixture db_session no los
         # deshace, hay que limpiarlos explícitamente.
+        await db_session.execute(delete(Tender).where(Tender.expediente.like("CS2026/94-%")))
+        await db_session.commit()
+
+
+async def test_run_daily_ingestion_skips_a_malformed_entry_without_losing_the_rest(
+    db_session: AsyncSession,
+) -> None:
+    """A malformed entry ahead of a valid one in the feed must not sink the
+    valid one — the real bug found in the 1.11 review (one bad entry crashed
+    the whole run).
+    """
+    feed = _atom_feed([_malformed_entry("BAD"), _matching_entry("GOOD")])
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, content=feed)
+
+    client = httpx2.Client(transport=httpx2.MockTransport(handler))
+
+    try:
+        count = await run_daily_ingestion(client, db_session, commit_every=1)
+
+        assert count == 1
+
+        result = await db_session.execute(
+            select(Tender).where(Tender.expediente == "CS2026/94-GOOD")
+        )
+        assert result.scalar_one_or_none() is not None
+        result = await db_session.execute(
+            select(Tender).where(Tender.expediente == "CS2026/94-BAD")
+        )
+        assert result.scalar_one_or_none() is None
+    finally:
+        # commit_every=1 -> commits reales, igual que en el test anterior.
         await db_session.execute(delete(Tender).where(Tender.expediente.like("CS2026/94-%")))
         await db_session.commit()

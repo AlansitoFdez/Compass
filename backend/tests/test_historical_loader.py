@@ -45,6 +45,16 @@ def _non_matching_entry() -> bytes:
     return FIXTURE_PATH.read_bytes().replace(XML_HEADER, b"")
 
 
+def _malformed_entry() -> bytes:
+    """A matching entry whose status code is one PLACSP has never used —
+    parse_codice_entry() raises for it; try_parse_codice_entry() must not.
+    """
+    content = _matching_entry().replace(
+        b">PUB</ns3:ContractFolderStatusCode>", b">ZZZZ</ns3:ContractFolderStatusCode>", 1
+    )
+    return content.replace(b">CS2026/94-MATCH<", b">CS2026/94-MALFORMED<", 1)
+
+
 def _build_zip(entries: list[bytes]) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as zf:
@@ -117,3 +127,30 @@ async def test_load_month_persists_only_vertical_matches(db_session: AsyncSessio
 
     result = await db_session.execute(select(Tender).where(Tender.expediente == "CS2026/94-MATCH"))
     assert result.scalar_one().cpv_codes[0] == "72000000"
+
+
+async def test_load_month_skips_a_malformed_entry_without_losing_the_rest(
+    db_session: AsyncSession,
+) -> None:
+    """A malformed entry ahead of a valid one in the archive must not sink the
+    valid one — the real bug found in the 1.11 review (one bad entry crashed
+    the whole run).
+    """
+    zip_content = _build_zip([_malformed_entry(), _matching_entry()])
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, content=zip_content)
+
+    client = httpx2.Client(transport=httpx2.MockTransport(handler))
+
+    count = await load_month(2026, 6, client, db_session)
+    await db_session.flush()
+
+    assert count == 1
+
+    result = await db_session.execute(select(Tender).where(Tender.expediente == "CS2026/94-MATCH"))
+    assert result.scalar_one_or_none() is not None
+    result = await db_session.execute(
+        select(Tender).where(Tender.expediente == "CS2026/94-MALFORMED")
+    )
+    assert result.scalar_one_or_none() is None
