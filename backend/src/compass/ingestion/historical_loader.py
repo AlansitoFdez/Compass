@@ -11,7 +11,7 @@ import httpx2
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from compass.ingestion.atom_client import parse_atom_page
-from compass.ingestion.codice_parser import parse_codice_entry
+from compass.ingestion.codice_parser import try_parse_codice_entry
 from compass.tenders.repository import upsert_tender
 from compass.tenders.vertical import matches_it_vertical
 
@@ -75,7 +75,9 @@ async def load_month(year: int, month: int, client: httpx2.Client, session: Asyn
     persisted = 0
 
     for entry in iter_entries_from_url(url, client):
-        tender = parse_codice_entry(entry)
+        tender = try_parse_codice_entry(entry)
+        if tender is None:
+            continue
         if not matches_it_vertical(tender.cpv_codes):
             continue
         await upsert_tender(session, tender)

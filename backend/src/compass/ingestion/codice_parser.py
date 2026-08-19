@@ -5,6 +5,7 @@ breakdowns under ProcurementProjectLot are deliberately ignored, same
 partial-mapping philosophy as the rest of the project.
 """
 
+import logging
 from datetime import datetime
 from decimal import Decimal
 from xml.etree.ElementTree import Element
@@ -12,6 +13,8 @@ from zoneinfo import ZoneInfo
 
 from compass.ingestion.codice_codes import get_contract_type, get_procedure_type_label, get_status
 from compass.tenders.schemas import TenderSchema
+
+logger = logging.getLogger(__name__)
 
 NS = {
     "atom": "http://www.w3.org/2005/Atom",
@@ -39,7 +42,10 @@ def _decimal(entry: Element, path: str) -> Decimal | None:
 
 def _cpv_codes(entry: Element) -> list[str]:
     path = f"{PROJECT}/cac:RequiredCommodityClassification/cbc:ItemClassificationCode"
-    return [code.text for code in entry.findall(path, NS)]
+    # code.text is None for an empty <ItemClassificationCode/> — real, seen in
+    # the wild. Dropped rather than kept: a code we can't read isn't usable
+    # data, and keeping it as None would violate the -> list[str] contract.
+    return [code.text for code in entry.findall(path, NS) if code.text]
 
 
 def _submission_deadline(entry: Element) -> datetime | None:
@@ -95,3 +101,20 @@ def parse_codice_entry(entry: Element) -> TenderSchema:
         published_at=updated_at,
         updated_at_source=updated_at,
     )
+
+
+def try_parse_codice_entry(entry: Element) -> TenderSchema | None:
+    """Like parse_codice_entry, but returns None (logging the failure) instead of
+    raising.
+
+    PLACSP entries are third-party data we don't control — a missing required
+    field, an unrecognized code, or a malformed number/date must not sink an
+    entire ingestion run of ~800 tenders over one bad entry. Callers skip the
+    entry and move on to the next one.
+    """
+    try:
+        return parse_codice_entry(entry)
+    except Exception:
+        expediente = _text(entry, f"{STATUS_ROOT}/cbc:ContractFolderID")
+        logger.exception("Skipping malformed CODICE entry (expediente=%s)", expediente)
+        return None

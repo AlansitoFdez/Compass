@@ -3,7 +3,7 @@
 import httpx2
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from compass.ingestion.codice_parser import parse_codice_entry
+from compass.ingestion.codice_parser import try_parse_codice_entry
 from compass.ingestion.feed_reader import ingest_atom_feed
 from compass.tenders.repository import upsert_tender
 from compass.tenders.vertical import matches_it_vertical
@@ -31,7 +31,9 @@ async def run_daily_ingestion(
     since_last_commit = 0
 
     for entry in ingest_atom_feed(client):
-        tender = parse_codice_entry(entry)
+        tender = try_parse_codice_entry(entry)
+        if tender is None:
+            continue
         if not matches_it_vertical(tender.cpv_codes):
             continue
         await upsert_tender(session, tender)
