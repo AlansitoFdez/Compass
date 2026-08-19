@@ -7,7 +7,13 @@ import pytest
 from sqlalchemy import delete, event, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from compass.ingestion.checkpoint import clear_last_processed_atom_url
+from compass.ingestion.checkpoint import (
+    clear_high_water_mark,
+    clear_last_processed_atom_url,
+    clear_pending_high_water_mark,
+    get_high_water_mark,
+    get_last_processed_atom_url,
+)
 from compass.ingestion.daily_ingestion import run_daily_ingestion
 from compass.tenders.models import Tender
 
@@ -39,8 +45,12 @@ def _malformed_entry(suffix: str) -> bytes:
 @pytest.fixture(autouse=True)
 def _clean_checkpoint():
     clear_last_processed_atom_url()
+    clear_high_water_mark()
+    clear_pending_high_water_mark()
     yield
     clear_last_processed_atom_url()
+    clear_high_water_mark()
+    clear_pending_high_water_mark()
 
 
 async def test_run_daily_ingestion_commits_periodically(db_session: AsyncSession) -> None:
@@ -111,5 +121,31 @@ async def test_run_daily_ingestion_skips_a_malformed_entry_without_losing_the_re
         assert result.scalar_one_or_none() is None
     finally:
         # commit_every=1 -> commits reales, igual que en el test anterior.
+        await db_session.execute(delete(Tender).where(Tender.expediente.like("CS2026/94-%")))
+        await db_session.commit()
+
+
+async def test_run_daily_ingestion_completes_the_checkpoint_after_the_final_commit(
+    db_session: AsyncSession,
+) -> None:
+    """A full run must clear the resume checkpoint and promote the high-water
+    mark — but only complete_run(), called here after the final commit, does
+    that; ingest_atom_feed() itself never touches either (see feed_reader.py
+    and the 1.11 finding about advancing the mark before commits land).
+    """
+    entries = [_matching_entry(str(i)) for i in range(2)]
+    feed = _atom_feed(entries)
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, content=feed)
+
+    client = httpx2.Client(transport=httpx2.MockTransport(handler))
+
+    try:
+        await run_daily_ingestion(client, db_session)
+
+        assert get_last_processed_atom_url() is None
+        assert get_high_water_mark() is not None
+    finally:
         await db_session.execute(delete(Tender).where(Tender.expediente.like("CS2026/94-%")))
         await db_session.commit()
