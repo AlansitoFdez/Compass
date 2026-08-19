@@ -3,8 +3,9 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ARRAY, DateTime, Numeric, String, Text, func
+from sqlalchemy import DateTime, Numeric, String, Text, func
 from sqlalchemy import Enum as SqlEnum
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from compass.core.db import Base
