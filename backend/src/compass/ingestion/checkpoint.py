@@ -1,18 +1,68 @@
-"""Tracks the last successfully-processed ATOM feed URL, so ingestion can resume after a failure."""
+"""Tracks ingestion progress across the ATOM feed: resuming after a mid-run
+failure, and skipping content a previous complete run already ingested.
+"""
 
 from compass.core.redis_client import get_redis_client
 
-CHECKPOINT_KEY = "ingestion:atom:last_processed_url"
+LAST_PROCESSED_URL_KEY = "ingestion:atom:last_processed_url"
+PENDING_HIGH_WATER_MARK_KEY = "ingestion:atom:pending_high_water_mark"
+HIGH_WATER_MARK_KEY = "ingestion:atom:high_water_mark"
 
 
 def get_last_processed_atom_url() -> str | None:
-    return get_redis_client().get(CHECKPOINT_KEY)
+    return get_redis_client().get(LAST_PROCESSED_URL_KEY)
 
 
 def set_last_processed_atom_url(url: str) -> None:
-    get_redis_client().set(CHECKPOINT_KEY, url)
+    get_redis_client().set(LAST_PROCESSED_URL_KEY, url)
 
 
 def clear_last_processed_atom_url() -> None:
-    """Called once the feed is fully drained — the next run starts fresh, it doesn't resume."""
-    get_redis_client().delete(CHECKPOINT_KEY)
+    get_redis_client().delete(LAST_PROCESSED_URL_KEY)
+
+
+def get_high_water_mark() -> str | None:
+    """The newest atom:updated value the last fully completed run ingested —
+    entries at or before this point were already processed and don't need
+    to be walked again.
+    """
+    return get_redis_client().get(HIGH_WATER_MARK_KEY)
+
+
+def clear_high_water_mark() -> None:
+    get_redis_client().delete(HIGH_WATER_MARK_KEY)
+
+
+def get_pending_high_water_mark() -> str | None:
+    return get_redis_client().get(PENDING_HIGH_WATER_MARK_KEY)
+
+
+def clear_pending_high_water_mark() -> None:
+    get_redis_client().delete(PENDING_HIGH_WATER_MARK_KEY)
+
+
+def set_pending_high_water_mark(updated_at: str) -> None:
+    """Set once, right after fetching the first page of a fresh run: the
+    newest entry's atom:updated for the run now in progress.
+
+    Kept separate from HIGH_WATER_MARK_KEY (the real threshold future runs
+    stop at) until complete_run() promotes it. Advancing the real one early —
+    before this run's tenders are confirmed committed — would mean losing
+    them forever: the whole point of the high-water mark is that future runs
+    never re-fetch what it covers, so it must never get ahead of what's
+    actually durable.
+    """
+    get_redis_client().set(PENDING_HIGH_WATER_MARK_KEY, updated_at)
+
+
+def complete_run() -> None:
+    """Called by the caller of ingest_atom_feed(), once, after its own writes
+    are durably committed: promotes this run's pending high-water mark to
+    the real one, and clears the per-run resume checkpoint — the run is
+    done, there's nothing left to resume.
+    """
+    client = get_redis_client()
+    pending = client.get(PENDING_HIGH_WATER_MARK_KEY)
+    if pending is not None:
+        client.set(HIGH_WATER_MARK_KEY, pending)
+    client.delete(LAST_PROCESSED_URL_KEY, PENDING_HIGH_WATER_MARK_KEY)
