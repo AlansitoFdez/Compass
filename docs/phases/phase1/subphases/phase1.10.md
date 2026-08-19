@@ -34,6 +34,11 @@ Del desglose de la Fase 1 (`docs/phases/phase1/phase1.md`): `GET /tenders` con f
 - Verificado vía el esquema OpenAPI de la app real (`create_app().openapi()["paths"]`), no vía `app.routes` directamente: en esta versión de FastAPI, `app.routes` no aplana los routers incluidos (aparecen envueltos en un `_IncludedRouter` interno) — un detalle de representación interna, no un fallo de registro. `openapi()["paths"]` → `['/health', '/tenders']`, confirmando ambos endpoints activos en la app real.
 - `ruff check`/`format --check` sin avisos.
 
-### Paso 4 — Tests (pendiente)
+### Paso 4 — Tests (completado)
+
+- `tests/test_tender_repository.py`: 6 tests nuevos para `list_tenders()` (cpv exacto, status, rango de importe, location, combinación AND, orden `published_at desc` + paginación `limit`/`offset`). Todos usan un CPV sintético fuera de la división 72 (`LIST_TEST_CPV = "99999999"`) como filtro de aislamiento — Docker persiste ~1.200+ licitaciones reales en el mismo Postgres que usan los tests (1.9), así que un test sin ese filtro contaría también esas filas reales en `total`.
+- `tests/test_tenders_endpoint.py` (nuevo): 4 tests sobre la app real vía `TestClient` — forma del sobre (`items`/`total`/`limit`/`offset`), un filtro aplicado de extremo a extremo (basta uno: la lógica exhaustiva de filtros ya está cubierta a nivel de repositorio), y las dos validaciones de límites (`limit > 100`, `offset < 0` → 422). Fixture nueva `db_client`: sobrescribe `get_db` (`app.dependency_overrides`) para que el endpoint use el mismo `db_session` del test — así los datos con solo `flush()` (sin `commit()`) son visibles en la petición HTTP, y el rollback de `db_session` limpia todo al terminar.
+- **Bug real encontrado al correr contra Postgres de verdad, no un fallo de test**: `Tender.cpv_codes` estaba declarado con el `ARRAY` genérico de `sqlalchemy` (no el específico de PostgreSQL) — ese `ARRAY` base no implementa `.contains()`, solo lanza `NotImplementedError`; el operador `@>` nativo solo está disponible en `sqlalchemy.dialects.postgresql.ARRAY`. Fix en `tenders/models.py`: importar `ARRAY` desde `sqlalchemy.dialects.postgresql` en vez de `sqlalchemy`. Sin migración: ambas clases compilan a la misma columna Postgres (`text[]`), la diferencia es solo qué operadores expone el lado Python — confirmado con `alembic check` → "No new upgrade operations detected."
+- Suite completa: **56 passed** (46 previos + 10 nuevos). `ruff check`/`format --check` sin avisos.
 
 ### Paso 5 — Verificación final: servidor real, Swagger UI, ruff, pytest (pendiente)
