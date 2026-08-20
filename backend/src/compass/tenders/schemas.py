@@ -33,3 +33,13 @@ class TenderSchema(BaseModel):
 
     published_at: datetime
     updated_at_source: datetime
+
+
+class TenderListResponse(BaseModel):
+    """Paginated envelope for GET /tenders — items plus enough to know how
+    many pages there are, not just the current one."""
+
+    items: list[TenderSchema]
+    total: int
+    limit: int
+    offset: int

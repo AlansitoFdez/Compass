@@ -3,25 +3,17 @@
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from compass.core.db import get_db
 from compass.tenders.enums import TenderStatus
 from compass.tenders.repository import list_tenders
-from compass.tenders.schemas import TenderSchema
+from compass.tenders.schemas import TenderListResponse, TenderSchema
 
 router = APIRouter(prefix="/tenders", tags=["tenders"])
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
-
-
-class TenderListResponse(BaseModel):
-    items: list[TenderSchema]
-    total: int
-    limit: int
-    offset: int
 
 
 @router.get("")
