@@ -6,7 +6,7 @@ partial-mapping philosophy as the rest of the project.
 """
 
 import logging
-from datetime import datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from xml.etree.ElementTree import Element
 from zoneinfo import ZoneInfo
@@ -73,6 +73,38 @@ def _updated_at(entry: Element) -> datetime:
     return datetime.fromisoformat(_text(entry, "atom:updated"))
 
 
+def _published_at(entry: Element, updated_at: datetime) -> datetime:
+    """The earliest officially published notice for this tender — the closest
+    proxy CODICE offers to "when was this actually published".
+
+    NOT atom:updated: that field reflects the last time PLACSP touched the
+    record and gets rewritten on every republish (see phase1.11.md, bug 3) —
+    confirmed against a real mature expediente where atom:updated was
+    2026-08-19 (today) while its earliest "Anuncio de Licitación" notice
+    (DOC_CN, the official announcement code — verified against PLACSP's own
+    TenderingNoticeTypeCode list) was dated 2023-10-08, almost three years
+    earlier. Takes the minimum IssueDate across ALL notices, not just DOC_CN,
+    since a tender can be re-announced (a second DOC_CN with a later date)
+    and the earliest notice of any kind is still the true first appearance.
+
+    Falls back to atom:updated when no notice has been published yet —
+    common for very recently opened tenders, or lighter-publicity procedures
+    (e.g. contratos menores) that may never get one.
+    """
+    path = (
+        f"{STATUS_ROOT}/cac-place-ext:ValidNoticeInfo/cac-place-ext:AdditionalPublicationStatus"
+        "/cac-place-ext:AdditionalPublicationDocumentReference/cbc:IssueDate"
+    )
+    issue_dates = [
+        date.fromisoformat(text)
+        for text in (element.text for element in entry.findall(path, NS))
+        if text
+    ]
+    if not issue_dates:
+        return updated_at
+    return datetime.combine(min(issue_dates), time.min, tzinfo=MADRID_TZ)
+
+
 def parse_codice_entry(entry: Element) -> TenderSchema:
     """Parses one ATOM <entry> (already containing inline CODICE) into a TenderSchema."""
     updated_at = _updated_at(entry)
@@ -98,7 +130,7 @@ def parse_codice_entry(entry: Element) -> TenderSchema:
         pcap_url=_document_url(entry, "LegalDocumentReference"),
         ppt_url=_document_url(entry, "TechnicalDocumentReference"),
         platform_url=_platform_url(entry),
-        published_at=updated_at,
+        published_at=_published_at(entry, updated_at),
         updated_at_source=updated_at,
     )
 
