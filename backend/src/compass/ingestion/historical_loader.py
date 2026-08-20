@@ -1,5 +1,6 @@
 """Downloads and processes PLACSP's historical monthly archives (last 3 months)."""
 
+import logging
 import tempfile
 import zipfile
 from collections.abc import Iterator
@@ -14,6 +15,8 @@ from compass.ingestion.atom_client import parse_atom_page
 from compass.ingestion.codice_parser import try_parse_codice_entry
 from compass.tenders.repository import upsert_tender
 from compass.tenders.vertical import matches_it_vertical
+
+logger = logging.getLogger(__name__)
 
 BASE_URL = "https://contrataciondelsectorpublico.gob.es/sindicacion/sindicacion_643"
 
@@ -96,12 +99,16 @@ async def _main() -> None:
             for year, month in recent_months(3):
                 count = await load_month(year, month, client, session)
                 await session.commit()
-                print(f"{year:04d}-{month:02d}: {count} licitaciones del vertical guardadas")
+                logger.info("%04d-%02d: %d licitaciones del vertical guardadas", year, month, count)
 
 
 if __name__ == "__main__":
     import asyncio
     import sys
+
+    # Sin esto, logger.info() no imprime nada al correr como script suelto
+    # -- print() lo daba gratis, logging necesita un handler configurado.
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     if sys.platform == "win32":
         asyncio.run(_main(), loop_factory=asyncio.SelectorEventLoop)
