@@ -3,7 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Numeric, String, Text, func
+from sqlalchemy import DateTime, Index, Numeric, String, Text, func
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
@@ -14,6 +14,13 @@ from compass.tenders.enums import ContractType, TenderStatus
 
 class Tender(Base):
     __tablename__ = "tenders"
+    __table_args__ = (
+        # GIN sobre el array: acelera `@>`/`&&`/`=` (el caso de código CPV
+        # completo, ver repository.py). No acelera el LIKE sobre elementos
+        # desanidados que usa el filtro por prefijo/división -- ese sigue
+        # siendo Seq Scan, documentado en phase1.11.md (paso 7).
+        Index("ix_tenders_cpv_codes_gin", "cpv_codes", postgresql_using="gin"),
+    )
 
     expediente: Mapped[str] = mapped_column(String, primary_key=True)
     contracting_body: Mapped[str] = mapped_column(String)
@@ -47,7 +54,8 @@ class Tender(Base):
     ppt_url: Mapped[str | None] = mapped_column(String)
     platform_url: Mapped[str | None] = mapped_column(String)
 
-    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # index=True: GET /tenders siempre ordena por este campo (ver repository.py).
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     updated_at_source: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

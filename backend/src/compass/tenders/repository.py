@@ -12,6 +12,10 @@ from compass.tenders.models import Tender
 from compass.tenders.schemas import TenderSchema
 from compass.tenders.vertical import normalize_cpv_code
 
+# CPV codes are always exactly 8 digits (EU classification: division + group
+# + class + category + subcategory) once the check digit is stripped.
+FULL_CPV_CODE_LENGTH = 8
+
 
 async def upsert_tender(session: AsyncSession, tender: TenderSchema) -> None:
     values = tender.model_dump()
@@ -45,15 +49,20 @@ async def list_tenders(
         # producto entero) siempre devolvía cero resultados, porque ningún
         # código guardado es literalmente "72". `vertical.py` ya filtra por
         # prefijo en la ingesta; la API debe ser consistente con eso (bug 7
-        # de la 1.11). Un prefijo de 8 dígitos completo sigue actuando como
-        # coincidencia exacta -- ningún otro código CPV comparte ese prefijo.
-        escaped = (
-            normalize_cpv_code(cpv).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        )
-        unnested = func.unnest(Tender.cpv_codes).table_valued("code").render_derived()
-        filters.append(
-            select(1).select_from(unnested).where(unnested.c.code.like(f"{escaped}%")).exists()
-        )
+        # de la 1.11).
+        normalized = normalize_cpv_code(cpv)
+        if len(normalized) == FULL_CPV_CODE_LENGTH:
+            # Código completo: sigue siendo una coincidencia exacta -- ningún
+            # otro código CPV comparte un prefijo de 8 dígitos con otro -- y
+            # `@>` sí puede usar el índice GIN (ver phase1.11.md, paso 7),
+            # a diferencia del unnest()+LIKE de la rama de abajo.
+            filters.append(Tender.cpv_codes.contains([normalized]))
+        else:
+            escaped = normalized.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            unnested = func.unnest(Tender.cpv_codes).table_valued("code").render_derived()
+            filters.append(
+                select(1).select_from(unnested).where(unnested.c.code.like(f"{escaped}%")).exists()
+            )
     if status is not None:
         filters.append(Tender.status == status)
     if min_budget is not None:
