@@ -10,6 +10,7 @@ from sqlalchemy.sql import func
 from compass.tenders.enums import TenderStatus
 from compass.tenders.models import Tender
 from compass.tenders.schemas import TenderSchema
+from compass.tenders.vertical import normalize_cpv_code
 
 
 async def upsert_tender(session: AsyncSession, tender: TenderSchema) -> None:
@@ -38,8 +39,21 @@ async def list_tenders(
 ) -> tuple[list[Tender], int]:
     filters = []
     if cpv is not None:
-        # @> nativo de Postgres sobre el array, sin subconsultas (ver phase1.10.md).
-        filters.append(Tender.cpv_codes.contains([cpv]))
+        # Prefijo, no exacto: la 1.10 usaba `@>` (coincidencia exacta) para
+        # evitar un unnest(), pero eso rompe el caso de uso real -- filtrar
+        # por división CPV (p.ej. "72", los servicios TI que definen el
+        # producto entero) siempre devolvía cero resultados, porque ningún
+        # código guardado es literalmente "72". `vertical.py` ya filtra por
+        # prefijo en la ingesta; la API debe ser consistente con eso (bug 7
+        # de la 1.11). Un prefijo de 8 dígitos completo sigue actuando como
+        # coincidencia exacta -- ningún otro código CPV comparte ese prefijo.
+        escaped = (
+            normalize_cpv_code(cpv).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        )
+        unnested = func.unnest(Tender.cpv_codes).table_valued("code").render_derived()
+        filters.append(
+            select(1).select_from(unnested).where(unnested.c.code.like(f"{escaped}%")).exists()
+        )
     if status is not None:
         filters.append(Tender.status == status)
     if min_budget is not None:
