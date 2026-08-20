@@ -9,9 +9,9 @@ import httpx2
 from compass.ingestion.atom_client import ATOM_NS, FEED_URL, fetch_atom_page
 from compass.ingestion.checkpoint import (
     get_high_water_mark,
-    get_last_processed_atom_url,
-    set_last_processed_atom_url,
+    get_resume_url,
     set_pending_high_water_mark,
+    set_resume_url,
 )
 
 
@@ -44,8 +44,8 @@ def ingest_atom_feed(client: httpx2.Client) -> Iterator[Element]:
     the per-run breadcrumbs (pending high-water mark, resume URL) needed to
     do that safely, it never promotes or clears them itself.
     """
-    is_fresh_start = get_last_processed_atom_url() is None
-    url: str | None = get_last_processed_atom_url() or FEED_URL
+    is_fresh_start = get_resume_url() is None
+    url: str | None = get_resume_url() or FEED_URL
     high_water_mark = get_high_water_mark()
     high_water_dt = datetime.fromisoformat(high_water_mark) if high_water_mark else None
 
@@ -62,5 +62,5 @@ def ingest_atom_feed(client: httpx2.Client) -> Iterator[Element]:
             yield entry
 
         if page.next_url is not None:
-            set_last_processed_atom_url(page.next_url)
+            set_resume_url(page.next_url)
         url = page.next_url

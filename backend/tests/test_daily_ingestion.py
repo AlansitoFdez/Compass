@@ -10,10 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from compass.ingestion.checkpoint import (
     clear_high_water_mark,
-    clear_last_processed_atom_url,
     clear_pending_high_water_mark,
+    clear_resume_url,
     get_high_water_mark,
-    get_last_processed_atom_url,
+    get_resume_url,
 )
 from compass.ingestion.daily_ingestion import run_daily_ingestion
 from compass.tenders.models import Tender
@@ -45,11 +45,11 @@ def _malformed_entry(suffix: str) -> bytes:
 
 @pytest.fixture(autouse=True)
 def _clean_checkpoint() -> Iterator[None]:
-    clear_last_processed_atom_url()
+    clear_resume_url()
     clear_high_water_mark()
     clear_pending_high_water_mark()
     yield
-    clear_last_processed_atom_url()
+    clear_resume_url()
     clear_high_water_mark()
     clear_pending_high_water_mark()
 
@@ -145,7 +145,7 @@ async def test_run_daily_ingestion_completes_the_checkpoint_after_the_final_comm
     try:
         await run_daily_ingestion(client, db_session)
 
-        assert get_last_processed_atom_url() is None
+        assert get_resume_url() is None
         assert get_high_water_mark() is not None
     finally:
         await db_session.execute(delete(Tender).where(Tender.expediente.like("CS2026/94-%")))

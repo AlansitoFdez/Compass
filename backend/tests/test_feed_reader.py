@@ -8,13 +8,13 @@ import pytest
 
 from compass.ingestion.checkpoint import (
     clear_high_water_mark,
-    clear_last_processed_atom_url,
     clear_pending_high_water_mark,
+    clear_resume_url,
     complete_run,
-    get_last_processed_atom_url,
     get_pending_high_water_mark,
-    set_last_processed_atom_url,
+    get_resume_url,
     set_pending_high_water_mark,
+    set_resume_url,
 )
 from compass.ingestion.feed_reader import ingest_atom_feed
 
@@ -42,11 +42,11 @@ PAGES = {
 
 @pytest.fixture(autouse=True)
 def _clean_checkpoint() -> Iterator[None]:
-    clear_last_processed_atom_url()
+    clear_resume_url()
     clear_high_water_mark()
     clear_pending_high_water_mark()
     yield
-    clear_last_processed_atom_url()
+    clear_resume_url()
     clear_high_water_mark()
     clear_pending_high_water_mark()
 
@@ -71,7 +71,7 @@ def test_ingest_atom_feed_yields_all_entries_on_a_fresh_start() -> None:
 
 
 def test_ingest_atom_feed_resumes_from_an_existing_checkpoint() -> None:
-    set_last_processed_atom_url("https://fake/page-2.atom")
+    set_resume_url("https://fake/page-2.atom")
 
     entries = list(ingest_atom_feed(_mocked_client()))
 
@@ -82,7 +82,7 @@ def test_ingest_atom_feed_resumes_from_an_existing_checkpoint() -> None:
 
 
 def test_checkpoint_reflects_completed_page_even_if_the_next_fetch_then_fails() -> None:
-    set_last_processed_atom_url("https://fake/page-1.atom")
+    set_resume_url("https://fake/page-1.atom")
 
     def handler(request: httpx2.Request) -> httpx2.Response:
         if str(request.url) == "https://fake/page-1.atom":
@@ -98,7 +98,7 @@ def test_checkpoint_reflects_completed_page_even_if_the_next_fetch_then_fails() 
     with pytest.raises(httpx2.HTTPStatusError):
         next(generator)
 
-    assert get_last_processed_atom_url() == "https://fake/page-2.atom"
+    assert get_resume_url() == "https://fake/page-2.atom"
 
 
 def test_ingest_atom_feed_stops_at_the_high_water_mark_without_walking_further() -> None:

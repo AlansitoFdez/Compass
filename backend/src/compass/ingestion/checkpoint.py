@@ -6,7 +6,7 @@ from typing import cast
 
 from compass.core.redis_client import get_redis_client
 
-LAST_PROCESSED_URL_KEY = "ingestion:atom:last_processed_url"
+RESUME_URL_KEY = "ingestion:atom:resume_url"
 PENDING_HIGH_WATER_MARK_KEY = "ingestion:atom:pending_high_water_mark"
 HIGH_WATER_MARK_KEY = "ingestion:atom:high_water_mark"
 
@@ -18,16 +18,16 @@ def _get_str(key: str) -> str | None:
     return cast("str | None", get_redis_client().get(key))
 
 
-def get_last_processed_atom_url() -> str | None:
-    return _get_str(LAST_PROCESSED_URL_KEY)
+def get_resume_url() -> str | None:
+    return _get_str(RESUME_URL_KEY)
 
 
-def set_last_processed_atom_url(url: str) -> None:
-    get_redis_client().set(LAST_PROCESSED_URL_KEY, url)
+def set_resume_url(url: str) -> None:
+    get_redis_client().set(RESUME_URL_KEY, url)
 
 
-def clear_last_processed_atom_url() -> None:
-    get_redis_client().delete(LAST_PROCESSED_URL_KEY)
+def clear_resume_url() -> None:
+    get_redis_client().delete(RESUME_URL_KEY)
 
 
 def get_high_water_mark() -> str | None:
@@ -74,4 +74,4 @@ def complete_run() -> None:
     pending = client.get(PENDING_HIGH_WATER_MARK_KEY)
     if pending is not None:
         client.set(HIGH_WATER_MARK_KEY, pending)
-    client.delete(LAST_PROCESSED_URL_KEY, PENDING_HIGH_WATER_MARK_KEY)
+    client.delete(RESUME_URL_KEY, PENDING_HIGH_WATER_MARK_KEY)
