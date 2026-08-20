@@ -35,6 +35,20 @@ def _text(element: Element, path: str) -> str | None:
     return element.findtext(path, namespaces=NS)
 
 
+def _required_text(element: Element, path: str) -> str:
+    """Like _text, but for fields TenderSchema declares as required.
+
+    Raises instead of silently passing None down to Pydantic/get_status() &
+    co. -- try_parse_codice_entry() still catches it and skips the entry
+    (untrusted third-party data), but with a message naming exactly which
+    field was missing, not a generic downstream ValidationError.
+    """
+    text = _text(element, path)
+    if text is None:
+        raise ValueError(f"Missing required field at {path!r}")
+    return text
+
+
 def _decimal(entry: Element, path: str) -> Decimal | None:
     text = _text(entry, path)
     return Decimal(text) if text is not None else None
@@ -70,7 +84,7 @@ def _platform_url(entry: Element) -> str | None:
 
 
 def _updated_at(entry: Element) -> datetime:
-    return datetime.fromisoformat(_text(entry, "atom:updated"))
+    return datetime.fromisoformat(_required_text(entry, "atom:updated"))
 
 
 def _published_at(entry: Element, updated_at: datetime) -> datetime:
@@ -110,21 +124,25 @@ def parse_codice_entry(entry: Element) -> TenderSchema:
     updated_at = _updated_at(entry)
 
     return TenderSchema(
-        expediente=_text(entry, f"{STATUS_ROOT}/cbc:ContractFolderID"),
-        contracting_body=_text(
+        expediente=_required_text(entry, f"{STATUS_ROOT}/cbc:ContractFolderID"),
+        contracting_body=_required_text(
             entry,
             f"{STATUS_ROOT}/cac-place-ext:LocatedContractingParty/cac:Party/cac:PartyName/cbc:Name",
         ),
-        title=_text(entry, f"{PROJECT}/cbc:Name"),
+        title=_required_text(entry, f"{PROJECT}/cbc:Name"),
         cpv_codes=_cpv_codes(entry),
         budget_with_vat=_decimal(entry, f"{PROJECT}/cac:BudgetAmount/cbc:TotalAmount"),
         budget_without_vat=_decimal(entry, f"{PROJECT}/cac:BudgetAmount/cbc:TaxExclusiveAmount"),
         estimated_value=_decimal(
             entry, f"{PROJECT}/cac:BudgetAmount/cbc:EstimatedOverallContractAmount"
         ),
-        contract_type=get_contract_type(_text(entry, f"{PROJECT}/cbc:TypeCode")),
-        procedure_type=get_procedure_type_label(_text(entry, f"{PROCESS}/cbc:ProcedureCode")),
-        status=get_status(_text(entry, f"{STATUS_ROOT}/cbc-place-ext:ContractFolderStatusCode")),
+        contract_type=get_contract_type(_required_text(entry, f"{PROJECT}/cbc:TypeCode")),
+        procedure_type=get_procedure_type_label(
+            _required_text(entry, f"{PROCESS}/cbc:ProcedureCode")
+        ),
+        status=get_status(
+            _required_text(entry, f"{STATUS_ROOT}/cbc-place-ext:ContractFolderStatusCode")
+        ),
         submission_deadline=_submission_deadline(entry),
         location=_text(entry, f"{PROJECT}/cac:RealizedLocation/cbc:CountrySubentity"),
         pcap_url=_document_url(entry, "LegalDocumentReference"),

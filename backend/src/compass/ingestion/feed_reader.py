@@ -16,7 +16,10 @@ from compass.ingestion.checkpoint import (
 
 
 def _entry_updated_at(entry: Element) -> datetime:
-    return datetime.fromisoformat(entry.findtext(f"{ATOM_NS}updated"))
+    updated = entry.findtext(f"{ATOM_NS}updated")
+    if updated is None:
+        raise ValueError("Entry is missing atom:updated")
+    return datetime.fromisoformat(updated)
 
 
 def ingest_atom_feed(client: httpx2.Client) -> Iterator[Element]:
@@ -42,7 +45,7 @@ def ingest_atom_feed(client: httpx2.Client) -> Iterator[Element]:
     do that safely, it never promotes or clears them itself.
     """
     is_fresh_start = get_last_processed_atom_url() is None
-    url = get_last_processed_atom_url() or FEED_URL
+    url: str | None = get_last_processed_atom_url() or FEED_URL
     high_water_mark = get_high_water_mark()
     high_water_dt = datetime.fromisoformat(high_water_mark) if high_water_mark else None
 
