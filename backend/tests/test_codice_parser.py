@@ -4,9 +4,12 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from xml.etree.ElementTree import Element, fromstring
+from zoneinfo import ZoneInfo
 
 from compass.ingestion.codice_parser import _cpv_codes, parse_codice_entry, try_parse_codice_entry
 from compass.tenders.enums import ContractType, TenderStatus
+
+MADRID_TZ = ZoneInfo("Europe/Madrid")
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "codice_entry_sample.xml"
 
@@ -39,6 +42,34 @@ def _load_entry_with_unknown_status_code() -> Element:
     return fromstring(mutated)
 
 
+def _load_entry_without_notices() -> Element:
+    """The real fixture, with both <ValidNoticeInfo> blocks stripped out —
+    a real shape too (very recently opened tenders, or lighter-publicity
+    procedures, may not have one yet).
+    """
+    raw = FIXTURE_PATH.read_bytes().decode("utf-8")
+    start = raw.index("<ns1:ValidNoticeInfo>")
+    end = raw.rindex("</ns1:ValidNoticeInfo>") + len("</ns1:ValidNoticeInfo>")
+    mutated = (raw[:start] + raw[end:]).encode("utf-8")
+    assert b"ValidNoticeInfo" not in mutated
+    return fromstring(mutated)
+
+
+def _load_entry_with_an_earlier_second_notice() -> Element:
+    """The real fixture's two <ValidNoticeInfo> blocks both date 2026-08-15 —
+    this backdates the first one (DOC_CD) to 2020-01-01, so the minimum
+    across notices is unambiguous and distinct from atom:updated's day.
+    """
+    raw = FIXTURE_PATH.read_bytes()
+    mutated = raw.replace(
+        b"<ns2:IssueDate>2026-08-15</ns2:IssueDate>",
+        b"<ns2:IssueDate>2020-01-01</ns2:IssueDate>",
+        1,
+    )
+    assert mutated != raw, "fixture no contenía la fecha de aviso esperada"
+    return fromstring(mutated)
+
+
 def test_parse_codice_entry_extracts_all_fields() -> None:
     tender = parse_codice_entry(_load_sample_entry())
 
@@ -58,7 +89,22 @@ def test_parse_codice_entry_extracts_all_fields() -> None:
     assert tender.ppt_url is not None
     assert tender.pcap_url != tender.ppt_url
     assert tender.platform_url.startswith("https://contrataciondelestado.es")
+    # La fecha del aviso publicado (2026-08-15, medianoche) es real,
+    # distinta del instante exacto de atom:updated -- bug 3 de la 1.11.
+    assert tender.published_at == datetime(2026, 8, 15, tzinfo=MADRID_TZ)
+    assert tender.published_at != tender.updated_at_source
+
+
+def test_parse_codice_entry_published_at_falls_back_to_updated_when_no_notices() -> None:
+    tender = parse_codice_entry(_load_entry_without_notices())
+
     assert tender.published_at == tender.updated_at_source
+
+
+def test_parse_codice_entry_published_at_uses_the_earliest_notice() -> None:
+    tender = parse_codice_entry(_load_entry_with_an_earlier_second_notice())
+
+    assert tender.published_at == datetime(2020, 1, 1, tzinfo=MADRID_TZ)
 
 
 def test_cpv_codes_skips_empty_elements() -> None:
