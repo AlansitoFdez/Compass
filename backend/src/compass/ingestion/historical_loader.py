@@ -89,11 +89,14 @@ async def load_month(year: int, month: int, client: httpx2.Client, session: Asyn
 async def _main() -> None:
     from compass.core.db import async_session_factory
 
-    async with async_session_factory() as session, httpx2.Client(timeout=60) as client:
-        for year, month in recent_months(3):
-            count = await load_month(year, month, client, session)
-            await session.commit()
-            print(f"{year:04d}-{month:02d}: {count} licitaciones del vertical guardadas")
+    # httpx2.Client es deliberadamente síncrono (ver ingestion/tasks.py) --
+    # no admite "async with", solo el "with" normal.
+    with httpx2.Client(timeout=60) as client:
+        async with async_session_factory() as session:
+            for year, month in recent_months(3):
+                count = await load_month(year, month, client, session)
+                await session.commit()
+                print(f"{year:04d}-{month:02d}: {count} licitaciones del vertical guardadas")
 
 
 if __name__ == "__main__":
