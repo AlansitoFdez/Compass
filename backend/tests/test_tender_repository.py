@@ -102,7 +102,10 @@ def _list_tender(expediente: str, **overrides: object) -> TenderSchema:
     return TenderSchema(**defaults)
 
 
-async def test_list_tenders_filters_by_cpv_exact_match(db_session: AsyncSession) -> None:
+async def test_list_tenders_filters_by_cpv_full_code_acts_as_exact_match(
+    db_session: AsyncSession,
+) -> None:
+    """Un prefijo de 8 dígitos completo no coincide con ningún otro código."""
     await upsert_tender(
         db_session, _list_tender("TEST-LIST-CPV-MATCH", cpv_codes=[LIST_TEST_CPV, "72200000"])
     )
@@ -113,6 +116,38 @@ async def test_list_tenders_filters_by_cpv_exact_match(db_session: AsyncSession)
 
     assert total == 1
     assert items[0].expediente == "TEST-LIST-CPV-MATCH"
+
+
+async def test_list_tenders_filters_by_cpv_division_prefix(db_session: AsyncSession) -> None:
+    """El caso de uso real que estaba roto: filtrar por división (bug 7 de la
+    1.11) -- LIST_TEST_CPV = "99999999" cae bajo la división sintética "999".
+    """
+    await upsert_tender(
+        db_session, _list_tender("TEST-LIST-CPV-DIV-MATCH", cpv_codes=[LIST_TEST_CPV])
+    )
+    await upsert_tender(
+        db_session, _list_tender("TEST-LIST-CPV-DIV-NOMATCH", cpv_codes=["88888888"])
+    )
+    await db_session.flush()
+
+    items, total = await list_tenders(db_session, cpv="999", limit=10, offset=0)
+
+    assert total == 1
+    assert items[0].expediente == "TEST-LIST-CPV-DIV-MATCH"
+
+
+async def test_list_tenders_filters_by_cpv_normalizes_the_check_digit(
+    db_session: AsyncSession,
+) -> None:
+    await upsert_tender(
+        db_session, _list_tender("TEST-LIST-CPV-CHECKDIGIT", cpv_codes=[LIST_TEST_CPV])
+    )
+    await db_session.flush()
+
+    items, total = await list_tenders(db_session, cpv=f"{LIST_TEST_CPV}-0", limit=10, offset=0)
+
+    assert total == 1
+    assert items[0].expediente == "TEST-LIST-CPV-CHECKDIGIT"
 
 
 async def test_list_tenders_filters_by_status(db_session: AsyncSession) -> None:
