@@ -2,24 +2,30 @@
 validation. Exhaustive filter logic is already covered at the repository level
 in test_tender_repository.py; here we only need one filter exercised end to
 end to prove the query params actually reach list_tenders().
+
+Real commits, not the usual flush()+rollback db_session pattern: GET /tenders
+runs through the real get_db() dependency, on whatever event loop TestClient
+happens to run requests on -- confirmed empirically to be a *different* loop
+than pytest-asyncio's own. The 1.10 version of this file worked around that
+by overriding get_db() to hand the endpoint the test's own db_session, so an
+uncommitted transaction ended up shared across two event loops -- exactly
+the psycopg-async danger create_task_engine()/NullPool exist to avoid (1.9).
+Committing the fixture data for real sidesteps the whole problem: a commit
+is visible to any connection on any loop, so there's nothing left to share.
 """
 
-from collections.abc import AsyncGenerator, Iterator
 from datetime import UTC, datetime
 from decimal import Decimal
 
-import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from compass.core.db import get_db
-from compass.main import app
 from compass.tenders.enums import ContractType, TenderStatus
+from compass.tenders.models import Tender
 from compass.tenders.repository import upsert_tender
 from compass.tenders.schemas import TenderSchema
 
-# Distinto del usado en test_tender_repository.py, aunque hoy no compartan
-# transacción: cada test aísla sus propias filas del resto de la tabla real.
 ENDPOINT_TEST_CPV = "99999998"
 
 
@@ -41,51 +47,52 @@ def _tender(expediente: str, **overrides: object) -> TenderSchema:
     return TenderSchema(**defaults)
 
 
-@pytest.fixture
-def db_client(db_session: AsyncSession) -> Iterator[TestClient]:
-    """TestClient cuyo `get_db` está sobrescrito para devolver el `db_session` del
-    propio test: lo que se inserta (solo flush, sin commit) en el test es visible
-    para la petición HTTP, y el rollback de `db_session` deshace todo al terminar.
-    """
+async def _seed(db_session: AsyncSession, *tenders: TenderSchema) -> None:
+    for tender in tenders:
+        await upsert_tender(db_session, tender)
+    await db_session.commit()
 
-    async def _override() -> AsyncGenerator[AsyncSession]:
-        yield db_session
 
-    app.dependency_overrides[get_db] = _override
-    yield TestClient(app)
-    app.dependency_overrides.clear()
+async def _cleanup(db_session: AsyncSession) -> None:
+    await db_session.execute(delete(Tender).where(Tender.cpv_codes.contains([ENDPOINT_TEST_CPV])))
+    await db_session.commit()
 
 
 async def test_get_tenders_returns_envelope_shape(
-    db_session: AsyncSession, db_client: TestClient
+    db_session: AsyncSession, client: TestClient
 ) -> None:
-    await upsert_tender(db_session, _tender("TEST-EP-SHAPE"))
-    await db_session.flush()
+    try:
+        await _seed(db_session, _tender("TEST-EP-SHAPE"))
 
-    response = db_client.get("/tenders", params={"cpv": ENDPOINT_TEST_CPV})
+        response = client.get("/tenders", params={"cpv": ENDPOINT_TEST_CPV})
 
-    assert response.status_code == 200
-    body = response.json()
-    assert body["total"] == 1
-    assert body["limit"] == 20
-    assert body["offset"] == 0
-    assert body["items"][0]["expediente"] == "TEST-EP-SHAPE"
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total"] == 1
+        assert body["limit"] == 20
+        assert body["offset"] == 0
+        assert body["items"][0]["expediente"] == "TEST-EP-SHAPE"
+    finally:
+        await _cleanup(db_session)
 
 
 async def test_get_tenders_applies_status_filter(
-    db_session: AsyncSession, db_client: TestClient
+    db_session: AsyncSession, client: TestClient
 ) -> None:
-    await upsert_tender(
-        db_session, _tender("TEST-EP-OPEN", status=TenderStatus.OPEN_FOR_SUBMISSION)
-    )
-    await upsert_tender(db_session, _tender("TEST-EP-AWARDED", status=TenderStatus.AWARDED))
-    await db_session.flush()
+    try:
+        await _seed(
+            db_session,
+            _tender("TEST-EP-OPEN", status=TenderStatus.OPEN_FOR_SUBMISSION),
+            _tender("TEST-EP-AWARDED", status=TenderStatus.AWARDED),
+        )
 
-    response = db_client.get("/tenders", params={"cpv": ENDPOINT_TEST_CPV, "status": "awarded"})
+        response = client.get("/tenders", params={"cpv": ENDPOINT_TEST_CPV, "status": "awarded"})
 
-    body = response.json()
-    assert body["total"] == 1
-    assert body["items"][0]["expediente"] == "TEST-EP-AWARDED"
+        body = response.json()
+        assert body["total"] == 1
+        assert body["items"][0]["expediente"] == "TEST-EP-AWARDED"
+    finally:
+        await _cleanup(db_session)
 
 
 def test_get_tenders_rejects_limit_over_max(client: TestClient) -> None:
