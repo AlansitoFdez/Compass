@@ -25,6 +25,8 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "celery-types>=0.26.0",
+    "mypy>=2.3.1",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.16.2",
@@ -57,6 +59,12 @@ extend-immutable-calls = ["fastapi.Depends"]
 
 [tool.ruff.format]
 quote-style = "double"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
