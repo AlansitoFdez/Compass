@@ -11,7 +11,10 @@ celery_app = Celery(
     include=["compass.ingestion.tasks"],
 )
 
-celery_app.conf.timezone = "Europe/Madrid"
+# celery-types tipa conf.timezone como una propiedad de solo lectura que
+# devuelve tzinfo -- pero en runtime, Config.__setattr__ es dinámico (como un
+# dict) y sí acepta un string, que es justo lo que necesita crontab() más abajo.
+celery_app.conf.timezone = "Europe/Madrid"  # type: ignore[misc, assignment]
 celery_app.conf.beat_schedule = {
     "daily-ingestion": {
         "task": "daily_ingestion",

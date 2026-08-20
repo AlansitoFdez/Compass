@@ -2,6 +2,8 @@
 failure, and skipping content a previous complete run already ingested.
 """
 
+from typing import cast
+
 from compass.core.redis_client import get_redis_client
 
 LAST_PROCESSED_URL_KEY = "ingestion:atom:last_processed_url"
@@ -9,8 +11,15 @@ PENDING_HIGH_WATER_MARK_KEY = "ingestion:atom:pending_high_water_mark"
 HIGH_WATER_MARK_KEY = "ingestion:atom:high_water_mark"
 
 
+def _get_str(key: str) -> str | None:
+    # redis-py types .get() as bytes | str | None, since it depends on the
+    # client's decode_responses setting -- get_redis_client() always sets it
+    # True, so this is always really a str, never bytes.
+    return cast("str | None", get_redis_client().get(key))
+
+
 def get_last_processed_atom_url() -> str | None:
-    return get_redis_client().get(LAST_PROCESSED_URL_KEY)
+    return _get_str(LAST_PROCESSED_URL_KEY)
 
 
 def set_last_processed_atom_url(url: str) -> None:
@@ -26,7 +35,7 @@ def get_high_water_mark() -> str | None:
     entries at or before this point were already processed and don't need
     to be walked again.
     """
-    return get_redis_client().get(HIGH_WATER_MARK_KEY)
+    return _get_str(HIGH_WATER_MARK_KEY)
 
 
 def clear_high_water_mark() -> None:
@@ -34,7 +43,7 @@ def clear_high_water_mark() -> None:
 
 
 def get_pending_high_water_mark() -> str | None:
-    return get_redis_client().get(PENDING_HIGH_WATER_MARK_KEY)
+    return _get_str(PENDING_HIGH_WATER_MARK_KEY)
 
 
 def clear_pending_high_water_mark() -> None:

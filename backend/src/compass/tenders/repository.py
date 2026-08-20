@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func
@@ -37,7 +37,7 @@ async def list_tenders(
     limit: int,
     offset: int,
 ) -> tuple[list[Tender], int]:
-    filters = []
+    filters: list[ColumnElement[bool]] = []
     if cpv is not None:
         # Prefijo, no exacto: la 1.10 usaba `@>` (coincidencia exacta) para
         # evitar un unnest(), pero eso rompe el caso de uso real -- filtrar
