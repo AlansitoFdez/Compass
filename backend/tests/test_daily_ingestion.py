@@ -1,5 +1,6 @@
 """Tests for the daily ingestion orchestration — commit behavior in particular."""
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import httpx2
@@ -43,7 +44,7 @@ def _malformed_entry(suffix: str) -> bytes:
 
 
 @pytest.fixture(autouse=True)
-def _clean_checkpoint():
+def _clean_checkpoint() -> Iterator[None]:
     clear_last_processed_atom_url()
     clear_high_water_mark()
     clear_pending_high_water_mark()

@@ -4,7 +4,7 @@ in test_tender_repository.py; here we only need one filter exercised end to
 end to prove the query params actually reach list_tenders().
 """
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -42,7 +42,7 @@ def _tender(expediente: str, **overrides: object) -> TenderSchema:
 
 
 @pytest.fixture
-def db_client(db_session: AsyncSession) -> TestClient:
+def db_client(db_session: AsyncSession) -> Iterator[TestClient]:
     """TestClient cuyo `get_db` está sobrescrito para devolver el `db_session` del
     propio test: lo que se inserta (solo flush, sin commit) en el test es visible
     para la petición HTTP, y el rollback de `db_session` deshace todo al terminar.

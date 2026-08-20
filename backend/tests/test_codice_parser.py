@@ -88,6 +88,7 @@ def test_parse_codice_entry_extracts_all_fields() -> None:
     assert tender.pcap_url is not None
     assert tender.ppt_url is not None
     assert tender.pcap_url != tender.ppt_url
+    assert tender.platform_url is not None
     assert tender.platform_url.startswith("https://contrataciondelestado.es")
     # La fecha del aviso publicado (2026-08-15, medianoche) es real,
     # distinta del instante exacto de atom:updated -- bug 3 de la 1.11.

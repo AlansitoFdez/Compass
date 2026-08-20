@@ -7,7 +7,9 @@ from compass.core.celery_app import celery_app
 
 
 def test_celery_app_uses_madrid_timezone() -> None:
-    assert celery_app.conf.timezone == "Europe/Madrid"
+    # Mismo desajuste de celery-types que en celery_app.py: en runtime esto
+    # es un str, no el tzinfo que el stub anuncia.
+    assert celery_app.conf.timezone == "Europe/Madrid"  # type: ignore[comparison-overlap]
 
 
 def test_daily_ingestion_task_is_registered() -> None:
