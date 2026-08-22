@@ -153,6 +153,11 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Celery beat: estado local del planificador (última ejecución de cada tarea).
+# En Python 3.13 shelve resuelve a dbm.sqlite3, así que son tres archivos:
+# la base, su -wal y su -shm. Se regeneran solos al arrancar el beat.
+celerybeat-schedule*
+
 # Claude Code project instructions — kept locally, not published to GitHub
 CLAUDE.md
 
