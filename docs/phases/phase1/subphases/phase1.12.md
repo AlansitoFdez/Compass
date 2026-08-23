@@ -69,3 +69,18 @@ Primer paquete del recorrido, y el correcto para empezar: los otros cinco depend
 **Verificación.** `uv run ruff check .` limpio, `uv run ruff format .` sin cambios, `uv run mypy` sin incidencias en 44 archivos. Ninguna línea ejecutable tocada, así que la suite no podía moverse.
 
 **Decisión de granularidad de commits.** Un commit por área, no por archivo. Un archivo suelto no es una unidad revisable — el docstring de `config.py` no se juzga sin `db.py` al lado —, no hay nada que bisecar porque no hay cambio de comportamiento, y así cada commit se corresponde uno a uno con su entrada de este log. Con `tests/` partido por el módulo que protege, salen nueve: `core` · `tenders` · `ingestion` · `api` · `alembic` · `tests/core` · `tests/tenders` · `tests/ingestion` · `tests/api`. El *scope* del commit pasa a ser el paquete (`docs(core): ...`) en vez del `backend`/`repo` usado hasta ahora: nueve commits del mismo tipo necesitan que el scope los distinga en el `git log`.
+
+### Paso 2 — `tenders/`
+
+El dominio, en el orden acordado: `enums` → `models` → `schemas` → `vertical` → `repository`. Cinco archivos, `vertical.py` ya estaba completo y no necesitó ningún cambio.
+
+**Lo que se añadió.**
+
+- `enums.py` — docstring en `ContractType` (de dónde sale ese vocabulario cerrado: el esquema CODICE de PLACSP) y en `TenderStatus`, explicando que un cambio de estado es lo que el upsert traduce en un `UPDATE`, nunca en un borrado — el "no hagas" de las retiradas, dicho en el punto exacto del código donde se decide qué estados existen.
+- `models.py` — docstring de la clase `Tender`: que `expediente` es una clave primaria *natural*, no un id inventado, y que es justo lo que permite a `repository.upsert_tender` hacer `ON CONFLICT (expediente) DO UPDATE` en una sola sentencia en vez de consultar antes si la fila ya existe. Antes de escribirlo se verificó contra `repository.py` que la afirmación es exacta y no una suposición.
+- `schemas.py` — docstring de `TenderSchema`. Se comprobó con un `grep` de sus usos antes de escribir nada: la clase trabaja en dos direcciones, como frontera de validación de entrada (`codice_parser.py` la construye desde el feed, y un campo mal formado falla aquí y no tres capas más abajo como error de base de datos) y como forma de salida de la API (`from_attributes=True` es lo que permite a `api/routes/tenders.py` construirla directamente desde una fila ORM con `model_validate`, sin pasar por un dict).
+- `repository.py` — docstring en `upsert_tender` y en `list_tenders`, la única función pública del paquete que no tenía ninguno de los dos.
+
+**Lo que se tradujo.** Los tres bloques de comentarios en español de `repository.py`: el razonamiento del filtro por prefijo CPV frente al de código completo (bug 7 de la 1.11), y el comentario sobre el orden explícito de `published_at` para que `limit`/`offset` sea estable entre llamadas. Y en `models.py`, el comentario del índice GIN y el de por qué `published_at` lleva `index=True`.
+
+**Verificación.** `uv run ruff check .`, `uv run ruff format --check .` y `uv run mypy` limpios sobre los 44 archivos de `src/`. Ningún cambio de comportamiento.
