@@ -28,14 +28,20 @@ BASE_TENDER = TenderSchema(
 
 
 async def _fetch_all(session: AsyncSession, expediente: str) -> list[Tender]:
-    # expire_all(): olvida lo que la sesión tuviera en caché, para releer de
-    # verdad de la base de datos tras un upsert (ver hallazgo en phase1.7.md).
+    """Re-reads every row for `expediente` straight from Postgres, bypassing the session cache.
+
+    `expire_all()` is required here, not decorative: without it, a query
+    right after `upsert_tender` can return the session's stale in-memory
+    copy instead of what Postgres actually has (see the finding in
+    phase1.7.md).
+    """
     session.expire_all()
     result = await session.execute(select(Tender).where(Tender.expediente == expediente))
     return list(result.scalars().all())
 
 
 async def test_upsert_tender_creates_a_new_row(db_session: AsyncSession) -> None:
+    """Protects the base case: upserting a brand-new expediente inserts exactly one row."""
     await upsert_tender(db_session, BASE_TENDER)
     await db_session.flush()
 
@@ -45,6 +51,10 @@ async def test_upsert_tender_creates_a_new_row(db_session: AsyncSession) -> None
 async def test_upsert_tender_processed_twice_with_same_data_is_one_row(
     db_session: AsyncSession,
 ) -> None:
+    """Protects the "no plain INSERT" rule from CLAUDE.md.
+
+    Same expediente processed twice must still be one row.
+    """
     await upsert_tender(db_session, BASE_TENDER)
     await upsert_tender(db_session, BASE_TENDER)
     await db_session.flush()
@@ -55,13 +65,19 @@ async def test_upsert_tender_processed_twice_with_same_data_is_one_row(
 async def test_upsert_tender_updates_fields_and_preserves_created_at(
     db_session: AsyncSession,
 ) -> None:
+    """Protects the update half of upsert: changed fields land, created_at doesn't, updated_at does.
+
+    A republished tender must overwrite `title`/`submission_deadline` in
+    place, keep its original `created_at` (it's still the same row, not a
+    new one), and bump `updated_at` past its previous value.
+    """
     await upsert_tender(db_session, BASE_TENDER)
     await db_session.flush()
     first = (await _fetch_all(db_session, BASE_TENDER.expediente))[0]
-    # Capturados como valores sueltos, no como atributos de `first`: el mapa
-    # de identidad de la sesión muta `first` in-place en la siguiente consulta
-    # (misma fila = mismo objeto Python), así que comparar contra `first.x`
-    # más adelante compararía un objeto contra sí mismo ya actualizado.
+    # Captured as plain values, not as attributes on `first`: the session's
+    # identity map mutates `first` in place on the next query (same row =
+    # same Python object), so comparing against `first.x` later would
+    # compare an already-updated object against itself.
     first_created_at = first.created_at
     first_updated_at = first.updated_at
 
@@ -78,13 +94,14 @@ async def test_upsert_tender_updates_fields_and_preserves_created_at(
     assert second.updated_at > first_updated_at
 
 
-# CPV fuera de la división 72 (servicios TI): ningún dato real ingerido lo usa, así
-# que aísla las filas sintéticas de estas pruebas del resto de la tabla — Docker
-# persiste ~1.200+ licitaciones reales en el mismo Postgres que usan los tests.
+# A CPV outside division 72 (IT services): no real ingested data uses it, so
+# it isolates these tests' synthetic rows from the rest of the table --
+# Docker persists ~1,200+ real tenders in the same Postgres the tests use.
 LIST_TEST_CPV = "99999999"
 
 
 def _list_tender(expediente: str, **overrides: object) -> TenderSchema:
+    """A minimal valid `TenderSchema` for the `list_tenders` tests, with `overrides` applied."""
     defaults: dict[str, object] = {
         "expediente": expediente,
         "contracting_body": "Ayuntamiento de Prueba",
@@ -105,7 +122,7 @@ def _list_tender(expediente: str, **overrides: object) -> TenderSchema:
 async def test_list_tenders_filters_by_cpv_full_code_acts_as_exact_match(
     db_session: AsyncSession,
 ) -> None:
-    """Un prefijo de 8 dígitos completo no coincide con ningún otro código."""
+    """Protects the full-8-digit-code path: an exact match, never a prefix match on another code."""
     await upsert_tender(
         db_session, _list_tender("TEST-LIST-CPV-MATCH", cpv_codes=[LIST_TEST_CPV, "72200000"])
     )
@@ -119,8 +136,9 @@ async def test_list_tenders_filters_by_cpv_full_code_acts_as_exact_match(
 
 
 async def test_list_tenders_filters_by_cpv_division_prefix(db_session: AsyncSession) -> None:
-    """El caso de uso real que estaba roto: filtrar por división (bug 7 de la
-    1.11) -- LIST_TEST_CPV = "99999999" cae bajo la división sintética "999".
+    """Protects the real use case that used to be broken: filtering by division (bug 7 of 1.11).
+
+    `LIST_TEST_CPV = "99999999"` falls under the synthetic division "999".
     """
     await upsert_tender(
         db_session, _list_tender("TEST-LIST-CPV-DIV-MATCH", cpv_codes=[LIST_TEST_CPV])
@@ -139,6 +157,10 @@ async def test_list_tenders_filters_by_cpv_division_prefix(db_session: AsyncSess
 async def test_list_tenders_filters_by_cpv_normalizes_the_check_digit(
     db_session: AsyncSession,
 ) -> None:
+    """Protects a caller passing a CPV filter with its check digit still attached.
+
+    E.g. a value typed into a UI field, not yet normalized by the caller.
+    """
     await upsert_tender(
         db_session, _list_tender("TEST-LIST-CPV-CHECKDIGIT", cpv_codes=[LIST_TEST_CPV])
     )
@@ -151,6 +173,7 @@ async def test_list_tenders_filters_by_cpv_normalizes_the_check_digit(
 
 
 async def test_list_tenders_filters_by_status(db_session: AsyncSession) -> None:
+    """Protects the `status` filter: only tenders in the requested status come back."""
     await upsert_tender(
         db_session, _list_tender("TEST-LIST-STATUS-OPEN", status=TenderStatus.OPEN_FOR_SUBMISSION)
     )
@@ -168,6 +191,7 @@ async def test_list_tenders_filters_by_status(db_session: AsyncSession) -> None:
 
 
 async def test_list_tenders_filters_by_budget_range(db_session: AsyncSession) -> None:
+    """Protects `min_budget`/`max_budget` as independent, inclusive bounds."""
     await upsert_tender(
         db_session, _list_tender("TEST-LIST-BUDGET-LOW", budget_with_vat=Decimal("5000.00"))
     )
@@ -188,6 +212,7 @@ async def test_list_tenders_filters_by_budget_range(db_session: AsyncSession) ->
 
 
 async def test_list_tenders_filters_by_location(db_session: AsyncSession) -> None:
+    """Protects the `location` filter: an exact match on `location`."""
     await upsert_tender(db_session, _list_tender("TEST-LIST-LOC-AST", location="Asturias"))
     await upsert_tender(db_session, _list_tender("TEST-LIST-LOC-MAD", location="Madrid"))
     await db_session.flush()
@@ -201,13 +226,14 @@ async def test_list_tenders_filters_by_location(db_session: AsyncSession) -> Non
 
 
 async def test_list_tenders_combines_filters_with_and(db_session: AsyncSession) -> None:
+    """Protects AND semantics: a row matching only one of two given filters must not come back."""
     await upsert_tender(
         db_session,
         _list_tender("TEST-LIST-AND-MATCH", status=TenderStatus.AWARDED, location="Madrid"),
     )
     await upsert_tender(
         db_session,
-        # Coincide en status pero no en location: probaría un OR por error.
+        # Matches on status but not on location: would pass under an OR by mistake.
         _list_tender("TEST-LIST-AND-PARTIAL", status=TenderStatus.AWARDED, location="Asturias"),
     )
     await db_session.flush()
@@ -228,6 +254,10 @@ async def test_list_tenders_combines_filters_with_and(db_session: AsyncSession) 
 async def test_list_tenders_orders_by_published_at_desc_and_paginates(
     db_session: AsyncSession,
 ) -> None:
+    """Protects newest-first ordering.
+
+    Also that limit/offset return consistent, non-overlapping pages.
+    """
     now = datetime.now(UTC)
     await upsert_tender(
         db_session, _list_tender("TEST-LIST-PAGE-OLD", published_at=now - timedelta(days=2))

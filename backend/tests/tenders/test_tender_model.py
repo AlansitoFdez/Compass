@@ -11,6 +11,15 @@ from compass.tenders.schemas import TenderSchema
 
 
 async def test_tender_persists_and_round_trips(db_session: AsyncSession) -> None:
+    """Protects the ORM mapping end to end: insert, fetch back, and re-validate as a schema.
+
+    In particular, that `contract_type`/`status` come back as real enum
+    members (not the raw stored strings) -- the `values_callable=` mapping
+    in `models.py` is what makes that work, and a regression there would
+    silently pass a string where an enum is expected instead of failing loud.
+    Also that `created_at`'s `server_default=func.now()` actually fires, and
+    that a fetched row can build a `TenderSchema` via `from_attributes=True`.
+    """
     tender = Tender(
         expediente="TEST-0001",
         contracting_body="Ayuntamiento de Prueba",

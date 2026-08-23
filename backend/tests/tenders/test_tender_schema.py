@@ -22,6 +22,11 @@ VALID_DATA = {
 
 
 def test_tender_schema_accepts_valid_data() -> None:
+    """Protects against a required field turning optional, or a default silently changing.
+
+    `budget_with_vat is None` confirms fields genuinely absent from
+    `VALID_DATA` fall back to their declared default rather than raising.
+    """
     schema = TenderSchema(**VALID_DATA)
 
     assert schema.contract_type is ContractType.SERVICES
@@ -29,5 +34,9 @@ def test_tender_schema_accepts_valid_data() -> None:
 
 
 def test_tender_schema_rejects_invalid_status() -> None:
+    """Protects the closed `TenderStatus` set.
+
+    An unrecognized value must fail loud, not slip in as a plain string.
+    """
     with pytest.raises(ValidationError):
         TenderSchema(**{**VALID_DATA, "status": "not_a_real_status"})
