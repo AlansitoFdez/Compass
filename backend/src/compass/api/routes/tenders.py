@@ -27,6 +27,15 @@ async def get_tenders(
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_db),
 ) -> TenderListResponse:
+    """Lists tenders matching every given filter, paginated.
+
+    All filter query params are optional and AND together, mirroring
+    `repository.list_tenders`. `limit` is capped at `MAX_LIMIT` so a client
+    can't request the whole table in one call.
+
+    Returns:
+        The matching page, plus `total` across all pages.
+    """
     items, total = await list_tenders(
         session,
         cpv=cpv,
