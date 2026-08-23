@@ -6,6 +6,22 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Environment-backed configuration for the whole application.
+
+    Values are read from the environment first and from `.env` as a fallback.
+    Fields without a default are required, so a missing one stops the process
+    at startup with a validation error naming the field, instead of surfacing
+    much later as an obscure connection failure.
+
+    Attributes:
+        app_env: Name of the deployment environment.
+        log_level: Root log level used by the entry points.
+        database_url: PostgreSQL DSN, in its plain `postgresql://` form; the
+            async driver is spliced in by `compass.core.db`.
+        redis_url: Redis DSN, shared by the Celery broker and the ingestion
+            checkpoint store.
+    """
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_env: str = "development"
@@ -16,4 +32,12 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """The settings instance shared by the whole process.
+
+    Cached so `.env` is parsed once and every caller sees the same object,
+    which is what makes it safe to call this at import time.
+
+    Returns:
+        The validated settings for this process.
+    """
     return Settings()

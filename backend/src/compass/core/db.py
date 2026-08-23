@@ -15,7 +15,12 @@ from compass.core.config import get_settings
 
 
 class Base(DeclarativeBase):
-    pass
+    """Declarative base every ORM model inherits from.
+
+    Its `metadata` is the single registry of tables that Alembic's
+    `--autogenerate` diffs against the live database, which is why
+    `alembic/env.py` must import each model module for its table to be seen.
+    """
 
 
 def _async_database_url(database_url: str) -> str:

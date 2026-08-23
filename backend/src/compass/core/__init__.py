@@ -1,1 +1,1 @@
-"""Cross-cutting infrastructure shared across the app (config, and later db/cache)."""
+"""Cross-cutting infrastructure: settings, database engine, Redis client, Celery app."""

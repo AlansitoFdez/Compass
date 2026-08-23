@@ -11,9 +11,9 @@ celery_app = Celery(
     include=["compass.ingestion.tasks"],
 )
 
-# celery-types tipa conf.timezone como una propiedad de solo lectura que
-# devuelve tzinfo -- pero en runtime, Config.__setattr__ es dinámico (como un
-# dict) y sí acepta un string, que es justo lo que necesita crontab() más abajo.
+# celery-types declares conf.timezone as a read-only property returning tzinfo
+# -- but at runtime Config.__setattr__ is dynamic (dict-like) and does accept a
+# string, which is exactly what crontab() below needs.
 celery_app.conf.timezone = "Europe/Madrid"  # type: ignore[misc, assignment]
 celery_app.conf.beat_schedule = {
     "daily-ingestion": {
