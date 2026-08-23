@@ -105,3 +105,17 @@ El paquete más grande del recorrido: `atom_client` → `feed_reader` → `check
 - `historical_loader.py` — el comentario sobre `httpx2.Client` síncrono, el de `logging.basicConfig` en el bloque `__main__`, y el mensaje de `logger.info(...)` de `_main` (estaba en español; se tradujo por coherencia con el resto de mensajes de log del proyecto, todos en inglés, aunque no es un docstring ni un comentario).
 
 **Verificación.** `uv run ruff check .`, `uv run ruff format --check .` y `uv run mypy` limpios tras cada archivo tocado. Ningún cambio de comportamiento.
+
+### Paso 4 — `api/` + `main.py`
+
+El paquete más fino de todo el recorrido: cinco archivos, ninguno con lógica propia más allá de adaptar HTTP a `tenders/repository.py`. Sin comentarios en español que traducir — solo faltaban docstrings.
+
+**Lo que se añadió.**
+
+- `main.py` — docstring de módulo y de `create_app()`, el único archivo del paquete que no tenía ninguno de los dos.
+- `api/routes/health.py` — docstring de `health_check`.
+- `api/routes/tenders.py` — docstring de `get_tenders`, con `Returns:` explícito.
+
+`api/__init__.py`, `api/routes/__init__.py` y `api/router.py` ya tenían su docstring de módulo y no necesitaron ningún cambio.
+
+**Verificación.** `uv run ruff check .`, `uv run ruff format --check .` y `uv run mypy` limpios. Ningún cambio de comportamiento.
