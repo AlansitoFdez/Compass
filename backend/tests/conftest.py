@@ -1,3 +1,5 @@
+"""Shared pytest fixtures: a real-app test client and a rollback-backed real DB session."""
+
 import asyncio
 import sys
 from collections.abc import AsyncGenerator
@@ -20,6 +22,7 @@ if sys.platform == "win32":
 
 @pytest.fixture
 def client() -> TestClient:
+    """A client against the real app -- routes exercised end-to-end, nothing mocked out."""
     return TestClient(app)
 
 
