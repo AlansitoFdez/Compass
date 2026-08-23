@@ -84,3 +84,24 @@ El dominio, en el orden acordado: `enums` → `models` → `schemas` → `vertic
 **Lo que se tradujo.** Los tres bloques de comentarios en español de `repository.py`: el razonamiento del filtro por prefijo CPV frente al de código completo (bug 7 de la 1.11), y el comentario sobre el orden explícito de `published_at` para que `limit`/`offset` sea estable entre llamadas. Y en `models.py`, el comentario del índice GIN y el de por qué `published_at` lleva `index=True`.
 
 **Verificación.** `uv run ruff check .`, `uv run ruff format --check .` y `uv run mypy` limpios sobre los 44 archivos de `src/`. Ningún cambio de comportamiento.
+
+### Paso 3 — `ingestion/`
+
+El paquete más grande del recorrido: `atom_client` → `feed_reader` → `checkpoint` → `codice_codes` → `codice_parser` → `daily_ingestion` → `tasks` → `historical_loader`. Ocho archivos; `daily_ingestion.py` ya estaba completo y no necesitó ningún cambio.
+
+**Lo que se añadió.**
+
+- `atom_client.py` — docstring de la dataclass `AtomPage` (qué es cada campo, y que `entries` llega sin el CODICE parseado todavía).
+- `feed_reader.py` — docstring de `_entry_updated_at`, el único hueco; `ingest_atom_feed` ya traía uno completo.
+- `checkpoint.py` — el peor del paquete: 7 docstrings, uno por función pública/privada que no tenía ninguno (`_get_str`, `get_resume_url`, `set_resume_url`, `clear_resume_url`, `clear_high_water_mark`, `get_pending_high_water_mark`, `clear_pending_high_water_mark`).
+- `codice_codes.py` — docstring en las tres funciones de traducción código→dominio (`get_contract_type`, `get_status`, `get_procedure_type_label`), con un `Raises:` explícito en las tres. El de `get_procedure_type_label` deja constancia de por qué devuelve `str` y no un enum: `procedure_type` es un conjunto abierto por diseño, así que un código CODICE nuevo es una fila más en el diccionario, no un cambio de esquema.
+- `codice_parser.py` — 7 docstrings (`_text`, `_decimal`, `_cpv_codes`, `_submission_deadline`, `_document_url`, `_platform_url`, `_updated_at`); `_required_text` y `_published_at` ya los tenían y no se tocaron.
+- `tasks.py` — docstring de `_run()` (por qué construye su propio engine desechable, remitiendo al porqué ya documentado en `create_task_engine()`) y de `daily_ingestion_task()` (qué devuelve, incluido el caso de ejecución saltada por el lock).
+- `historical_loader.py` — docstring en `monthly_archive_url`, `iter_entries_from_zip`, `iter_entries_from_url` y `_main`.
+
+**Lo que se tradujo.**
+
+- `tasks.py` — los tres bloques de comentarios en español: la justificación de `LOCK_TIMEOUT_SECONDS`, el motivo de saltar una ejecución solapada, y el caso borde de `LockError` al liberar un lock ya expirado.
+- `historical_loader.py` — el comentario sobre `httpx2.Client` síncrono, el de `logging.basicConfig` en el bloque `__main__`, y el mensaje de `logger.info(...)` de `_main` (estaba en español; se tradujo por coherencia con el resto de mensajes de log del proyecto, todos en inglés, aunque no es un docstring ni un comentario).
+
+**Verificación.** `uv run ruff check .`, `uv run ruff format --check .` y `uv run mypy` limpios tras cada archivo tocado. Ningún cambio de comportamiento.
