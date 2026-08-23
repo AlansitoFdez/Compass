@@ -11,6 +11,8 @@ from enum import StrEnum
 
 
 class ContractType(StrEnum):
+    """The closed set of contract types PLACSP's CODICE schema defines."""
+
     SERVICES = "services"
     SUPPLIES = "supplies"
     WORKS = "works"
@@ -25,6 +27,14 @@ class ContractType(StrEnum):
 
 
 class TenderStatus(StrEnum):
+    """Where a tender sits in its own lifecycle, as PLACSP reports it.
+
+    Order matters here: PLACSP republishes the same expediente every time it
+    changes state, and a status change is what tells the upsert whether a
+    tender that was `OPEN_FOR_SUBMISSION` yesterday is now `CANCELLED` — never
+    a physical delete.
+    """
+
     PRIOR_NOTICE = "prior_notice"
     OPEN_FOR_SUBMISSION = "open_for_submission"
     PENDING_AWARD = "pending_award"

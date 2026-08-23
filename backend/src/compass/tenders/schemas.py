@@ -9,6 +9,16 @@ from compass.tenders.enums import ContractType, TenderStatus
 
 
 class TenderSchema(BaseModel):
+    """A tender, validated -- the shape shared by ingestion input and API output.
+
+    `codice_parser` builds one from a parsed CODICE `<entry>` before it ever
+    reaches `repository.upsert_tender`, so a malformed feed entry fails here,
+    at the boundary, rather than surfacing later as a database error.
+    `from_attributes=True` is what also lets the API build one straight from
+    an ORM `Tender` row (`TenderSchema.model_validate(item)`) instead of
+    requiring a dict -- one schema serves both directions.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     expediente: str

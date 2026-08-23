@@ -13,12 +13,20 @@ from compass.tenders.enums import ContractType, TenderStatus
 
 
 class Tender(Base):
+    """One licitación, keyed by its own `expediente` -- never a surrogate id.
+
+    PLACSP republishes the same expediente every time a tender changes (new
+    status, updated budget, a new deadline), so `expediente` doubles as the
+    conflict target for `repository.upsert_tender`: the same row is updated
+    in place, and a withdrawal is a `status` change, never a row deletion.
+    """
+
     __tablename__ = "tenders"
     __table_args__ = (
-        # GIN sobre el array: acelera `@>`/`&&`/`=` (el caso de código CPV
-        # completo, ver repository.py). No acelera el LIKE sobre elementos
-        # desanidados que usa el filtro por prefijo/división -- ese sigue
-        # siendo Seq Scan, documentado en phase1.11.md (paso 7).
+        # GIN on the array speeds up `@>`/`&&`/`=` (the full-CPV-code case, see
+        # repository.py). It does NOT speed up the LIKE over unnested elements
+        # used by the prefix/division filter -- that stays a Seq Scan,
+        # documented in phase1.11.md (step 7).
         Index("ix_tenders_cpv_codes_gin", "cpv_codes", postgresql_using="gin"),
     )
 
@@ -54,7 +62,7 @@ class Tender(Base):
     ppt_url: Mapped[str | None] = mapped_column(String)
     platform_url: Mapped[str | None] = mapped_column(String)
 
-    # index=True: GET /tenders siempre ordena por este campo (ver repository.py).
+    # index=True: GET /tenders always orders by this field (see repository.py).
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     updated_at_source: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
