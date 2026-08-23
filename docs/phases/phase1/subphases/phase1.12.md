@@ -119,3 +119,16 @@ El paquete más fino de todo el recorrido: cinco archivos, ninguno con lógica p
 `api/__init__.py`, `api/routes/__init__.py` y `api/router.py` ya tenían su docstring de módulo y no necesitaron ningún cambio.
 
 **Verificación.** `uv run ruff check .`, `uv run ruff format --check .` y `uv run mypy` limpios. Ningún cambio de comportamiento.
+
+### Paso 5 — `alembic/`
+
+`env.py` y los tres archivos de `versions/`. Sin comentarios en español, pero con la plantilla genérica de Alembic (`"""Upgrade schema."""` / `"""Downgrade schema."""`) en `upgrade()`/`downgrade()` de las tres migraciones — el tipo de docstring que reformula el nombre sin decir nada, así que se reescribieron los seis con lo que cada uno hace de verdad. Cambiar ese texto no toca ni una línea de DDL: es comentario puro sobre migraciones ya aplicadas, cero riesgo.
+
+**Lo que se añadió.**
+
+- `env.py` — docstring de módulo (estaba en la lista de módulos sin él) y de `do_run_migrations`, explicando por qué recibe una `Connection` síncrona pese a que la app usa un engine async (el puente es `AsyncConnection.run_sync` dentro de `run_async_migrations`).
+- Las tres migraciones — `upgrade()`/`downgrade()` reescritos con lo que cada uno hace, en vez de la plantilla genérica.
+
+**Un hallazgo verificado contra la base de datos real, no supuesto.** La migración `364d5b8e1271` se titula *"expand contract_type and add cancelled status"*, pero su `upgrade()` solo toca `contract_type`. Antes de escribir el docstring se comprobó contra Postgres (`docker compose up -d`, consulta a `pg_constraint` e `information_schema.columns`, luego `docker compose down` sin `-v` para dejarlo como estaba): la tabla `tenders` no tiene ningún `CHECK` constraint, ni en `contract_type` ni en `status`. Con `Enum(native_enum=False)`, SQLAlchemy 2.0 solo guarda un `VARCHAR` limitado por longitud — nada más. `contract_type` pasó de `VARCHAR(8)` a `VARCHAR(28)` porque `"public_private_collaboration"` no cabía; `status` ya era `VARCHAR(19)` por `"open_for_submission"`, y `"cancelled"` (9 caracteres) entraba de sobra sin tocar nada. El título de la migración prometía más de lo que el código hace, y ahora los docstrings de `upgrade()`/`downgrade()` lo dejan explícito.
+
+**Verificación.** `uv run ruff check .`, `uv run ruff format --check .` y `uv run mypy` limpios. Ningún cambio de comportamiento ni de DDL.
