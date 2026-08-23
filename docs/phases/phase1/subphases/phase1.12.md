@@ -46,3 +46,26 @@ Dos decisiones tomadas al planificar:
 4. Ningún docstring se limita a reformular el nombre de la función. En los tests, cada uno dice **qué comportamiento protege**.
 
 ## Progreso
+
+### Paso 1 — `core/`
+
+Primer paquete del recorrido, y el correcto para empezar: los otros cinco dependen de él y ninguno al revés. Cinco archivos, todos tocados, ninguna línea ejecutable modificada.
+
+**Lo que se añadió.**
+
+- `config.py` — docstring de `Settings` con sección `Attributes:` para los cuatro campos, y de `get_settings()`. Lo que había que dejar escrito no es que la clase "guarda configuración", sino dos decisiones que el código no enseña por sí solo: que el orden de precedencia es *entorno primero, `.env` como respaldo*, y que un campo sin valor por defecto (`database_url`, `redis_url`) hace que el proceso muera al arrancar con un error de validación que nombra el campo — en vez de arrancar bien y fallar mucho después con un error de conexión ilegible. El `lru_cache` de `get_settings()` es lo que hace seguro llamarlo en tiempo de importación, y por eso se dice en su docstring.
+- `db.py` — docstring de `Base`, explicando que su `metadata` es el registro único de tablas contra el que `alembic --autogenerate` hace el diff, que es la razón de que `alembic/env.py` tenga que importar cada módulo de modelos. Es la trampa documentada en `CLAUDE.md` — un modelo no importado genera una migración vacía sin avisar — y ahora está dicha también en el punto del código donde muerde.
+- `redis_client.py` — docstring de `get_redis_client()`: `decode_responses=True` hace que todo vuelva como `str` y no como `bytes`, que es exactamente lo que permite a los helpers de checkpoint comparar cadenas planas sin decodificar. Y que construir el cliente no toca la red: las conexiones se abren perezosamente.
+
+**Lo que se corrigió.**
+
+- El docstring de módulo de `redis_client.py` decía *"used by the ingestion pipeline (Celery, 1.9+)"*. La referencia a una subfase envejece mal y no informa a quien lee el archivo dentro de seis meses; se sustituyó por sus dos consumidores reales: el broker de Celery y los checkpoints de la ingesta.
+- El de `core/__init__.py` decía *"config, and later db/cache"*. Ese "later" ya llegó — se actualizó a lo que el paquete contiene hoy.
+
+**Lo que se tradujo.**
+
+- `celery_app.py` — el comentario de tres líneas que justifica el `# type: ignore[misc, assignment]` sobre `conf.timezone`. Es justo el tipo de comentario que la convención quiere conservar: no describe la línea, explica por qué el tipado miente (`celery-types` declara la propiedad como solo-lectura devolviendo `tzinfo`, pero en ejecución `Config.__setattr__` es dinámico y sí acepta la cadena que `crontab()` necesita). Traducirlo era obligatorio; borrarlo habría sido perder la única razón por la que ese `ignore` está justificado.
+
+**Verificación.** `uv run ruff check .` limpio, `uv run ruff format .` sin cambios, `uv run mypy` sin incidencias en 44 archivos. Ninguna línea ejecutable tocada, así que la suite no podía moverse.
+
+**Decisión de granularidad de commits.** Un commit por área, no por archivo. Un archivo suelto no es una unidad revisable — el docstring de `config.py` no se juzga sin `db.py` al lado —, no hay nada que bisecar porque no hay cambio de comportamiento, y así cada commit se corresponde uno a uno con su entrada de este log. Con `tests/` partido por el módulo que protege, salen nueve: `core` · `tenders` · `ingestion` · `api` · `alembic` · `tests/core` · `tests/tenders` · `tests/ingestion` · `tests/api`. El *scope* del commit pasa a ser el paquete (`docs(core): ...`) en vez del `backend`/`repo` usado hasta ahora: nueve commits del mismo tipo necesitan que el scope los distinga en el `git log`.
