@@ -1,3 +1,5 @@
+"""Alembic migration runner, wired to the app's own async engine and models."""
+
 import asyncio
 import sys
 from logging.config import fileConfig
@@ -50,6 +52,12 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    """Runs pending migrations synchronously over an already-open connection.
+
+    Alembic's migration machinery is sync; `run_async_migrations()` bridges
+    into it via `AsyncConnection.run_sync`, which is what hands this function
+    a plain sync `Connection` despite the app using an async engine.
+    """
     context.configure(connection=connection, target_metadata=target_metadata)
 
     with context.begin_transaction():
