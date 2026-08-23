@@ -22,6 +22,7 @@ BASE_URL = "https://contrataciondelsectorpublico.gob.es/sindicacion/sindicacion_
 
 
 def monthly_archive_url(year: int, month: int) -> str:
+    """URL of PLACSP's monthly archive ZIP for `year`-`month`."""
     return f"{BASE_URL}/licitacionesPerfilesContratanteCompleto3_{year:04d}{month:02d}.zip"
 
 
@@ -52,6 +53,7 @@ def download_archive(url: str, client: httpx2.Client) -> Path:
 
 
 def iter_entries_from_zip(zip_path: Path) -> Iterator[Element]:
+    """Yields every <entry> across all `.atom` pages packed inside the archive."""
     with zipfile.ZipFile(zip_path) as zf:
         for name in zf.namelist():
             if not name.endswith(".atom"):
@@ -62,6 +64,7 @@ def iter_entries_from_zip(zip_path: Path) -> Iterator[Element]:
 
 
 def iter_entries_from_url(url: str, client: httpx2.Client) -> Iterator[Element]:
+    """Downloads the archive at `url`, yields its entries, then deletes the temp file."""
     zip_path = download_archive(url, client)
     try:
         yield from iter_entries_from_zip(zip_path)
@@ -90,24 +93,25 @@ async def load_month(year: int, month: int, client: httpx2.Client, session: Asyn
 
 
 async def _main() -> None:
+    """CLI entry point: loads the last three months, committing once per month."""
     from compass.core.db import async_session_factory
 
-    # httpx2.Client es deliberadamente síncrono (ver ingestion/tasks.py) --
-    # no admite "async with", solo el "with" normal.
+    # httpx2.Client is deliberately synchronous (see ingestion/tasks.py) --
+    # it doesn't support "async with", only the plain "with".
     with httpx2.Client(timeout=60) as client:
         async with async_session_factory() as session:
             for year, month in recent_months(3):
                 count = await load_month(year, month, client, session)
                 await session.commit()
-                logger.info("%04d-%02d: %d licitaciones del vertical guardadas", year, month, count)
+                logger.info("%04d-%02d: %d IT-vertical tenders saved", year, month, count)
 
 
 if __name__ == "__main__":
     import asyncio
     import sys
 
-    # Sin esto, logger.info() no imprime nada al correr como script suelto
-    # -- print() lo daba gratis, logging necesita un handler configurado.
+    # Without this, logger.info() prints nothing when run as a standalone
+    # script -- print() gave that for free, logging needs a configured handler.
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     if sys.platform == "win32":

@@ -51,6 +51,11 @@ PROCEDURE_TYPE_LABELS: dict[str, str] = {
 
 
 def get_contract_type(code: str) -> ContractType:
+    """Maps a CODICE ContractCode to its `ContractType`.
+
+    Raises:
+        ValueError: `code` is not one of the known CODICE codes.
+    """
     try:
         return CONTRACT_TYPE_CODES[code]
     except KeyError:
@@ -58,6 +63,11 @@ def get_contract_type(code: str) -> ContractType:
 
 
 def get_status(code: str) -> TenderStatus:
+    """Maps a CODICE SyndicationContractFolderStatusCode to its `TenderStatus`.
+
+    Raises:
+        ValueError: `code` is not one of the known CODICE codes.
+    """
     try:
         return STATUS_CODES[code]
     except KeyError:
@@ -65,6 +75,15 @@ def get_status(code: str) -> TenderStatus:
 
 
 def get_procedure_type_label(code: str) -> str:
+    """Maps a CODICE SyndicationTenderingProcessCode to its Spanish label.
+
+    Returns the label as a plain string, not an enum -- `procedure_type` is
+    an open set (see `compass.tenders.enums`), so a new code PLACSP starts
+    using is a data update here, not a schema change.
+
+    Raises:
+        ValueError: `code` is not one of the known CODICE codes.
+    """
     try:
         return PROCEDURE_TYPE_LABELS[code]
     except KeyError:

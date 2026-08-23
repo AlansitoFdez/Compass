@@ -12,21 +12,27 @@ HIGH_WATER_MARK_KEY = "ingestion:atom:high_water_mark"
 
 
 def _get_str(key: str) -> str | None:
-    # redis-py types .get() as bytes | str | None, since it depends on the
-    # client's decode_responses setting -- get_redis_client() always sets it
-    # True, so this is always really a str, never bytes.
+    """Reads a key back as `str`, never `bytes`.
+
+    redis-py types `.get()` as `bytes | str | None`, since it depends on the
+    client's `decode_responses` setting -- `get_redis_client()` always sets it
+    `True`, so this is always really a `str`.
+    """
     return cast("str | None", get_redis_client().get(key))
 
 
 def get_resume_url() -> str | None:
+    """The page URL to resume the in-progress run from, or `None` for a fresh start."""
     return _get_str(RESUME_URL_KEY)
 
 
 def set_resume_url(url: str) -> None:
+    """Records `url` as the page to resume from if this run is interrupted."""
     get_redis_client().set(RESUME_URL_KEY, url)
 
 
 def clear_resume_url() -> None:
+    """Forgets the resume point -- there is nothing left to resume."""
     get_redis_client().delete(RESUME_URL_KEY)
 
 
@@ -39,14 +45,17 @@ def get_high_water_mark() -> str | None:
 
 
 def clear_high_water_mark() -> None:
+    """Forgets the promoted checkpoint, so the next run walks the feed from the start."""
     get_redis_client().delete(HIGH_WATER_MARK_KEY)
 
 
 def get_pending_high_water_mark() -> str | None:
+    """The current run's not-yet-promoted high-water mark, or `None` if none was set."""
     return _get_str(PENDING_HIGH_WATER_MARK_KEY)
 
 
 def clear_pending_high_water_mark() -> None:
+    """Discards the pending high-water mark without promoting it."""
     get_redis_client().delete(PENDING_HIGH_WATER_MARK_KEY)
 
 

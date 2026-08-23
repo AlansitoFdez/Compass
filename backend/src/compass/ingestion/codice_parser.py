@@ -32,6 +32,7 @@ MADRID_TZ = ZoneInfo("Europe/Madrid")
 
 
 def _text(element: Element, path: str) -> str | None:
+    """The text at `path`, or `None` if the element is absent or empty."""
     return element.findtext(path, namespaces=NS)
 
 
@@ -50,11 +51,13 @@ def _required_text(element: Element, path: str) -> str:
 
 
 def _decimal(entry: Element, path: str) -> Decimal | None:
+    """The value at `path` as a `Decimal`, or `None` if the field is absent."""
     text = _text(entry, path)
     return Decimal(text) if text is not None else None
 
 
 def _cpv_codes(entry: Element) -> list[str]:
+    """The tender's CPV codes, in document order."""
     path = f"{PROJECT}/cac:RequiredCommodityClassification/cbc:ItemClassificationCode"
     # code.text is None for an empty <ItemClassificationCode/> — real, seen in
     # the wild. Dropped rather than kept: a code we can't read isn't usable
@@ -63,6 +66,13 @@ def _cpv_codes(entry: Element) -> list[str]:
 
 
 def _submission_deadline(entry: Element) -> datetime | None:
+    """The tender submission deadline, or `None` if it has none.
+
+    CODICE splits it into a date and an optional time; a missing time
+    defaults to midnight rather than dropping the deadline. The result is
+    always timezone-aware, in `Europe/Madrid` -- CODICE gives no timezone of
+    its own, and PLACSP deadlines are always local Spanish time.
+    """
     period = f"{PROCESS}/cac:TenderSubmissionDeadlinePeriod"
     end_date = _text(entry, f"{period}/cbc:EndDate")
     if end_date is None:
@@ -74,16 +84,24 @@ def _submission_deadline(entry: Element) -> datetime | None:
 
 
 def _document_url(entry: Element, reference_tag: str) -> str | None:
+    """The URL of the attached document referenced by `reference_tag`, or `None`.
+
+    `reference_tag` is the CODICE reference element name (e.g.
+    `"LegalDocumentReference"` for the PCAP, `"TechnicalDocumentReference"`
+    for the PPT) -- the same lookup shape, just pointed at a different tag.
+    """
     path = f"{STATUS_ROOT}/cac:{reference_tag}/cac:Attachment/cac:ExternalReference/cbc:URI"
     return _text(entry, path)
 
 
 def _platform_url(entry: Element) -> str | None:
+    """The tender's page on the contracting platform: the ATOM entry's own `<link>` href."""
     link = entry.find("atom:link", NS)
     return link.get("href") if link is not None else None
 
 
 def _updated_at(entry: Element) -> datetime:
+    """When PLACSP last touched this record -- rewritten on every republish, not a publish date."""
     return datetime.fromisoformat(_required_text(entry, "atom:updated"))
 
 

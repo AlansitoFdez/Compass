@@ -16,6 +16,11 @@ from compass.ingestion.checkpoint import (
 
 
 def _entry_updated_at(entry: Element) -> datetime:
+    """Parses an entry's `atom:updated` timestamp -- the field the high-water mark is built on.
+
+    Raises:
+        ValueError: The entry has no `atom:updated` element.
+    """
     updated = entry.findtext(f"{ATOM_NS}updated")
     if updated is None:
         raise ValueError("Entry is missing atom:updated")

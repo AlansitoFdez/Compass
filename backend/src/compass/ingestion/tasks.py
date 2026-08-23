@@ -17,16 +17,21 @@ from compass.ingestion.daily_ingestion import run_daily_ingestion
 logger = logging.getLogger(__name__)
 
 LOCK_KEY = "ingestion:daily_ingestion:lock"
-# Generosamente por encima de cualquier duración real observada (corridas
-# incrementales de segundos tras el fix de la 1.11; el peor caso documentado
-# en la 1.9 -- un arranque en frío con meses de backlog -- tardó minutos, no
-# horas). Si una corrida de verdad superase esto, el lock expira solo: se
-# prefiere arriesgar un solape excepcional antes que bloquear la ingesta para
-# siempre por un proceso que murió sin liberar el lock.
+# Generously above any observed real duration (incremental runs take seconds
+# after the 1.11 fix; the worst case documented in 1.9 -- a cold start with
+# months of backlog -- took minutes, not hours). If a real run ever exceeded
+# this, the lock expires on its own: an occasional overlap is preferred over
+# blocking ingestion forever because a process died without releasing it.
 LOCK_TIMEOUT_SECONDS = 3600
 
 
 async def _run() -> int:
+    """Runs one ingestion inside its own event loop and engine.
+
+    Builds a throwaway `AsyncEngine` via `create_task_engine()` -- see its
+    docstring for why a Celery task can't reuse the module-level `engine` --
+    and disposes it in `finally`, so nothing outlives this call.
+    """
     engine = create_task_engine()
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
@@ -41,12 +46,18 @@ async def _run() -> int:
 
 @celery_app.task(name="daily_ingestion")
 def daily_ingestion_task() -> int:
+    """Celery entry point for the daily ingestion, guarded by a Redis lock.
+
+    Returns:
+        How many tenders matched the IT vertical and were persisted; `0` if
+        this run was skipped because a previous one was still in progress.
+    """
     lock = get_redis_client().lock(LOCK_KEY, timeout=LOCK_TIMEOUT_SECONDS)
     if not lock.acquire(blocking=False):
-        # Dos corridas a la vez escribirían el mismo checkpoint sin saber la
-        # una de la otra -- páginas saltadas, o una marca de agua promovida
-        # con el valor equivocado (ver phase1.11.md, paso 3). Se salta esta
-        # corrida en vez de arriesgarse a corromper el checkpoint.
+        # Two concurrent runs would write the same checkpoint without knowing
+        # about each other -- skipped pages, or a high-water mark promoted
+        # with the wrong value (see phase1.11.md, step 3). This run is
+        # skipped rather than risking a corrupted checkpoint.
         logger.warning("daily_ingestion: previous run still in progress, skipping")
         return 0
 
@@ -70,6 +81,7 @@ def daily_ingestion_task() -> int:
         try:
             lock.release()
         except LockError:
-            # Ya expiró solo (corrida más larga que LOCK_TIMEOUT_SECONDS) o
-            # ya lo liberó otra cosa -- no hay nada que deshacer aquí.
+            # Already expired on its own (a run longer than
+            # LOCK_TIMEOUT_SECONDS) or already released by something else --
+            # there is nothing to undo here.
             logger.warning("daily_ingestion: lock already expired or released")

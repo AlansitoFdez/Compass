@@ -15,6 +15,14 @@ FEED_URL = (
 
 @dataclass
 class AtomPage:
+    """One page of the PLACSP ATOM feed.
+
+    Attributes:
+        entries: The `<entry>` elements on this page, each with its CODICE
+            content inline -- unparsed at this point, just XML elements.
+        next_url: URL of the next page, or `None` when this is the last one.
+    """
+
     entries: list[Element]
     next_url: str | None
 
