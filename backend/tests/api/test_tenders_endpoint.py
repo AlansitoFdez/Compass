@@ -30,6 +30,7 @@ ENDPOINT_TEST_CPV = "99999998"
 
 
 def _tender(expediente: str, **overrides: object) -> TenderSchema:
+    """A minimal valid `TenderSchema` for the endpoint tests, with `overrides` applied."""
     defaults: dict[str, object] = {
         "expediente": expediente,
         "contracting_body": "Ayuntamiento de Prueba",
@@ -48,12 +49,14 @@ def _tender(expediente: str, **overrides: object) -> TenderSchema:
 
 
 async def _seed(db_session: AsyncSession, *tenders: TenderSchema) -> None:
+    """Upserts and commits `tenders` for real -- see the module docstring for why a real commit."""
     for tender in tenders:
         await upsert_tender(db_session, tender)
     await db_session.commit()
 
 
 async def _cleanup(db_session: AsyncSession) -> None:
+    """Deletes every row this test module seeded, committed for real like `_seed`."""
     await db_session.execute(delete(Tender).where(Tender.cpv_codes.contains([ENDPOINT_TEST_CPV])))
     await db_session.commit()
 
@@ -61,6 +64,10 @@ async def _cleanup(db_session: AsyncSession) -> None:
 async def test_get_tenders_returns_envelope_shape(
     db_session: AsyncSession, client: TestClient
 ) -> None:
+    """Protects the wiring end to end.
+
+    Query params must reach `list_tenders`, and the response must match `TenderListResponse`.
+    """
     try:
         await _seed(db_session, _tender("TEST-EP-SHAPE"))
 
@@ -79,6 +86,11 @@ async def test_get_tenders_returns_envelope_shape(
 async def test_get_tenders_applies_status_filter(
     db_session: AsyncSession, client: TestClient
 ) -> None:
+    """Protects that a query param actually reaches `list_tenders`.
+
+    One filter, exercised end to end -- exhaustive filter logic is already
+    covered at the repository level, in test_tender_repository.py.
+    """
     try:
         await _seed(
             db_session,
@@ -96,12 +108,14 @@ async def test_get_tenders_applies_status_filter(
 
 
 def test_get_tenders_rejects_limit_over_max(client: TestClient) -> None:
+    """Protects `MAX_LIMIT`: a client can't request more than 100 rows in one call."""
     response = client.get("/tenders", params={"limit": 101})
 
     assert response.status_code == 422
 
 
 def test_get_tenders_rejects_negative_offset(client: TestClient) -> None:
+    """Protects against a negative offset being silently accepted instead of rejected."""
     response = client.get("/tenders", params={"offset": -1})
 
     assert response.status_code == 422
