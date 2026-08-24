@@ -13,7 +13,7 @@ from compass.tenders.enums import ContractType, TenderStatus
 
 
 class Tender(Base):
-    """One licitación, keyed by its own `expediente` -- never a surrogate id.
+    """One tender, keyed by its own `expediente` -- never a surrogate id.
 
     PLACSP republishes the same expediente every time a tender changes (new
     status, updated budget, a new deadline), so `expediente` doubles as the

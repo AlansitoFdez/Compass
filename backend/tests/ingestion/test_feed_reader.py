@@ -59,6 +59,7 @@ def _mocked_client(requested: list[str] | None = None) -> httpx2.Client:
     """A client serving `PAGES` from memory; `requested` records every URL asked for, if given."""
 
     def handler(request: httpx2.Request) -> httpx2.Response:
+        """Serves the requested page from `PAGES`, recording the URL if `requested` was given."""
         if requested is not None:
             requested.append(str(request.url))
         return httpx2.Response(200, content=PAGES[str(request.url)])
@@ -94,6 +95,7 @@ def test_checkpoint_reflects_completed_page_even_if_the_next_fetch_then_fails() 
     set_resume_url("https://fake/page-1.atom")
 
     def handler(request: httpx2.Request) -> httpx2.Response:
+        """Serves page 1 normally, then a 500 for any further request (page 2)."""
         if str(request.url) == "https://fake/page-1.atom":
             return httpx2.Response(200, content=PAGE_1)
         return httpx2.Response(500)

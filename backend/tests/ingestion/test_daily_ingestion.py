@@ -68,6 +68,7 @@ async def test_run_daily_ingestion_commits_periodically(db_session: AsyncSession
     feed = _atom_feed(entries)
 
     def handler(request: httpx2.Request) -> httpx2.Response:
+        """Serves the synthetic 3-entry feed for any request."""
         return httpx2.Response(200, content=feed)
 
     client = httpx2.Client(transport=httpx2.MockTransport(handler))
@@ -75,6 +76,7 @@ async def test_run_daily_ingestion_commits_periodically(db_session: AsyncSession
     commit_count = 0
 
     def _on_commit(session: object) -> None:
+        """Counts real commits on `db_session`, via SQLAlchemy's `after_commit` event."""
         nonlocal commit_count
         commit_count += 1
 
@@ -108,6 +110,7 @@ async def test_run_daily_ingestion_skips_a_malformed_entry_without_losing_the_re
     feed = _atom_feed([_malformed_entry("BAD"), _matching_entry("GOOD")])
 
     def handler(request: httpx2.Request) -> httpx2.Response:
+        """Serves the synthetic feed (one malformed entry, one good one) for any request."""
         return httpx2.Response(200, content=feed)
 
     client = httpx2.Client(transport=httpx2.MockTransport(handler))
@@ -143,6 +146,7 @@ async def test_run_daily_ingestion_completes_the_checkpoint_after_the_final_comm
     feed = _atom_feed(entries)
 
     def handler(request: httpx2.Request) -> httpx2.Response:
+        """Serves the synthetic 2-entry feed for any request."""
         return httpx2.Response(200, content=feed)
 
     client = httpx2.Client(transport=httpx2.MockTransport(handler))

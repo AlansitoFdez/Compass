@@ -43,6 +43,7 @@ def test_fetch_atom_page_uses_mocked_transport() -> None:
     """Protects that `fetch_atom_page` requests the given URL and delegates parsing correctly."""
 
     def handler(request: httpx2.Request) -> httpx2.Response:
+        """Confirms the requested URL, then serves a canned two-entry page."""
         assert str(request.url) == "https://fake/page-1.atom"
         return httpx2.Response(200, content=ATOM_WITH_NEXT)
 
@@ -57,6 +58,7 @@ def test_fetch_atom_page_raises_on_http_error() -> None:
     """Protects against a 404/5xx being silently parsed as an empty page instead of raising."""
 
     def handler(request: httpx2.Request) -> httpx2.Response:
+        """Serves a 404 for any request, standing in for a dead or missing feed page."""
         return httpx2.Response(404)
 
     client = httpx2.Client(transport=httpx2.MockTransport(handler))
