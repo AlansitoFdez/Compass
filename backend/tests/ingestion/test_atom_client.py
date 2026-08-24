@@ -21,6 +21,7 @@ ATOM_LAST_PAGE = b"""<?xml version="1.0" encoding="UTF-8"?>
 
 
 def test_parse_atom_page_extracts_entries_and_next_url() -> None:
+    """Protects the happy path: both `entries` and the `rel="next"` link are read out."""
     page = parse_atom_page(ATOM_WITH_NEXT)
 
     assert len(page.entries) == 2
@@ -28,6 +29,10 @@ def test_parse_atom_page_extracts_entries_and_next_url() -> None:
 
 
 def test_parse_atom_page_without_next_link() -> None:
+    """Protects the last-page case.
+
+    No `rel="next"` link means `next_url` is `None`, not an error.
+    """
     page = parse_atom_page(ATOM_LAST_PAGE)
 
     assert len(page.entries) == 1
@@ -35,6 +40,8 @@ def test_parse_atom_page_without_next_link() -> None:
 
 
 def test_fetch_atom_page_uses_mocked_transport() -> None:
+    """Protects that `fetch_atom_page` requests the given URL and delegates parsing correctly."""
+
     def handler(request: httpx2.Request) -> httpx2.Response:
         assert str(request.url) == "https://fake/page-1.atom"
         return httpx2.Response(200, content=ATOM_WITH_NEXT)
@@ -47,6 +54,8 @@ def test_fetch_atom_page_uses_mocked_transport() -> None:
 
 
 def test_fetch_atom_page_raises_on_http_error() -> None:
+    """Protects against a 404/5xx being silently parsed as an empty page instead of raising."""
+
     def handler(request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(404)
 

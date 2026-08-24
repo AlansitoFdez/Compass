@@ -30,6 +30,7 @@ def _matching_entry(suffix: str) -> bytes:
 
 
 def _atom_feed(entries: list[bytes]) -> bytes:
+    """Wraps raw `<entry>` XML fragments in a single-page ATOM feed document."""
     body = b"".join(entries)
     return XML_HEADER + b'<feed xmlns="http://www.w3.org/2005/Atom">' + body + b"</feed>"
 
@@ -45,6 +46,10 @@ def _malformed_entry(suffix: str) -> bytes:
 
 @pytest.fixture(autouse=True)
 def _clean_checkpoint() -> Iterator[None]:
+    """Wipes every checkpoint key before and after each test.
+
+    So tests can't see each other's leftover state.
+    """
     clear_resume_url()
     clear_high_water_mark()
     clear_pending_high_water_mark()
@@ -87,8 +92,8 @@ async def test_run_daily_ingestion_commits_periodically(db_session: AsyncSession
         assert len(result.scalars().all()) == 3
     finally:
         event.remove(db_session.sync_session, "after_commit", _on_commit)
-        # Ya son commits reales — el rollback de la fixture db_session no los
-        # deshace, hay que limpiarlos explícitamente.
+        # These are real commits now -- the db_session fixture's rollback
+        # won't undo them, so they need explicit cleanup.
         await db_session.execute(delete(Tender).where(Tender.expediente.like("CS2026/94-%")))
         await db_session.commit()
 
@@ -121,7 +126,7 @@ async def test_run_daily_ingestion_skips_a_malformed_entry_without_losing_the_re
         )
         assert result.scalar_one_or_none() is None
     finally:
-        # commit_every=1 -> commits reales, igual que en el test anterior.
+        # commit_every=1 -> real commits, same as in the previous test.
         await db_session.execute(delete(Tender).where(Tender.expediente.like("CS2026/94-%")))
         await db_session.commit()
 

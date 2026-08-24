@@ -15,6 +15,7 @@ FIXTURE_PATH = Path(__file__).parent / "fixtures" / "codice_entry_sample.xml"
 
 
 def _load_sample_entry() -> Element:
+    """The real, unmodified CODICE fixture entry."""
     return fromstring(FIXTURE_PATH.read_bytes())
 
 
@@ -26,7 +27,7 @@ def _load_entry_with_empty_cpv_code() -> Element:
     mutated = raw.replace(
         b">30231320</ns2:ItemClassificationCode>", b"></ns2:ItemClassificationCode>", 1
     )
-    assert mutated != raw, "fixture no contenía el codigo CPV esperado"
+    assert mutated != raw, "fixture did not contain the expected CPV code"
     return fromstring(mutated)
 
 
@@ -38,7 +39,7 @@ def _load_entry_with_unknown_status_code() -> Element:
     mutated = raw.replace(
         b">PUB</ns3:ContractFolderStatusCode>", b">ZZZZ</ns3:ContractFolderStatusCode>", 1
     )
-    assert mutated != raw, "fixture no contenía el codigo de estado esperado"
+    assert mutated != raw, "fixture did not contain the expected status code"
     return fromstring(mutated)
 
 
@@ -66,11 +67,17 @@ def _load_entry_with_an_earlier_second_notice() -> Element:
         b"<ns2:IssueDate>2020-01-01</ns2:IssueDate>",
         1,
     )
-    assert mutated != raw, "fixture no contenía la fecha de aviso esperada"
+    assert mutated != raw, "fixture did not contain the expected notice date"
     return fromstring(mutated)
 
 
 def test_parse_codice_entry_extracts_all_fields() -> None:
+    """Protects the full field mapping against the real fixture, end to end.
+
+    One test covering every field rather than one test per field: they're
+    all read from the same real entry, so splitting them apart would just
+    mean re-parsing the same fixture many times for no extra protection.
+    """
     tender = parse_codice_entry(_load_sample_entry())
 
     assert tender.expediente == "CS2026/94"
@@ -90,25 +97,31 @@ def test_parse_codice_entry_extracts_all_fields() -> None:
     assert tender.pcap_url != tender.ppt_url
     assert tender.platform_url is not None
     assert tender.platform_url.startswith("https://contrataciondelestado.es")
-    # La fecha del aviso publicado (2026-08-15, medianoche) es real,
-    # distinta del instante exacto de atom:updated -- bug 3 de la 1.11.
+    # The published notice date (2026-08-15, midnight) is real, distinct from
+    # atom:updated's exact instant -- bug 3 of 1.11.
     assert tender.published_at == datetime(2026, 8, 15, tzinfo=MADRID_TZ)
     assert tender.published_at != tender.updated_at_source
 
 
 def test_parse_codice_entry_published_at_falls_back_to_updated_when_no_notices() -> None:
+    """Protects tenders with no publication notice yet.
+
+    Falls back to `updated_at_source` instead of leaving `published_at` unset.
+    """
     tender = parse_codice_entry(_load_entry_without_notices())
 
     assert tender.published_at == tender.updated_at_source
 
 
 def test_parse_codice_entry_published_at_uses_the_earliest_notice() -> None:
+    """Protects "earliest, not first" when a tender has been re-announced with a later notice."""
     tender = parse_codice_entry(_load_entry_with_an_earlier_second_notice())
 
     assert tender.published_at == datetime(2020, 1, 1, tzinfo=MADRID_TZ)
 
 
 def test_cpv_codes_skips_empty_elements() -> None:
+    """Protects against an empty `<ItemClassificationCode/>` becoming a `None` entry in the list."""
     codes = _cpv_codes(_load_entry_with_empty_cpv_code())
 
     assert len(codes) == 8
@@ -116,6 +129,10 @@ def test_cpv_codes_skips_empty_elements() -> None:
 
 
 def test_try_parse_codice_entry_returns_the_tender_for_a_valid_entry() -> None:
+    """Protects the pass-through case.
+
+    A well-formed entry must still parse normally under the try/except wrapper.
+    """
     tender = try_parse_codice_entry(_load_sample_entry())
 
     assert tender is not None
@@ -123,4 +140,8 @@ def test_try_parse_codice_entry_returns_the_tender_for_a_valid_entry() -> None:
 
 
 def test_try_parse_codice_entry_returns_none_for_an_unknown_status_code() -> None:
+    """Protects the "skip, don't crash" contract.
+
+    A malformed entry returns `None`, not an exception.
+    """
     assert try_parse_codice_entry(_load_entry_with_unknown_status_code()) is None
