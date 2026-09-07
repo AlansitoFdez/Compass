@@ -26,3 +26,4 @@ class ProviderSchema(BaseModel):
     max_budget: Decimal | None = None
     annual_revenue: Decimal | None = None
     certifications: list[str] | None = None
+    locations: list[str] | None = None

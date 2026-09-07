@@ -41,6 +41,10 @@ class Provider(Base):
     max_budget: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     annual_revenue: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     certifications: Mapped[list[str] | None] = mapped_column(ARRAY(String))
+    # None means no geographic restriction -- matches a Tender regardless of
+    # its own `location`. Added in 2.2 for the funnel's hard-filter stage
+    # (the design doc lists "provincia o ámbito" alongside CPV/importe).
+    locations: Mapped[list[str] | None] = mapped_column(ARRAY(String))
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
