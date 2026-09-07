@@ -92,8 +92,14 @@ def _location_filter(provider: Provider) -> ColumnElement[bool] | None:
     return Tender.location.in_(provider.locations)
 
 
-def _build_filters(provider: Provider) -> list[ColumnElement[bool]]:
-    """Every hard filter that applies to `provider`, in the fixed order the funnel checks them."""
+def build_filters(provider: Provider) -> list[ColumnElement[bool]]:
+    """Every hard filter that applies to `provider`, in the fixed order the funnel checks them.
+
+    Not private: `matching.lexical` (Etapa 2) reuses this to scope its own
+    ranking to the same survivors this stage already narrowed down to --
+    the funnel is sequential, so later stages never look at a wider set
+    than this one already passed.
+    """
     filters = [_status_filter(), _cpv_filter(provider)]
 
     budget_filter = _budget_filter(provider)
@@ -126,7 +132,7 @@ async def list_matches(
     Returns:
         The page of matching tenders, and the total match count across all pages.
     """
-    filters = _build_filters(provider)
+    filters = build_filters(provider)
     total = await _count(session, filters)
 
     items_stmt = (
