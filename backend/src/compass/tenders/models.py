@@ -3,9 +3,9 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Index, Numeric, String, Text, func
+from sqlalchemy import Computed, DateTime, Index, Numeric, String, Text, func
 from sqlalchemy import Enum as SqlEnum
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
 from compass.core.db import Base
@@ -28,12 +28,22 @@ class Tender(Base):
         # used by the prefix/division filter -- that stays a Seq Scan,
         # documented in phase1.11.md (step 7).
         Index("ix_tenders_cpv_codes_gin", "cpv_codes", postgresql_using="gin"),
+        # GIN on the generated tsvector -- what the Etapa 2 lexical
+        # recovery (2.3) ranks against with `@@`/`ts_rank`.
+        Index("ix_tenders_title_tsv_gin", "title_tsv", postgresql_using="gin"),
     )
 
     expediente: Mapped[str] = mapped_column(String, primary_key=True)
     contracting_body: Mapped[str] = mapped_column(String)
     title: Mapped[str] = mapped_column(Text)
     cpv_codes: Mapped[list[str]] = mapped_column(ARRAY(String))
+
+    # Generated and maintained by Postgres itself on every insert/update of
+    # `title` -- never set from Python, so there is no risk of it silently
+    # drifting out of sync with the title it's derived from.
+    title_tsv: Mapped[str] = mapped_column(
+        TSVECTOR, Computed("to_tsvector('spanish', title)", persisted=True)
+    )
 
     budget_with_vat: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     budget_without_vat: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
