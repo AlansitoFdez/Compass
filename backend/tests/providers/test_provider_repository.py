@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from compass.providers.models import PROVIDER_ID, Provider
@@ -29,8 +29,26 @@ async def _fetch(session: AsyncSession) -> Provider:
 
 
 async def test_get_provider_returns_none_when_unseeded(db_session: AsyncSession) -> None:
-    """Protects the "not seeded yet" case: no row means `None`, not an exception."""
-    assert await get_provider(db_session) is None
+    """Protects the "not seeded yet" case: no row means `None`, not an exception.
+
+    Runs against real Postgres, where the singleton row usually already
+    exists (`providers/seed.py` has been run for real, see phase2.1.md) --
+    so this removes it for the duration of the assertion and restores
+    exactly what was there before in a `finally`, a real delete + real
+    commit (`db_session`'s rollback-on-teardown doesn't undo it), instead
+    of assuming a pristine table that no longer reflects this environment.
+    """
+    existing = await get_provider(db_session)
+    existing_schema = ProviderSchema.model_validate(existing) if existing is not None else None
+
+    await db_session.execute(delete(Provider))
+    await db_session.commit()
+    try:
+        assert await get_provider(db_session) is None
+    finally:
+        if existing_schema is not None:
+            await upsert_provider(db_session, existing_schema)
+            await db_session.commit()
 
 
 async def test_upsert_provider_creates_the_row(db_session: AsyncSession) -> None:
