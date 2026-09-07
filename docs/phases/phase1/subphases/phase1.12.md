@@ -35,7 +35,7 @@ Un paquete por paso, con commit y entrada de log por paso.
 
 Dos decisiones tomadas al planificar:
 
-- **Los docstrings los escribe Claude**, excepción explícita a la regla de `CLAUDE.md` de que el código lo escribe Alan: aquí no hay lógica que decidir, es documentar lo que el código ya hace. Alan los revisa uno a uno antes de cerrar cada paso.
+- **Los docstrings se escriben sin tocar lógica.** No hay decisiones de comportamiento que tomar en esta subfase, es documentar lo que el código ya hace. Cada uno se revisa antes de cerrar el paso correspondiente.
 - **Los helpers anidados dentro de los tests llevan docstring** (los `handler` de los transportes mock, `fake_run_daily_ingestion`, `_on_commit`): ~15 de los 139. Se cumple "sin exenciones" literalmente, en vez de abrir un agujero en la regla.
 
 ### Criterios de aceptación
