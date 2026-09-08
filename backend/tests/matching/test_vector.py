@@ -17,7 +17,7 @@ from compass.tenders.models import Tender
 # A CPV outside division 72: isolates these tests' synthetic rows from the
 # real corpus already persisted in the same Postgres, same reasoning as
 # tests/matching/test_lexical.py's LEXICAL_CPV.
-VECTOR_CPV = "99777777"
+VECTOR_CPV = "99555555"
 
 PROVIDER = Provider(
     id="test",
