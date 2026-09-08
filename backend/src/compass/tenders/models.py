@@ -3,6 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import Computed, DateTime, Index, Numeric, String, Text, func
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR
@@ -10,6 +11,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from compass.core.db import Base
 from compass.tenders.enums import ContractType, TenderStatus
+
+# Fixed by the 2.4 decision (ibm-granite/granite-embedding-278m-multilingual):
+# see docs/phases/phase2/subphases/phase2.4.md. Changing the model later means
+# migrating this column's dimension, not editing a constant.
+EMBEDDING_DIMENSIONS = 768
 
 
 class Tender(Base):
@@ -31,6 +37,17 @@ class Tender(Base):
         # GIN on the generated tsvector -- what the Etapa 2 lexical
         # recovery (2.3) ranks against with `@@`/`ts_rank`.
         Index("ix_tenders_title_tsv_gin", "title_tsv", postgresql_using="gin"),
+        # HNSW over cosine distance -- what the Etapa 2 vector recovery (2.5)
+        # ranks against with `<=>`. No training phase (unlike IVFFlat, whose
+        # `lists` parameter needs tuning to the row count), which fits a
+        # corpus of a few thousand rows better; see phase2.5.md.
+        Index(
+            "ix_tenders_title_embedding_hnsw",
+            "title_embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"title_embedding": "vector_cosine_ops"},
+        ),
     )
 
     expediente: Mapped[str] = mapped_column(String, primary_key=True)
@@ -44,6 +61,12 @@ class Tender(Base):
     title_tsv: Mapped[str] = mapped_column(
         TSVECTOR, Computed("to_tsvector('spanish', title)", persisted=True)
     )
+
+    # Nullable, unlike title_tsv: computing an embedding needs the model, not
+    # just SQL, so Postgres can't fill it in as a generated column. NULL means
+    # "not embedded yet" -- what matching.tasks.generate_embeddings_task looks
+    # for -- not "no embedding possible".
+    title_embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
 
     budget_with_vat: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     budget_without_vat: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))

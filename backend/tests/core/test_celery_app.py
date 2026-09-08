@@ -1,8 +1,11 @@
 """Tests for the Celery app configuration."""
 
+from datetime import timedelta
+
 from celery.schedules import crontab
 
 import compass.ingestion.tasks  # noqa: F401 — importing registers the task
+import compass.matching.tasks  # noqa: F401 — importing registers the task
 from compass.core.celery_app import celery_app
 
 
@@ -32,3 +35,19 @@ def test_beat_schedule_runs_daily_at_3am_madrid() -> None:
     entry = celery_app.conf.beat_schedule["daily-ingestion"]
     assert entry["task"] == "daily_ingestion"
     assert entry["schedule"] == crontab(hour=3, minute=0)
+
+
+def test_generate_embeddings_task_is_registered() -> None:
+    """Protects against `matching/tasks.py` never being imported, or the task being renamed.
+
+    Either would leave `"generate_embeddings"` unroutable: beat would enqueue
+    a task name no worker recognizes, and it would fail silently at runtime.
+    """
+    assert "generate_embeddings" in celery_app.tasks
+
+
+def test_beat_schedule_runs_generate_embeddings_every_15_minutes() -> None:
+    """Protects against the embedding backfill schedule drifting from the documented cadence."""
+    entry = celery_app.conf.beat_schedule["generate-embeddings"]
+    assert entry["task"] == "generate_embeddings"
+    assert entry["schedule"] == timedelta(minutes=15)
