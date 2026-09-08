@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from sqlalchemy import ColumnElement, select
+from sqlalchemy import ColumnElement, case, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func
@@ -25,6 +25,16 @@ async def upsert_tender(session: AsyncSession, tender: TenderSchema) -> None:
     plain insert -- a withdrawal arrives here as a `status` change, not a
     delete.
 
+    `title_embedding` is invalidated (reset to NULL) whenever `title` itself
+    changes on an update -- a republish that only touches budget/status/
+    deadline leaves an existing embedding alone, but an edited title would
+    otherwise leave a stale embedding computed from text that no longer
+    matches, with nothing marking it wrong (found reviewing 2.5's own "NULL
+    means not embedded yet" invariant against this function: it never
+    accounted for a title actually changing after the first embedding).
+    `matching.tasks.generate_embeddings_task` already re-embeds any NULL on
+    its own schedule, so resetting here is enough -- no need to embed inline.
+
     Args:
         session: The active database session; the caller commits.
         tender: The parsed, validated tender to persist.
@@ -33,6 +43,9 @@ async def upsert_tender(session: AsyncSession, tender: TenderSchema) -> None:
 
     stmt = pg_insert(Tender).values(**values)
     update_values = {key: getattr(stmt.excluded, key) for key in values if key != "expediente"}
+    update_values["title_embedding"] = case(
+        (Tender.title != stmt.excluded.title, None), else_=Tender.title_embedding
+    )
     # clock_timestamp(), not now(): now() is frozen at transaction start and
     # would give the same value for every upsert in the same transaction.
     update_values["updated_at"] = func.clock_timestamp()

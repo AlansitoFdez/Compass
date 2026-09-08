@@ -5,11 +5,12 @@ Postgres, no mocking.
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
+import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from compass.tenders.enums import ContractType, TenderStatus
-from compass.tenders.models import Tender
+from compass.tenders.models import EMBEDDING_DIMENSIONS, Tender
 from compass.tenders.repository import list_tenders, upsert_tender
 from compass.tenders.schemas import TenderSchema
 
@@ -92,6 +93,48 @@ async def test_upsert_tender_updates_fields_and_preserves_created_at(
     assert second.submission_deadline is None
     assert second.created_at == first_created_at
     assert second.updated_at > first_updated_at
+
+
+async def test_upsert_tender_invalidates_the_embedding_when_title_changes(
+    db_session: AsyncSession,
+) -> None:
+    """Protects against a stale `title_embedding`: computed from the old title, silently
+    left in place, and indistinguishable from a fresh, correct one (2.5's `IS NOT NULL`
+    check has no way to tell the difference).
+    """
+    await upsert_tender(db_session, BASE_TENDER)
+    await db_session.flush()
+    tender = (await _fetch_all(db_session, BASE_TENDER.expediente))[0]
+    tender.title_embedding = [0.1] * EMBEDDING_DIMENSIONS
+    await db_session.flush()
+
+    modified = BASE_TENDER.model_copy(update={"title": "Servicio de prueba (modificado)"})
+    await upsert_tender(db_session, modified)
+    await db_session.flush()
+
+    reloaded = (await _fetch_all(db_session, BASE_TENDER.expediente))[0]
+    assert reloaded.title_embedding is None
+
+
+async def test_upsert_tender_keeps_the_embedding_when_title_is_unchanged(
+    db_session: AsyncSession,
+) -> None:
+    """Protects the other half: a republish that doesn't touch `title` (budget, status,
+    deadline...) must not throw away an embedding that's still valid -- generate_embeddings_task
+    shouldn't have to redo work a republish didn't actually invalidate.
+    """
+    await upsert_tender(db_session, BASE_TENDER)
+    await db_session.flush()
+    tender = (await _fetch_all(db_session, BASE_TENDER.expediente))[0]
+    tender.title_embedding = [0.1] * EMBEDDING_DIMENSIONS
+    await db_session.flush()
+
+    same_title = BASE_TENDER.model_copy(update={"status": TenderStatus.AWARDED})
+    await upsert_tender(db_session, same_title)
+    await db_session.flush()
+
+    reloaded = (await _fetch_all(db_session, BASE_TENDER.expediente))[0]
+    assert reloaded.title_embedding == pytest.approx([0.1] * EMBEDDING_DIMENSIONS)
 
 
 # A CPV outside division 72 (IT services): no real ingested data uses it, so
