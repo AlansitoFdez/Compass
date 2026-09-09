@@ -26,6 +26,7 @@ from sqlalchemy import select
 from compass.analysis.document import extract_pages
 from compass.analysis.extraction_schema import PliegoExtraction
 from compass.analysis.golden_set import GOLDEN_SET
+from compass.analysis.graph import SYSTEM_PROMPT, build_prompt
 from compass.analysis.openrouter import OpenRouterError, extract_structured
 from compass.core.config import get_settings
 from compass.core.db import async_session_factory
@@ -36,23 +37,7 @@ CANDIDATE_MODELS = [
     "nex-agi/nex-n2.5-pro:free",
 ]
 
-SYSTEM_PROMPT = (
-    "Eres un analista experto en contratación pública española (LCSP). Se te da el "
-    "texto completo de un pliego de cláusulas administrativas particulares (PCAP), "
-    "página a página. Extrae únicamente lo que el texto dice explícitamente, con su "
-    "cita exacta (número/identificador de cláusula tal como aparece en el texto, "
-    "número de página, y una cita textual verbatim copiada del pliego). Si el pliego "
-    "no aborda un campo, déjalo en null o lista vacía según corresponda -- no inventes "
-    "ni asumas valores típicos de otros pliegos que no conoces."
-)
-
 CERT_TOKEN_RE = re.compile(r"ISO\s?\d{4,5}|CMMI|ENS\b|IEC\s?\d+|CCN-?CERT", re.IGNORECASE)
-
-
-def build_prompt(pages: list[str]) -> str:
-    """The full PCAP text, one labeled block per page -- see module docstring for why
-    this is used instead of `chunk_by_clause`'s output here."""
-    return "\n\n".join(f"===== PÁGINA {i} =====\n{page}" for i, page in enumerate(pages, start=1))
 
 
 def _cert_tokens(certifications: list[str]) -> set[str]:
