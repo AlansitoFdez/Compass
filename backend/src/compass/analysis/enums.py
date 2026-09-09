@@ -16,3 +16,16 @@ class AnalysisStatus(StrEnum):
     COMPLETED = "completed"
     FAILED = "failed"
     NOT_ANALYZABLE = "not_analyzable"
+
+
+class Verdict(StrEnum):
+    """Whether a provider can bid on a tender, per `analysis.verdict.compute_verdict`.
+
+    Never set by the LLM -- see `docs/phases/phase3/phase3.md`, "el LLM extrae, el
+    código decide". Computed at read time from a `PliegoExtraction` and the current
+    `Provider`, never stored (same reasoning as `TenderAnalysis` storing no verdict).
+    """
+
+    APTO = "apto"
+    APTO_CON_RESERVAS = "apto_con_reservas"
+    NO_APTO = "no_apto"
