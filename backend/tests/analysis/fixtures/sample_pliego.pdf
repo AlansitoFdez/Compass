@@ -1,0 +1,58 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 800] /Resources << /Font << /F1 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 800] /Resources << /Font << /F1 5 0 R >> >> /Contents 7 0 R >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Length 504 >>
+stream
+BT /F1 10 Tf 50 750 Td
+(Clausula 1. Objeto del contrato) Tj
+0 -20 Td (El presente contrato tiene por objeto el desarrollo) Tj
+0 -20 Td (y mantenimiento de un portal web institucional para el) Tj
+0 -20 Td (sector publico, incluyendo accesibilidad y sede electronica.) Tj
+0 -40 Td (Clausula 2. Solvencia economica y financiera) Tj
+0 -20 Td (Los licitadores deberan acreditar una cifra de negocio) Tj
+0 -20 Td (minima de 100000 euros en alguno de los tres ultimos) Tj
+0 -20 Td (ejercicios economicos.) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Length 301 >>
+stream
+BT /F1 10 Tf 50 750 Td
+(Clausula 3. Certificaciones requeridas) Tj
+0 -20 Td (Se exige la certificacion ISO 27001 y el cumplimiento) Tj
+0 -20 Td (del Esquema Nacional de Seguridad.) Tj
+0 -40 Td (Clausula 4. Criterios de adjudicacion) Tj
+0 -20 Td (Precio: 60 puntos. Propuesta tecnica: 40 puntos.) Tj
+ET
+endstream
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000373 00000 n 
+0000000443 00000 n 
+0000000998 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+1350
+%%EOF
