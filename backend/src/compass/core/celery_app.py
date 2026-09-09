@@ -10,7 +10,7 @@ from compass.core.config import get_settings
 celery_app = Celery(
     "compass",
     broker=get_settings().redis_url,
-    include=["compass.ingestion.tasks", "compass.matching.tasks"],
+    include=["compass.ingestion.tasks", "compass.matching.tasks", "compass.analysis.tasks"],
 )
 
 # celery-types declares conf.timezone as a read-only property returning tzinfo

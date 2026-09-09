@@ -7,6 +7,7 @@ have a cached analysis, or do we need to start one" decision belongs to
 whoever has a real hash to check (Phase 3.2 onward), not to this module.
 """
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from compass.analysis.enums import AnalysisStatus
@@ -47,3 +48,30 @@ async def get_analysis(session: AsyncSession, pdf_hash: str) -> TenderAnalysis |
         The cached row, whatever its `status`, or `None`.
     """
     return await session.get(TenderAnalysis, pdf_hash)
+
+
+async def get_latest_analysis_for_tender(
+    session: AsyncSession, expediente: str
+) -> TenderAnalysis | None:
+    """The most recent analysis for `expediente`, for `GET /tenders/{expediente}/analysis`.
+
+    By `expediente` via `ix_tender_analyses_expediente`, not by `pdf_hash`: a caller here
+    only ever knows the tender, never the PCAP's own content hash -- that's the whole
+    reason this lookup exists alongside `get_analysis`, which the analysis task itself
+    uses once it has actually downloaded and hashed the document.
+
+    Args:
+        session: The active database session.
+        expediente: Which tender to look up.
+
+    Returns:
+        The row from the most recent analysis run for this tender, or `None` if it has
+        never been analyzed.
+    """
+    stmt = (
+        select(TenderAnalysis)
+        .where(TenderAnalysis.expediente == expediente)
+        .order_by(TenderAnalysis.created_at.desc())
+        .limit(1)
+    )
+    return (await session.scalars(stmt)).first()

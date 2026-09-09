@@ -2,9 +2,10 @@
 
 from fastapi import APIRouter
 
-from compass.api.routes import health, matches, tenders
+from compass.api.routes import analysis, health, matches, tenders
 
 api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(tenders.router)
 api_router.include_router(matches.router)
+api_router.include_router(analysis.router)

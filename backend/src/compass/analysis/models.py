@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, Index, String, Text, func
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -46,6 +46,11 @@ class TenderAnalysis(Base):
     # number, page, quote, solvency figures, etc.) lands in 3.4. Nullable:
     # empty until the status reaches COMPLETED.
     extraction: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+    # The fraction of extraction's citations that verify against the parsed
+    # pliego text (3.5's `citation_faithfulness`) -- the number Fase 4's
+    # RAGAS faithfulness evals track over time. Nullable for the same reason
+    # as `extraction`: only set once the graph reaches `verify`.
+    citation_faithfulness: Mapped[float | None] = mapped_column(Float)
     error_message: Mapped[str | None] = mapped_column(Text)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

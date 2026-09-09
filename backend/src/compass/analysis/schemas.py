@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from compass.analysis.enums import AnalysisStatus, Verdict
-from compass.analysis.extraction_schema import Citation
+from compass.analysis.extraction_schema import Citation, PliegoExtraction
 
 
 class TenderAnalysisSchema(BaseModel):
@@ -19,6 +19,7 @@ class TenderAnalysisSchema(BaseModel):
     expediente: str
     status: AnalysisStatus
     extraction: dict[str, object] | None = None
+    citation_faithfulness: float | None = None
     error_message: str | None = None
     created_at: datetime
     updated_at: datetime
@@ -44,3 +45,20 @@ class VerdictResult(BaseModel):
 
     verdict: Verdict
     reasons: list[VerdictReason]
+
+
+class TenderAnalysisResultSchema(BaseModel):
+    """The `GET /tenders/{expediente}/analysis` response: the analysis itself, plus the
+    verdict, computed live against whichever `Provider` is current -- never stored (see
+    `models.TenderAnalysis`), so this is the only place it's built, at read time.
+
+    `verdict` is `None` until `status` reaches `COMPLETED` -- there's nothing to compare
+    yet, so returning `APTO` by default would be misleading rather than merely absent.
+    """
+
+    expediente: str
+    status: AnalysisStatus
+    extraction: PliegoExtraction | None = None
+    citation_faithfulness: float | None = None
+    error_message: str | None = None
+    verdict: VerdictResult | None = None
