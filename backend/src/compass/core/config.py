@@ -20,6 +20,8 @@ class Settings(BaseSettings):
             async driver is spliced in by `compass.core.db`.
         redis_url: Redis DSN, shared by the Celery broker and the ingestion
             checkpoint store.
+        openrouter_api_key: OpenRouter API key used by the pliego analyst
+            agent (Fase 3) to call its extraction models.
     """
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -28,6 +30,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     database_url: str
     redis_url: str
+    openrouter_api_key: str
 
 
 @lru_cache
