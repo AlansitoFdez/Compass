@@ -7,6 +7,7 @@ from logging.config import fileConfig
 from sqlalchemy.engine import Connection
 
 from alembic import context
+from compass.analysis import models as analysis_models  # noqa: F401 — registers TenderAnalysis
 from compass.core.db import Base, engine
 from compass.providers import models as providers_models  # noqa: F401 — registers Provider
 from compass.tenders import models  # noqa: F401 — registers Tender on Base.metadata
