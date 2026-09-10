@@ -2,7 +2,7 @@
 
 Radar de **licitaciones públicas** españolas para proveedores que compiten por contratos y no dan abasto revisando los cientos de anuncios que [PLACSP](https://contrataciondelestado.es) publica cada día.
 
-Compass ingiere el feed ATOM/CODICE de PLACSP, filtra ese volumen hasta el puñado de licitaciones relevantes para un proveedor concreto, y (en una fase posterior) usa un agente LLM para leer el pliego de las que sobreviven y emitir un veredicto citado — APTO / APTO CON RESERVAS / NO APTO — contra el perfil de ese proveedor.
+Compass ingiere el feed ATOM/CODICE de PLACSP, filtra ese volumen hasta el puñado de licitaciones relevantes para un proveedor concreto, y usa un agente LLM para leer el pliego de las que sobreviven y emitir un veredicto citado — APTO / APTO CON RESERVAS / NO APTO — contra el perfil de ese proveedor.
 
 No es un buscador de subvenciones ni de ayudas: es un radar de contratos que la administración compra, no de dinero que reparte.
 
@@ -10,7 +10,8 @@ No es un buscador de subvenciones ni de ayudas: es un radar de contratos que la 
 
 - ✅ **Fase 1 — Ingesta y normalización.** El feed de PLACSP se ingiere de forma incremental (marca de agua sobre `atom:updated`, sin re-recorrer el feed en cada corrida), se parsea el CODICE, se filtra por el vertical de servicios informáticos (CPV división 72) y se persiste con upsert idempotente por `expediente` — una licitación republicada actualiza la misma fila, nunca crea una nueva ni se borra físicamente.
 - ✅ **Fase 2 — Matching híbrido y perfil de proveedor.** Un embudo de tres etapas reduce el corpus completo al puñado que de verdad encaja con un proveedor: filtros duros en SQL, recuperación híbrida (léxica + vectorial) y fusión por Reciprocal Rank Fusion. Nada de esto pasa por un LLM todavía — es determinista y auditable.
-- ⏳ **Fase 3 — Agente analista de pliegos**, con LangGraph, sobre el puñado que sobrevive al embudo. Sin empezar.
+- ✅ **Fase 3 — Agente analista de pliegos.** Un grafo LangGraph descarga el PCAP de una licitación bajo demanda, detecta si tiene capa de texto, extrae los campos que deciden el encaje (solvencia, certificaciones, criterios, garantías, plazos, lotes) contra un esquema Pydantic cerrado, verifica en Python que cada cita existe de verdad en el texto parseado, y calcula el veredicto — nunca el LLM — comparando la extracción contra el perfil del proveedor. Resultado cacheado por hash de documento; el segundo usuario que mire la misma licitación no vuelve a pagar el análisis.
+- ⏳ **Fase 4 — Trazas, coste y evals (Langfuse, RAGAS)**. Sin empezar.
 
 El detalle completo de cada subfase, con la evidencia y el razonamiento detrás de cada decisión, vive en `docs/phases/`.
 
@@ -43,9 +44,23 @@ Medido contra el corpus real (persistido desde PLACSP) y el perfil de proveedor 
 
 **La premisa del diseño híbrido, confirmada con números reales**: 24 de las 52 licitaciones finales (46%) las trajo *solo* el recuperador vectorial — se habrían perdido con una búsqueda puramente léxica. Y el léxico sigue aportando 2 que el vectorial no vio. Ninguno de los dos por sí solo cubre lo que cubren juntos.
 
+### Fase 3 — Análisis de pliegos, coste y tiempo reales
+
+Medido con tres análisis end-to-end reales (`POST /tenders/{expediente}/analyze` contra un pliego real del golden set de la 3.4, worker Celery real, modelo `nvidia/nemotron-3-super-120b-a12b:free` real) — no simulados.
+
+| Corrida | Tiempo real | Coste |
+|---|---|---|
+| 1ª | 101 s | 0,00 € |
+| 2ª | 75 s | 0,00 € |
+| 3ª | 260 s | 0,00 € |
+
+**Coste real: 0,00 € por análisis**, en las tres corridas — el nivel gratuito de OpenRouter elegido en la 3.4 se sostiene en producción, no solo en la medición inicial contra el golden set.
+
+**El tiempo varía mucho de una corrida a otra** (75-260 s) porque el modelo es de razonamiento: la mayor parte del tiempo se va en una traza interna antes de emitir el resultado, y esa traza no tiene una duración fija. La 3.9 confirmó que el timeout que protege contra un cuelgue real (300 s) da margen de sobra sobre lo observado, sin cortar una corrida legítima.
+
 ## Stack
 
-Python 3.13 (tipado estricto, `mypy --strict`) · FastAPI async sobre Uvicorn · PostgreSQL 17 + pgvector, vía SQLAlchemy async y Alembic · Celery sobre Redis para la ingesta diaria y el backfill de embeddings · `ibm-granite/granite-embedding-278m-multilingual` para los embeddings semánticos, corrido en local · pytest, ruff.
+Python 3.13 (tipado estricto, `mypy --strict`) · FastAPI async sobre Uvicorn · PostgreSQL 17 + pgvector, vía SQLAlchemy async y Alembic · Celery sobre Redis para la ingesta diaria, el backfill de embeddings y el análisis de pliegos bajo demanda · `ibm-granite/granite-embedding-278m-multilingual` para los embeddings semánticos, corrido en local · LangGraph para el agente analista de pliegos, con `nvidia/nemotron-3-super-120b-a12b:free` (vía OpenRouter) como modelo de extracción · pytest, ruff.
 
 ## Arrancar en local
 
