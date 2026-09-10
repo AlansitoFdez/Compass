@@ -11,7 +11,7 @@ No es un buscador de subvenciones ni de ayudas: es un radar de contratos que la 
 - ✅ **Fase 1 — Ingesta y normalización.** El feed de PLACSP se ingiere de forma incremental (marca de agua sobre `atom:updated`, sin re-recorrer el feed en cada corrida), se parsea el CODICE, se filtra por el vertical de servicios informáticos (CPV división 72) y se persiste con upsert idempotente por `expediente` — una licitación republicada actualiza la misma fila, nunca crea una nueva ni se borra físicamente.
 - ✅ **Fase 2 — Matching híbrido y perfil de proveedor.** Un embudo de tres etapas reduce el corpus completo al puñado que de verdad encaja con un proveedor: filtros duros en SQL, recuperación híbrida (léxica + vectorial) y fusión por Reciprocal Rank Fusion. Nada de esto pasa por un LLM todavía — es determinista y auditable.
 - ✅ **Fase 3 — Agente analista de pliegos.** Un grafo LangGraph descarga el PCAP de una licitación bajo demanda, detecta si tiene capa de texto, extrae los campos que deciden el encaje (solvencia, certificaciones, criterios, garantías, plazos, lotes) contra un esquema Pydantic cerrado, verifica en Python que cada cita existe de verdad en el texto parseado, y calcula el veredicto — nunca el LLM — comparando la extracción contra el perfil del proveedor. Resultado cacheado por hash de documento; el segundo usuario que mire la misma licitación no vuelve a pagar el análisis.
-- ⏳ **Fase 4 — Trazas, coste y evals (Langfuse, RAGAS)**. Sin empezar.
+- 🚧 **Fase 4 — Trazas, coste y evals.** En curso: cada análisis ya queda trazado en Langfuse con tokens y coste reales (4.1-4.2). Pendiente: golden set ampliado a 25-30 pliegos y RAGAS como gate de regresión, endurecimiento de prompt injection, CI.
 
 El detalle completo de cada subfase, con la evidencia y el razonamiento detrás de cada decisión, vive en `docs/phases/`.
 
@@ -57,6 +57,18 @@ Medido con tres análisis end-to-end reales (`POST /tenders/{expediente}/analyze
 **Coste real: 0,00 € por análisis**, en las tres corridas — el nivel gratuito de OpenRouter elegido en la 3.4 se sostiene en producción, no solo en la medición inicial contra el golden set.
 
 **El tiempo varía mucho de una corrida a otra** (75-260 s) porque el modelo es de razonamiento: la mayor parte del tiempo se va en una traza interna antes de emitir el resultado, y esa traza no tiene una duración fija. La 3.9 confirmó que el timeout que protege contra un cuelgue real (300 s) da margen de sobra sobre lo observado, sin cortar una corrida legítima.
+
+### Fase 4 — Coste real, medido con Langfuse
+
+Desde la 4.1, cada análisis queda trazado en [Langfuse](https://langfuse.com) con tokens y coste reales por llamada -- ya no una medición manual puntual como en la 3.9, sino observabilidad real que crece sola con cada análisis que se dispara. Números reales sobre los análisis trazados hasta ahora (`uv run python -m compass.analysis.cost_report`):
+
+| Análisis | Tokens (entrada / salida) | Coste | Tiempo real |
+|---|---|---|---|
+| 1º | 41.724 (32.985 / 8.739) | 0,00 € | 194 s |
+| 2º | 106.527 (93.834 / 12.693) | 0,00 € | 285 s |
+| **Media** | **74.126** | **0,00 €** | **240 s** |
+
+**El volumen de entrada varía mucho más de lo esperado** (33.000 a 94.000 tokens según el pliego): el prompt manda el texto completo del PCAP, página a página, sin trocear -- un pliego largo o con formato denso puede doblar o triplicar el de otro con el mismo número de páginas. **Coste real: 0,00 €** en el 100% de los análisis trazados, confirmando en producción -- ahora con tokens reales delante, no solo la cifra final -- lo que la 3.4 ya había medido contra el golden set: el nivel gratuito de OpenRouter se sostiene.
 
 ## Stack
 
