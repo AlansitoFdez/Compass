@@ -65,3 +65,25 @@ Lote 1 completado -- 9 de 25 pliegos. Pendiente: lotes 2 y 3 (16 pliegos más).
 Suite completa tras el lote: **198 passed** (193 previos + 5 nuevos: `test_extraction_golden_set.py` ahora protege 20 entradas). `ruff check`/`format`/`mypy`/`alembic check` sin avisos. Los 11 expedientes nuevos verificados con `pcap_url` real todavía vigente en el corpus.
 
 Lote 2 completado -- 20 de 25 pliegos. Pendiente: lote 3 (5 pliegos más).
+
+### Lote 3 — 5 pliegos (019-SER-2026, 001213/2026, 003/26-SI, 009/26-SG, 015/25-SI)
+
+**Candidatos descartados en este lote, dos más del patrón "pliego tipo"**: un contrato del Ministerio del Interior y otro de la Diputación de Toledo remiten sistemáticamente cada cifra concreta a un "Cuadro de Características"/"Anexo I" que, comprobado expresamente, no aparece en ningún punto del documento descargado más allá de su propio índice. Van ya seis casos de este patrón en toda la 4.3.
+
+**Descartado por razón distinta -- un "Contrato Basado" de LogiRAIL (Acuerdo Marco) sobre consultoría de plataforma LABOR**: al ser un contrato derivado de un Acuerdo Marco con proveedores ya precalificados, el propio documento no aborda solvencia, certificaciones ni subcontratación en absoluto -- son cuestiones resueltas al constituirse el Acuerdo Marco, no en cada contrato basado. Con solo 3 de los 9 campos citables, se descartó por no aportar suficiente señal como entrada del golden set, aunque el hallazgo en sí (un contrato basado no repite lo ya acreditado en el marco) queda documentado aquí por si resulta relevante para una futura subfase que trabaje con Acuerdos Marco.
+
+**Hallazgo real -- tres pliegos de Red.es (`003/26-SI`, `009/26-SG`, `015/25-SI`) parten cada PCAP en dos documentos por diseño**: unas "Condiciones Específicas" (lo único que `pcap_url` descarga) y unas "Condiciones Generales" compartidas entre expedientes (referenciadas explícitamente como aplicables también a `024/23-SI` y `013/22-SI`) que nunca forman parte del documento descargado. Confirmado con una búsqueda exhaustiva de "lote"/"garantía + porcentaje" en el texto completo de los tres: cero apariciones de la primera, y la segunda solo mencionada de pasada (para ejecutar penalidades), nunca con un régimen o porcentaje propio. A diferencia del patrón "pliego tipo" (que es un fallo real de la licitación, cifras perdidas sin más), aquí es una arquitectura documental deliberada y estable -- se documenta como tal en el docstring de `golden_set.py`, con `guarantees`, `lots` y `submission_deadline` en `None` para los tres, honestamente, en vez de forzar una cita que no existe.
+
+**Los 5 pliegos finalmente anotados**:
+
+- **`019-SER-2026`** (EMUASA, Murcia) -- servicios de certificación en continuidad de negocio (ISO 22301). La certificación exigida es una acreditación ENAC del propio organismo certificador licitador, no una certificación de calidad interna -- variante no vista hasta ahora del campo `certifications`.
+- **`001213/2026`** (Equipos Nucleares, S.A. -- ENSA) -- contrato de naturaleza **privada** (ENSA no es Administración Pública). Sin garantía definitiva en absoluto: solo un periodo de garantía técnica (24 meses) sobre la solución entregada.
+- **`003/26-SI`** (Red.es) -- servicio de la plataforma Datos.gob.es. El más rico en certificaciones formales del lote (ISO 20000 + ISO/IEC 15504-SPICE nivel 3).
+- **`009/26-SG`** (Red.es) -- soporte y mejora de sistemas de gestión. Único de los tres Red.es con el 100% de la valoración en criterios de fórmula, sin ningún criterio de juicio de valor.
+- **`015/25-SI`** (Red.es) -- desarrollo e implantación de servicios de IA. Dos certificaciones formales (ISO 9001 + ISO 27001) y los criterios de valoración desglosados en seis subcriterios de grano fino.
+
+**Verificación real**: las 45 citas de estos 5 pliegos se comprobaron con `verify_citation` antes de escribirlas en `golden_set.py`. Dos fallos de transcripción detectados y corregidos en el proceso: un número de página equivocado por un error de conteo manual (`001213/2026`), y dos citas que no tenían en cuenta una etiqueta de columna intercalada en una tabla de dos columnas (`019-SER-2026`, `001213/2026`) -- el mismo tipo de error ya visto y corregido en lotes anteriores, y la razón por la que esta subfase nunca da una cita por buena sin `verify_citation` en verde.
+
+Suite completa tras el lote: **198 passed** (`test_extraction_golden_set.py` ahora protege las 25 entradas finales). `ruff check`/`format`/`mypy`/`alembic check` sin avisos. Los 5 expedientes nuevos verificados con `pcap_url` real todavía vigente en el corpus.
+
+**Lote 3 completado -- 25 de 25 pliegos. Subfase 4.3 cerrada.** Los tres criterios de aceptación se cumplen: `GOLDEN_SET` tiene 25 entradas (21 nuevas sobre las 4 de la 3.4), cada una elegida por diversidad estructural real y confirmada al leerla (formatos narrativo, "Cuadro de Características", catalán/valenciano, dos documentos partidos, contrato privado, Acuerdo Marco descartado por insuficiente), y la suite de calidad queda limpia lote a lote.
