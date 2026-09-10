@@ -4,12 +4,16 @@ the PCAP download and the OpenRouter call, same pattern as `test_document.py`, p
 canned SSE body for the streaming chat-completions endpoint.
 """
 
+import asyncio
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from pathlib import Path
+from typing import cast
 
 import httpx2
+import pytest
 
+from compass.analysis import graph
 from compass.analysis.document import hash_document
 from compass.analysis.enums import AnalysisStatus
 from compass.analysis.extraction_schema import PliegoExtraction
@@ -80,17 +84,22 @@ def _sse_body(content: dict[str, object] | None) -> bytes:
     return ("\n\n".join(lines) + "\n\n").encode()
 
 
+_ExtractResponse = httpx2.Response | Coroutine[None, None, httpx2.Response]
+
+
 def _client(
     *,
     pcap_response: httpx2.Response,
-    extract_handler: Callable[[httpx2.Request], httpx2.Response] | None,
+    extract_handler: Callable[[httpx2.Request], _ExtractResponse] | None,
 ) -> httpx2.AsyncClient:
     """A client whose transport routes the PCAP download and the OpenRouter call
     separately -- `extract_handler=None` asserts `extract` is never called at all,
-    for the `NOT_ANALYZABLE` path.
+    for the `NOT_ANALYZABLE` path. `extract_handler` may be an `async def` (as
+    `httpx2.MockTransport` allows) when a test needs to actually yield to the event
+    loop, e.g. to simulate a stalled call.
     """
 
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(request: httpx2.Request) -> _ExtractResponse:
         if str(request.url) == PCAP_URL:
             return pcap_response
         if str(request.url) == CHAT_COMPLETIONS_URL:
@@ -99,7 +108,13 @@ def _client(
             return extract_handler(request)
         raise AssertionError(f"unexpected request to {request.url}")
 
-    return httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+    # MockTransport's own runtime (`handle_async_request`) accepts a handler that
+    # returns either a Response or an awaitable of one, per call -- its type stub
+    # only declares one fixed return type per handler value, not this per-call
+    # union, so this narrows back to satisfy it.
+    return httpx2.AsyncClient(
+        transport=httpx2.MockTransport(cast(Callable[[httpx2.Request], httpx2.Response], handler))
+    )
 
 
 async def test_analyze_pliego_completes_with_extraction_and_real_faithfulness_fraction() -> None:
@@ -168,3 +183,35 @@ async def test_analyze_pliego_retries_once_then_fails_on_a_persistently_empty_co
     assert result["status"] == AnalysisStatus.FAILED
     assert result.get("error_message")
     assert call_count == 2
+
+
+async def test_analyze_pliego_fails_when_the_extraction_call_stalls_past_the_wall_clock_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Protects the 3.9 wall-clock cap: a call that keeps streaming past
+    `_EXTRACT_TOTAL_TIMEOUT_SECONDS` is cut off and reported as `FAILED`, instead of
+    running unbounded -- the real risk phase3.5.md's >10-minute nemotron call exposed,
+    since httpx2's own per-chunk timeout never trips as long as data keeps trickling in.
+    Also protects that a stall isn't retried: `_EXTRACT_RETRY_POLICY.retry_on` deliberately
+    excludes it, so doubling the wait within the same task run doesn't happen.
+    """
+    monkeypatch.setattr(graph, "_EXTRACT_TOTAL_TIMEOUT_SECONDS", 0.05)
+    call_count = 0
+
+    async def stalling_extract(_: httpx2.Request) -> httpx2.Response:
+        nonlocal call_count
+        call_count += 1
+        await asyncio.sleep(0.2)
+        return httpx2.Response(200, content=_sse_body(FIXTURE_EXTRACTION))
+
+    client = _client(
+        pcap_response=httpx2.Response(200, content=SAMPLE_PLIEGO), extract_handler=stalling_extract
+    )
+
+    result = await analyze_pliego(PCAP_URL, api_key="fake-key", client=client)
+
+    assert result["status"] == AnalysisStatus.FAILED
+    error_message = result.get("error_message")
+    assert error_message is not None
+    assert "wall-clock cap" in error_message
+    assert call_count == 1

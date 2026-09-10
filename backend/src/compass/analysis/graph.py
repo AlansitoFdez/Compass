@@ -19,7 +19,9 @@ completion, an inline OpenRouter error, an HTTP error -- see phase3.5.md's real 
 its own catch-all around this.
 """
 
+import asyncio
 import json
+import logging
 from dataclasses import dataclass
 from typing import TypedDict, cast
 
@@ -35,6 +37,8 @@ from compass.analysis.enums import AnalysisStatus
 from compass.analysis.extraction_schema import PliegoExtraction
 from compass.analysis.openrouter import OpenRouterError, extract_structured
 from compass.analysis.verification import citation_faithfulness
+
+logger = logging.getLogger(__name__)
 
 # Decided in 3.4 against a real golden set: 100% of the 36 checks, faster than the
 # other free-tier candidate on the same document (phase3.4.md).
@@ -125,16 +129,40 @@ async def _extract(
     """Calls the extraction model and validates its output against the closed schema.
 
     Retried by the `extract` node's `RetryPolicy` (see module docstring) on the same
-    failure modes `extraction_eval.py` retried by hand; not caught here.
+    failure modes `extraction_eval.py` retried by hand; not caught here. Bounded to
+    `_EXTRACT_TOTAL_TIMEOUT_SECONDS` regardless of how the underlying stream behaves --
+    see that constant's docstring for why `extract_structured`'s own timeout doesn't
+    already guarantee this.
     """
     prompt = build_prompt(state["pages"])
-    response = await extract_structured(
-        model=runtime.context.model,
-        system_prompt=SYSTEM_PROMPT,
-        user_prompt=prompt,
-        schema=PliegoExtraction,
-        api_key=runtime.context.api_key,
-        client=runtime.context.client,
+    try:
+        response = await asyncio.wait_for(
+            extract_structured(
+                model=runtime.context.model,
+                system_prompt=SYSTEM_PROMPT,
+                user_prompt=prompt,
+                schema=PliegoExtraction,
+                api_key=runtime.context.api_key,
+                client=runtime.context.client,
+            ),
+            timeout=_EXTRACT_TOTAL_TIMEOUT_SECONDS,
+        )
+    except TimeoutError:
+        # asyncio.wait_for raises a bare TimeoutError with no message -- str(exc)
+        # would land in TenderAnalysis.error_message as an empty string otherwise.
+        raise TimeoutError(
+            f"extraction call exceeded {_EXTRACT_TOTAL_TIMEOUT_SECONDS:.0f}s wall-clock cap"
+        ) from None
+    # The only place this is visible at all: `TenderAnalysis` persists no usage/cost
+    # column (3.9 -- an extraction is cached by hash, not the per-call number), so the
+    # worker log is the sole real record of what an analysis actually costs -- the
+    # figure the design doc wants tracked once Fase 4 adds a cost line to the README.
+    logger.info(
+        "extract: model=%s prompt_tokens=%d completion_tokens=%d cost=%s",
+        runtime.context.model,
+        response.usage.prompt_tokens,
+        response.usage.completion_tokens,
+        response.usage.cost,
     )
     return {"extraction": PliegoExtraction.model_validate_json(response.content)}
 
@@ -156,6 +184,22 @@ _EXTRACT_RETRY_POLICY = RetryPolicy(
     max_attempts=2,
     retry_on=(OpenRouterError, httpx2.HTTPError, ValidationError, json.JSONDecodeError),
 )
+
+# httpx2's own `timeout=180.0` inside `extract_structured` bounds the gap between
+# streamed chunks, not the call's total wall-clock duration -- httpcore's transport
+# read() takes a per-call timeout that resets on every chunk received, so a response
+# that keeps trickling reasoning characters never trips it (confirmed against
+# httpx2/httpcore's own source, not assumed). Two real data points already show this
+# in production: phase3.4.md measured nemotron finishing one document in 209s, past
+# that 180s figure, and phase3.5.md hit a separate nemotron call that ran over 10
+# minutes still streaming and had to be killed by hand. Left unbounded, a stalled
+# call plus `_EXTRACT_RETRY_POLICY`'s second attempt could together outlive the
+# Celery task's own 900s Redis lock (`analysis/tasks.py`), letting a second run
+# start for the same expediente. Not added to `retry_on` above: retrying a genuine
+# stall would just double the wait inside the same task run, and a `FAILED` here
+# already gets a real second attempt the next time someone asks for this tender's
+# analysis (3.8's cache/retry design).
+_EXTRACT_TOTAL_TIMEOUT_SECONDS = 300.0
 
 
 def _build_graph() -> CompiledStateGraph[
