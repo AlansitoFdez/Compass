@@ -14,7 +14,7 @@ def test_golden_set_size_matches_the_current_batch() -> None:
     in batches of ~5-7 toward 25-30 -- bumped by hand each time a batch lands, not
     computed, so a missing/extra entry fails loudly instead of passing by accident.
     """
-    assert len(GOLDEN_SET) == 20
+    assert len(GOLDEN_SET) == 25
 
 
 def test_certifications_citation_is_none_only_when_certifications_is_empty() -> None:

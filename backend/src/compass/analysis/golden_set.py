@@ -23,7 +23,7 @@ for extraction, for reasons worth knowing about rather than silently discarding:
   figure -- solvencia, plazos, garantía, criterios -- to a separate "Cuadro Resumen" or
   "Apartado"/"Anexo I" that isn't part of the downloaded document at all
   (`document.extract_pages` returns real text, just none of the substantive values).
-  Seen four times among the discarded candidates -- common enough that a quick check
+  Seen six times among the discarded candidates -- common enough that a quick check
   for real "ANEXO I"/"CARACTERÍSTICAS" section content (not just a reference to one) is
   now the first triage step before committing to a full read.
 - A PCAP (Ayuntamiento de Ayerbe, `1868392P`) whose every page extracts to nothing but
@@ -40,6 +40,14 @@ for extraction, for reasons worth knowing about rather than silently discarding:
 - A PCAP dominated by a rotated diagonal watermark: `extract_pages` returns real
   characters, but ~93% of its lines are one or two stray characters from the
   watermark, with the substantive text unrecoverable from the noise.
+
+Not a failure mode, but worth knowing when reading the entries below: three PCAPs
+(Red.es, `003/26-SI`, `009/26-SG`, `015/25-SI`) split each tender's PCAP into two
+documents by design -- "Condiciones Específicas" (downloaded here, the only one that's
+`pcap_url`) and a separate, stable "Condiciones Generales" reused across many Red.es
+expedientes. Garantías, lotes and the submission deadline live exclusively in the
+latter, so those three fields are genuinely `None` for all three entries -- not a
+missed citation, just outside the document this project ingests.
 
 Annotated directly from the PCAP text (`compass.analysis.document.extract_pages`
 against the tender's real `pcap_url`), not from a summary -- every `Citation.quote`
@@ -2294,6 +2302,607 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
                 page=46,
                 quote="G. ÁMBITO DE LA OFERTA\nTotalidad: Sí ☒ No ☐",
             ),
+        ),
+    ),
+    # Empresa Municipal de Aguas y Saneamiento de Murcia (EMUASA) -- servicios de
+    # certificación en continuidad de negocio (ISO 22301), auditorías externas de
+    # recertificación y seguimiento. Formato "Cuadro de Características" con letras
+    # A-S, 82 páginas. La certificación exigida es una acreditación ENAC del propio
+    # organismo certificador, no una certificación de calidad interna del licitador.
+    "019-SER-2026": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=5850.00,
+            description="Volumen anual de negocios de al menos una vez y media el valor "
+            "estimado anual del contrato (19.500,00 € / 5 años máximos con prórroga = "
+            "3.900,00 €/año; x1,5 = 5.850,00 €). El pliego da la fórmula, no la cifra "
+            "final ya calculada.",
+            citation=Citation(
+                clause="F)",
+                page=6,
+                quote="Volumen anual de negocios, referido al mejor ejercicio dentro de "
+                "los tres últimos\ndisponibles, en función de las fechas de constitución "
+                "o de inicio de actividades del\nempresario y de presentación de las "
+                "ofertas, por importe igual o superior a una vez y\nmedia el valor "
+                "estimado anual del contrato.",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=2730.00,
+            description="Trabajos similares en los últimos tres años con importe anual "
+            "acumulado en el año de mayor ejecución de al menos el 70% de la anualidad "
+            "media del contrato (70% de 3.900,00 € = 2.730,00 €).",
+            citation=Citation(
+                clause="F)",
+                page=6,
+                quote="Trabajos efectuados en los tres últimos años, que deberán ser de "
+                "igual o similar\nnaturaleza que los que constituyen el objeto del "
+                "contrato, y cuyo importe anual\nacumulado en el año de mayor ejecución "
+                "sea igual o superior al 70 por ciento de la\nanualidad media del "
+                "contrato.",
+            ),
+        ),
+        certifications=["Acreditación ENAC para la certificación de la norma UNE-EN ISO 22301"],
+        certifications_citation=Citation(
+            clause="F)",
+            page=7,
+            quote="Acreditación ENAC (o entidad de acreditación equivalente) para la\n"
+            "certificación de la NORMA UNE EN ISO 22301. Las empresas\nlicitadoras que se "
+            "presenten deberán estar acreditadas en España por\nparte de la Entidad "
+            "Nacional de Acreditación (ENAC), u otra entidad de\nacreditación equivalente "
+            "para la certificación de la NORMA UNE EN ISO\n22301, para garantizar la "
+            "aceptación de los certificados emitidos a nivel\nnacional e internacional.",
+        ),
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(name="Oferta Económica", points=49, is_price=True),
+                AwardCriterion(
+                    name="Criterio Social: Plan de Formación", points=21, is_price=False
+                ),
+                AwardCriterion(
+                    name="Experiencia adicional auditor jefe", points=20, is_price=False
+                ),
+                AwardCriterion(
+                    name="Acto de Entrega Oficial del Certificado de Renovación",
+                    points=10,
+                    is_price=False,
+                ),
+            ],
+            citation=Citation(
+                clause="G)",
+                page=8,
+                quote="Varios criterios de adjudicación, en base a la mejor relación "
+                "calidad-precio,\nestableciéndose para ello los siguientes criterios:",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=5.0,
+            description="Sin garantía provisional. Garantía definitiva del 5% del "
+            "importe de adjudicación, IVA excluido; complementaria de hasta otro 5% del "
+            "presupuesto base de licitación si la oferta estuvo incursa en presunción de "
+            "anormalidad.",
+            citation=Citation(
+                clause="P)",
+                page=13,
+                quote="DEFINITIVA:\nSi se exige: 5% del importe de adjudicación (IVA excluido).",
+            ),
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="Duración de 3 años, prorrogable una única vez hasta 2 años más.",
+            citation=Citation(
+                clause="E)",
+                page=6,
+                quote="La duración del contrato será de TRES (3) Años .\nEl contrato es "
+                "prorrogable.",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="No se fija una fecha explícita en el PCAP; remite al anuncio de "
+            "licitación publicado en el perfil de contratante de EMUASA.",
+            citation=Citation(
+                clause="A)",
+                page=4,
+                quote="La fecha y hora en la que finaliza el plazo para\nproposiciones "
+                "presentar oferta figuran en el anuncio de licitación\npublicado en el "
+                "Perfil del Contratante de EMUASA en la\nPlataforma de Contratación del "
+                "Sector Público.",
+            ),
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida, con comunicación previa al órgano de contratación "
+            "identificando la parte a subcontratar y el subcontratista; no existen "
+            "tareas críticas excluidas de subcontratación.",
+            citation=Citation(
+                clause="K)",
+                page=12,
+                quote="K) SUBCONTRATACIÓN\nProcede:\nSI",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="No dividido en lotes, justificado en el apartado 2 de la "
+            "Memoria Justificativa del contrato.",
+            citation=Citation(
+                clause="C)",
+                page=5,
+                quote="Posibilidad de licitar por NO, tal y como se justifica en el "
+                "apartado 2 de la\nlotes Memoria Justificativa del contrato.",
+            ),
+        ),
+    ),
+    # Equipos Nucleares, S.A., S.M.E. (ENSA) -- servicio de desarrollo e implantación
+    # de una aplicación de gestión de desviaciones y acciones. Contrato de naturaleza
+    # PRIVADA (ENSA no es Administración Pública), 53 páginas. Sin garantía definitiva
+    # en absoluto -- solo un periodo de garantía técnica sobre la solución entregada.
+    "001213/2026": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=127500.00,
+            description="Volumen anual de negocios de al menos una vez y media el valor "
+            "estimado del contrato (85.000 € x 1,5 = 127.500 €), al ser la duración del "
+            "contrato de 12 meses (no superior a un año). Además, seguro de "
+            "responsabilidad civil vigente por un importe no inferior al valor estimado "
+            "del contrato.",
+            citation=Citation(
+                clause="5.2.1",
+                page=17,
+                quote="Declaración sobre el volumen anual de negocios, referido como "
+                "máximo a los\ntres últimos ejercicios disponibles en función de la "
+                "fecha de creación o de inicio\nde actividades del empresario, que "
+                "referido al año de mayor volumen deberá ser\nal menos una vez y media "
+                "el valor estimado del contrato cuando su duración no\nsea superior a "
+                "un año, y al menos una vez y media el valor anual medio del\ncontrato "
+                "si su duración es superior a un año.",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=59500.00,
+            description="Servicios similares en los últimos tres años con importe anual "
+            "acumulado en el año de mayor ejecución de al menos el 70% de la anualidad "
+            "media del contrato (70% de 85.000 € = 59.500 €, al coincidir la anualidad "
+            "media con el valor estimado en un contrato de 12 meses).",
+            citation=Citation(
+                clause="12",
+                page=3,
+                quote="Relación de las principales obras/servicios/suministros\n"
+                "realizados en los últimos tres años similares al solicitado, cuyo\n"
+                "importe anual acumulado en el año de mayor ejecución sea igual\no "
+                "superior al 70 por ciento de la anualidad media del contrato",
+            ),
+        ),
+        certifications=[],
+        certifications_citation=None,
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(name="Proposición económica", points=51, is_price=True),
+                AwardCriterion(name="Descripción de la Solución", points=37, is_price=False),
+                AwardCriterion(name="Plan de Proyecto", points=8, is_price=False),
+                AwardCriterion(name="Plan de Formación", points=4, is_price=False),
+            ],
+            citation=Citation(
+                clause="14",
+                page=3,
+                quote="Los criterios de adjudicación no evaluables mediante fórmulas\n"
+                "(CRITERIOS\nserán valorados con hasta un máximo de cuarenta y nueve\n"
+                "SUBJETIVOS)\n(49) puntos, según:",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=None,
+            description="La licitación no contempla garantía provisional; el pliego no "
+            "menciona en ningún punto una garantía definitiva -- solo un periodo de "
+            "garantía técnica (24 meses) sobre la solución entregada, coherente con "
+            "tratarse de un contrato de naturaleza privada (ENSA no es Administración "
+            "Pública).",
+            citation=Citation(
+                clause="4",
+                page=15,
+                quote="La presente licitación no contempla la constitución de garantía "
+                "provisional.",
+            ),
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="Duración de 12 meses desde la fecha indicada en el contrato; "
+            "sin prórrogas previstas.",
+            citation=Citation(
+                clause="11",
+                page=3,
+                quote="El plazo de ejecución será de doce (12) meses, a contar desde\n"
+                "11 PLAZOS\nla fecha indicada en el contrato.",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="Hasta las 13:00 horas del día 25 de mayo de 2026.",
+            citation=Citation(
+                clause="13",
+                page=3,
+                quote="Hasta las 13:00 horas del día 25 de mayo de 2026",
+            ),
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida con consentimiento previo y por escrito de ENSA; el "
+            "licitador debe indicar en su oferta si prevé subcontratar y el perfil del "
+            "subcontratista.",
+            citation=Citation(
+                clause="18",
+                page=7,
+                quote="El adjudicatario no podrá ceder ni subcontratar el contrato en\n"
+                "todo o en parte sin el consentimiento previo y por escrito de\nENSA.",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="No dividido en lotes: el objeto del contrato constituye una "
+            "unidad funcional indivisible.",
+            citation=Citation(
+                clause="6",
+                page=2,
+                quote="No procede su división en lotes debido a que el objeto del "
+                "contrato\n6 LOTES\nconstituye una unidad funcional indivisible.",
+            ),
+        ),
+    ),
+    # Red.es -- servicio avanzado de desarrollo, administración, soporte y
+    # mantenimiento de la plataforma de Datos.gob.es. "Condiciones Específicas" de un
+    # PCAP partido en dos documentos, 65 páginas -- garantías, lotes y plazo de
+    # presentación viven en las "Condiciones Generales" compartidas, no incluidas en
+    # este `pcap_url`. El más rico en certificaciones formales (ISO 20000 + ISO/IEC
+    # 15504-SPICE nivel 3).
+    "003/26-SI": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=1307566.50,
+            description="Volumen anual de negocios de al menos una vez y media la "
+            "anualidad media del contrato (1.307.566,50 €, ya calculada en el propio "
+            "pliego), impuestos indirectos excluidos.",
+            citation=Citation(
+                clause="3.1",
+                page=12,
+                quote="de presentación de las ofertas por importe igual o superior a "
+                "una vez y media la\nanualidad media del contrato (1.307.566,50 €), "
+                "impuestos indirectos aplicables\nexcluidos).",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=610197.70,
+            description="Servicios similares en los últimos tres años con importe anual "
+            "acumulado en el año de mayor ejecución de al menos 610.197,70 € (70% de la "
+            "anualidad media del contrato, ya calculado en el propio pliego).",
+            citation=Citation(
+                clause="3.2",
+                page=12,
+                quote="El importe anual acumulado en el año de mayor ejecución deberá "
+                "ser igual o\nsuperior a 610.197,70 € (70% de la anualidad media del "
+                "contrato), impuestos\nindirectos aplicables excluidos.",
+            ),
+        ),
+        certifications=[
+            "ISO 20000 (gestión de servicios TI) o norma EN ISO equivalente",
+            "ISO/IEC 15504-SPICE Nivel 3 (madurez de ingeniería del software) o "
+            "certificación equivalente",
+        ],
+        certifications_citation=Citation(
+            clause="3.2.b)",
+            page=13,
+            quote="Dado el objeto del contrato, se exige la presentación de "
+            "certificado expedido\npor organismo independiente conforme a la s normas "
+            "europeas relativas a la\ncertificación, que acredite que el empresario "
+            "cumple con el sistema de gestión de la\ncalidad contenido en la norma ISO "
+            "20.000, como mínimo, o norma EN ISO\nequivalente.",
+        ),
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(name="Precio", points=55, is_price=True),
+                AwardCriterion(
+                    name="Propuestas de mejora del desarrollo e implantación de los evolutivos",
+                    points=22.5,
+                    is_price=False,
+                ),
+                AwardCriterion(
+                    name="Propuestas de mejora de la monitorización de la plataforma",
+                    points=22.5,
+                    is_price=False,
+                ),
+            ],
+            citation=Citation(
+                clause="9.1",
+                page=31,
+                quote="Los criterios cuya cuantificación depende de un juicio de valor "
+                "tendrán un peso del\n45% en la valoración total de la oferta.",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=None,
+            description="El documento menciona la existencia de una garantía "
+            "definitiva (a efectos de ejecutar penalidades contra ella) pero remite su "
+            "régimen y porcentaje a las Condiciones Generales del Pliego de Cláusulas "
+            "Administrativas Particulares -- un documento base compartido por varios "
+            "expedientes de Red.es (024/23-SI, 013/22-SI) que no forma parte de este "
+            "PCAP descargado.",
+            citation=None,
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="Duración de 48 meses desde la formalización del contrato.",
+            citation=Citation(
+                clause="5",
+                page=19,
+                quote="El plazo de duración del contrato será de CUARENTA Y OCHO (48) "
+                "MESES, a contar\ndesde el día de su formalización.",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="No se menciona una fecha ni un plazo de presentación de "
+            "ofertas en este documento; remite implícitamente a las Condiciones "
+            "Generales del Pliego, no incluidas en este PCAP.",
+            citation=None,
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida con sujeción a lo dispuesto en los pliegos; "
+            "obligación de identificar en la oferta la parte a subcontratar y el "
+            "perfil del subcontratista.",
+            citation=Citation(
+                clause="2.2",
+                page=7,
+                quote="El contratista podrá concertar con terceros la realización "
+                "parcial de la prestación\ncon sujeción a lo dispuesto en los pliegos.",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="La división en lotes no se menciona en ningún punto de este "
+            "documento; remite implícitamente a las Condiciones Generales del Pliego, "
+            "no incluidas en este PCAP.",
+            citation=None,
+        ),
+    ),
+    # Red.es -- servicio de soporte, mantenimiento y mejora de los sistemas de gestión
+    # de la entidad. Misma familia documental que 003/26-SI, 46 páginas. Único de los
+    # tres con el 100% de la valoración en criterios de fórmula (sin ningún criterio de
+    # juicio de valor) y con prórroga obligatoria de otros 24 meses.
+    "009/26-SG": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=298350.00,
+            description="Volumen anual de negocios de al menos una vez y media la "
+            "anualidad media del contrato (298.350 €, ya calculada en el propio "
+            "pliego), impuestos indirectos excluidos.",
+            citation=Citation(
+                clause="3.1",
+                page=10,
+                quote="de presentación de las ofertas por importe igual o superior a "
+                "una vez y media la\nanualidad media del contrato (298.350 €).",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=139230.00,
+            description="Servicios similares en los últimos tres años con importe "
+            "anual acumulado en el año de mayor ejecución de al menos 139.230 €, "
+            "impuestos indirectos excluidos.",
+            citation=Citation(
+                clause="3.2",
+                page=10,
+                quote="El importe anual acumulado en el año de mayor ejecución deberá "
+                "ser igual o\nsuperior a 139.230 € impuestos indirectos aplicables "
+                "excluidos.",
+            ),
+        ),
+        certifications=["ISO 9001 (gestión de la calidad) o norma EN ISO equivalente"],
+        certifications_citation=Citation(
+            clause="3.2.b)",
+            page=11,
+            quote="b) Dado el objeto del contrato, se exige la presentación de "
+            "certificado expedido por\norganismo independiente conforme a las normas "
+            "europeas relativas a la\ncertificación, que acredite que el empresario "
+            "cumple con la norma EN ISO 9001,\no equivalente.",
+        ),
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(name="Criterio económico", points=60, is_price=True),
+                AwardCriterion(name="Criterio Técnico Cuantificable 1", points=5, is_price=False),
+                AwardCriterion(name="Criterio Técnico Cuantificable 2", points=5, is_price=False),
+                AwardCriterion(name="Criterio Técnico Cuantificable 3", points=15, is_price=False),
+                AwardCriterion(name="Criterio Técnico Cuantificable 4", points=15, is_price=False),
+            ],
+            citation=Citation(
+                clause="9.2",
+                page=26,
+                quote="Los criterios cuantificables mediante la mera aplicación de "
+                "fórmulas tendrán un\npeso del 100% de la valoración total de la "
+                "oferta e incluyen, además del resto de los\ncriterios que presentan "
+                "tal naturaleza, el criterio económico.",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=None,
+            description="El documento menciona la existencia de una garantía "
+            "definitiva (a efectos de ejecutar penalidades contra ella) pero remite su "
+            "régimen y porcentaje a las Condiciones Generales del Pliego de Cláusulas "
+            "Administrativas Particulares, un documento base compartido por varios "
+            "expedientes de Red.es que no forma parte de este PCAP descargado.",
+            citation=None,
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="Duración de 24 meses desde la formalización, prorrogable "
+            "(obligatoriamente para el contratista) por un periodo adicional de 24 "
+            "meses.",
+            citation=Citation(
+                clause="5",
+                page=16,
+                quote="El plazo de duracio n del Contrato sera de 24 MESES desde el "
+                "dí a de su formalizacio n.",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="No se menciona una fecha ni un plazo de presentación de "
+            "ofertas en este documento; remite implícitamente a las Condiciones "
+            "Generales del Pliego, no incluidas en este PCAP.",
+            citation=None,
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida con sujeción a lo dispuesto en los pliegos; "
+            "obligación de identificar en la oferta el porcentaje a subcontratar y el "
+            "perfil del subcontratista.",
+            citation=Citation(
+                clause="2.2",
+                page=7,
+                quote="El contratista podrá concertar con terceros la realización "
+                "parcial de la prestación\ncon sujeción a lo dispuesto en los pliegos.",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="La división en lotes no se menciona en ningún punto de este "
+            "documento; remite implícitamente a las Condiciones Generales del Pliego, "
+            "no incluidas en este PCAP.",
+            citation=None,
+        ),
+    ),
+    # Red.es -- servicio de desarrollo, implantación y mantenimiento de servicios de
+    # Inteligencia Artificial y automatización de procesos. Misma familia documental
+    # que 003/26-SI y 009/26-SG, 54 páginas. El único de los tres con dos
+    # certificaciones formales (ISO 9001 + ISO 27001) y con sus criterios de juicio de
+    # valor y de fórmula desglosados en subcriterios de grano fino.
+    "015/25-SI": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=971327.5,
+            description="Volumen anual de negocios de al menos una vez y media la "
+            "anualidad media del presupuesto base de licitación del contrato "
+            "(971.327,5 €, ya calculada en el propio pliego).",
+            citation=Citation(
+                clause="3.1",
+                page=12,
+                quote="superior a una vez y media la anualidad media del presupuesto "
+                "base de licitación del\ncontrato (971.327,5 €).",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=453286.17,
+            description="Servicios similares en los últimos tres años con importe "
+            "anual acumulado en el año de mayor ejecución de al menos 453.286,17 €, "
+            "impuestos indirectos excluidos.",
+            citation=Citation(
+                clause="3.2",
+                page=13,
+                quote="El importe anual acumulado de los servicios realizados en el "
+                "año de mayor\nejecución deberá ser igual o superior a CUATROCIENTOS "
+                "CINCUENTA Y TRES MIL\nDOSCIENTOS OCHENTA Y SEIS EUROS CON DIECISIETE "
+                "CÉNTIMOS (453.286,17€),\nimpuestos indirectos aplicables excluidos.",
+            ),
+        ),
+        certifications=[
+            "ISO 9001 (gestión de la calidad) o certificación equivalente",
+            "ISO 27001 (gestión de la seguridad de la información) o certificación equivalente",
+        ],
+        certifications_citation=Citation(
+            clause="3.2.b)",
+            page=13,
+            quote="b) Dado el objeto del contrato, se exige la presentación de "
+            "certificado\nexpedido por organismo independiente conforme a las "
+            "normas europeas relativas a\nla certificación, que acredite que el "
+            "empresario cumple con la norma EN ISO 9001,\no certificación "
+            "equivalente.",
+        ),
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(name="Criterio económico", points=42, is_price=True),
+                AwardCriterion(
+                    name="Propuestas de medidas de utilización eficiente de la "
+                    "plataforma tecnológica",
+                    points=16,
+                    is_price=False,
+                ),
+                AwardCriterion(
+                    name="Propuestas de fomento de la concienciación y uso "
+                    "responsable de la plataforma",
+                    points=12,
+                    is_price=False,
+                ),
+                AwardCriterion(
+                    name="Propuestas de mejora del rendimiento de los servicios de "
+                    "ejecución masiva",
+                    points=12,
+                    is_price=False,
+                ),
+                AwardCriterion(
+                    name="Criterio Técnico cuantificable CTC1 (cualificación de "
+                    "perfiles expertos en inteligencia artificial)",
+                    points=9,
+                    is_price=False,
+                ),
+                AwardCriterion(
+                    name="Criterio Técnico cuantificable CTC2 (cualificación de "
+                    "perfiles expertos en automatización)",
+                    points=9,
+                    is_price=False,
+                ),
+            ],
+            citation=Citation(
+                clause="9.1",
+                page=29,
+                quote="Los criterios cuya cuantificación depende de un juicio de "
+                "valor tendrán un\npeso del 40% del total en la valoración de la "
+                "oferta.",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=None,
+            description="El documento menciona la existencia de una garantía "
+            "definitiva (a efectos de ejecutar penalidades contra ella) pero remite su "
+            "régimen y porcentaje a las Condiciones Generales del Pliego de Cláusulas "
+            "Administrativas Particulares, un documento base compartido por varios "
+            "expedientes de Red.es que no forma parte de este PCAP descargado.",
+            citation=None,
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="Duración de 36 meses desde el día siguiente a la "
+            "formalización del contrato.",
+            citation=Citation(
+                clause="5",
+                page=19,
+                quote="El plazo de duración del Contrato será de TREINTA Y SEIS (36) "
+                "MESES desde\nel día siguiente a su formalización.",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="No se menciona una fecha ni un plazo de presentación de "
+            "ofertas en este documento; remite implícitamente a las Condiciones "
+            "Generales del Pliego, no incluidas en este PCAP.",
+            citation=None,
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida con sujeción a lo dispuesto en los pliegos; "
+            "obligación de identificar en la oferta el porcentaje a subcontratar y el "
+            "perfil del subcontratista.",
+            citation=Citation(
+                clause="2.3",
+                page=9,
+                quote="El contratista podrá concertar con terceros la realización "
+                "parcial de la\nprestación con sujeción a lo dispuesto en los "
+                "pliegos.",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="La división en lotes no se menciona en ningún punto de este "
+            "documento; remite implícitamente a las Condiciones Generales del Pliego, "
+            "no incluidas en este PCAP.",
+            citation=None,
         ),
     ),
 }
