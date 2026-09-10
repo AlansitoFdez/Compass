@@ -37,3 +37,31 @@ Del desglose de la Fase 4 (`docs/phases/phase4/phase4.md`): extensión del golde
 Suite completa tras el lote: **193 passed** (189 previos + 4 nuevos de `test_extraction_golden_set.py`, que ahora protege el tamaño real -- 9 -- en vez de los 4 originales). `ruff check`/`format --check`/`mypy` sin avisos. Los 9 expedientes del golden set (4 de la 3.4 + 5 de este lote) verificados con `pcap_url` real todavía vigente en el corpus.
 
 Lote 1 completado -- 9 de 25 pliegos. Pendiente: lotes 2 y 3 (16 pliegos más).
+
+### Lote 2 — 11 pliegos (2026-01027, 69-26, CMA 04/2026, 582026020000, 2026000731, L26-SERV-06, MT260312, SERV-2026000088, CONTR 2026 17947, INN 26 002, TEC0007188)
+
+**Candidatos descartados en este lote, cuatro en total, dos patrones ya vistos y dos nuevos**:
+
+- **Patrón "pliego tipo" ya conocido, dos casos más** (`PAS_325/2026`, Conselleria de Sanitat de la Generalitat Valenciana; y un expediente de la Junta de Extremadura): mismo diagnóstico que en el lote 1 -- el cuerpo del documento remite sistemáticamente a un "Apartado" del "Anexo I" para cada cifra concreta, y ese Anexo I, cuando existe en el propio PDF descargado, aparece como plantilla en blanco (casillas y líneas de puntos sin rellenar). Ya son cuatro casos de este patrón entre los descartados de la 4.3 -- lo bastante común como para convertir la comprobación de "¿el Anexo I tiene contenido real, no solo una referencia a él?" en el primer paso de triaje antes de leer un candidato entero.
+- **Hallazgo nuevo -- un PCAP cuya extracción sale con el texto invertido letra a letra, intercalado con códigos de glifo `(cid:N)` sin mapear** (expediente de un ayuntamiento, descartado): páginas enteras ilegibles por un mapa de fuente/codificación roto en el PDF de origen, no por falta de capa de texto -- `has_text_layer` tampoco lo detectaría, igual que el caso de Ayerbe del lote 1 pero por una causa distinta.
+- **Hallazgo nuevo -- un PCAP dominado por una marca de agua diagonal rotada** (expediente de una mutua, descartado): `document.extract_pages` sí devuelve texto real, pero cerca del 93% de sus líneas son uno o dos caracteres sueltos de la marca de agua; el contenido sustantivo no es recuperable de ese ruido con confianza suficiente para citar con precisión.
+
+**Los 11 pliegos finalmente anotados**, elegidos por diversidad real ya confirmada al leerlos:
+
+- **`2026-01027`** (Isdefe, para la Inspección General del Ejército) -- narrativo, 97 páginas.
+- **`69-26`** (ACOSOL, Costa del Sol) -- narrativo, 79 páginas, publicado vía plataforma de firma electrónica sedipualba: la huella de firma sale invertida en el pie de página, pero el cuerpo de las cláusulas se extrae intacto -- confirma que el problema de Ayerbe (lote 1) es específico de cómo esa plataforma concreta superpone el sello, no un problema general de sedipualba.
+- **`CMA 04/2026`** (Ayuntamiento de Gilet) -- procedimiento abierto simplificado abreviado de bajo valor, único de todo el golden set sin ninguna exigencia de solvencia ni garantía en absoluto.
+- **`582026020000`** (CETEDEX/INTA) -- organismo vinculado a la seguridad del Estado: subcontratación permitida pero siempre sujeta a autorización previa reforzada.
+- **`2026000731`** (Gobierno del Principado de Asturias) -- 122 páginas, el más largo del conjunto; único con el cierre de presentación expresado como hora exacta ("23:59:59").
+- **`L26-SERV-06`** (Mogán Gestión Municipal -- GESTIONA) -- servicio SaaS de control horario.
+- **`MT260312`** (Correos y Telégrafos) -- formato tabular de "instrucciones" con casillas; único criterio de adjudicación es el precio (mejor relación coste-eficacia al 100%).
+- **`SERV-2026000088`** (Ayuntamiento de Granada) -- solvencia expresada como fórmula sobre el valor anual medio del contrato, no como cifra ya calculada.
+- **`CONTR 2026 17947`** (Conselleria de Famílies, Benestar Social i Atenció a la Dependència, Illes Balears) -- pliego en catalán, formato "Quadre de característiques".
+- **`INN 26 002`** (Fundació Turisme Palma 365) -- narrativo en catalán, publicado vía sedipualba con el mismo patrón de firma invertida que `69-26`, cuerpo intacto.
+- **`TEC0007188`** (Grupo Tragsa, para el Ministerio para la Transición Ecológica) -- único del golden set sin ninguna garantía exigida; su tabla de criterios de adjudicación tenía un valor de puntos ("49", el del precio) desplazado a la línea siguiente por el layout de dos columnas de `extract_pages` -- confirmado sumando el resto de criterios explícitos (51) y comprobando que 49+51 cierra exactamente en 100, el mismo patrón de interleaving de tabla ya visto y corregido en `202601JC0007` (lote 1).
+
+**Verificación real**: las 99 citas de estos 11 pliegos (9 campos × 11) se comprobaron con `verify_citation` contra el texto real extraído antes de escribirlas en `golden_set.py` -- varias fallaron en el primer intento por errores de transcripción (orden de líneas en tablas de dos columnas, un apóstrofo tipográfico distinto al del PDF) y se corrigieron releyendo el `FAIL` de la propia verificación, no adivinando.
+
+Suite completa tras el lote: **198 passed** (193 previos + 5 nuevos: `test_extraction_golden_set.py` ahora protege 20 entradas). `ruff check`/`format`/`mypy`/`alembic check` sin avisos. Los 11 expedientes nuevos verificados con `pcap_url` real todavía vigente en el corpus.
+
+Lote 2 completado -- 20 de 25 pliegos. Pendiente: lote 3 (5 pliegos más).
