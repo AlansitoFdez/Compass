@@ -188,8 +188,15 @@ class PliegoExtraction(BaseModel):
     economic_solvency: EconomicSolvency
     technical_solvency: TechnicalSolvency
     certifications: list[str] = Field(
-        description="Required certifications (ISO 9001, ISO 27001, ENS, CMMI...), empty list if "
-        "none required."
+        description=(
+            "Formal quality/security certifications or accreditations the provider must "
+            "already hold (e.g. ISO 9001, ISO 27001, ENS, CMMI). Do NOT include generic "
+            "bidding paperwork or administrative declarations submitted with the offer "
+            "itself (DEUC/Documento Europeo Único de Contratación, declaraciones "
+            "responsables, declaraciones de protección de datos) -- those aren't "
+            "certifications a provider holds in advance, every bidder fills them out. "
+            "Empty list if no formal certification is required."
+        )
     )
     certifications_citation: Citation | None = Field(
         description="Null only if the pliego requires no certifications at all."
