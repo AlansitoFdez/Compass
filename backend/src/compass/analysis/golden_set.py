@@ -16,15 +16,16 @@ entirely to the anuncio de licitación or the PPT, some explicitly exempted. A m
 that only pattern-matches "solvencia económica -> find a euro figure" will get some of
 these wrong; that's the point.
 
-**Real limitation found while building the 4.3 batch, not present in the original
-4**: at least two real candidates considered for this set turned out structurally
-unusable for extraction, for reasons worth knowing about rather than silently
-discarding:
+**Real limitations found while building the 4.3 batch, not present in the original
+4**: several real candidates considered for this set turned out structurally unusable
+for extraction, for reasons worth knowing about rather than silently discarding:
 - A PCAP whose `pcap_url` is a "pliego tipo" (template) that defers every concrete
-  figure -- solvencia, plazos, garantía, criterios -- to a separate "Cuadro Resumen"
-  that isn't part of the downloaded document at all (`document.extract_pages` returns
-  real text, just none of the substantive values). Seen twice among the discarded
-  candidates.
+  figure -- solvencia, plazos, garantía, criterios -- to a separate "Cuadro Resumen" or
+  "Apartado"/"Anexo I" that isn't part of the downloaded document at all
+  (`document.extract_pages` returns real text, just none of the substantive values).
+  Seen four times among the discarded candidates -- common enough that a quick check
+  for real "ANEXO I"/"CARACTERÍSTICAS" section content (not just a reference to one) is
+  now the first triage step before committing to a full read.
 - A PCAP (Ayuntamiento de Ayerbe, `1868392P`) whose every page extracts to nothing but
   its own digital-signature header/footer boilerplate -- the clause text itself never
   appears in `extract_pages`'s output, likely from how that municipality's e-signature
@@ -32,6 +33,13 @@ discarding:
   not catch this today: there's plenty of (repeated, boilerplate) text per page, just
   none of it substantive. Not fixed here -- flagged as a real gap for a future
   subphase, not this one's job (see phase4.3.md).
+- A PCAP whose extraction comes back as reversed, letter-by-letter text interleaved
+  with unmapped `(cid:N)` glyph codes for entire pages -- a broken font/encoding map in
+  the source PDF, not an empty text layer, so `has_text_layer` doesn't catch this
+  either.
+- A PCAP dominated by a rotated diagonal watermark: `extract_pages` returns real
+  characters, but ~93% of its lines are one or two stray characters from the
+  watermark, with the substantive text unrecoverable from the noise.
 
 Annotated directly from the PCAP text (`compass.analysis.document.extract_pages`
 against the tender's real `pcap_url`), not from a summary -- every `Citation.quote`
@@ -1038,6 +1046,1253 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
                 page=52,
                 quote="la división en lotes podría generar un riesgo de perjudicar con "
                 "severa gravedad la ejecución adecuada del contrato.",
+            ),
+        ),
+    ),
+    # Isdefe, para la Inspección General del Ejército (IGE) -- evolución y mejora del
+    # sistema informático de gestión de la alimentación. Narrativo, 97 páginas.
+    "2026-01027": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=112800.00,
+            description="Volumen anual de negocios referido al mejor de los tres últimos "
+            "ejercicios, igual o superior a 112.800,00 € (IVA excluido).",
+            citation=Citation(
+                clause="5.1",
+                page=10,
+                quote="por importe igual o\nsuperior a: 112.800,00 euros IVA excluido.",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=13200.00,
+            description="Al menos dos contratos de servicios análogos en los últimos tres "
+            "años, cada uno por un importe de al menos 13.200 € (umbral por contrato, "
+            "no acumulado).",
+            citation=Citation(
+                clause="5.2",
+                page=11,
+                quote="Al menos DOS (2) contratos de servicios de apoyo técnico ( servicios "
+                "de evolución y mejora\ndel sistema informático) por un importe total cada "
+                "uno de ellos de al menos 13.200 euros.",
+            ),
+        ),
+        certifications=[],
+        certifications_citation=None,
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(
+                    name="Experiencia en diseño e implementación ASP.NET/Visual Studio",
+                    points=40,
+                    is_price=False,
+                ),
+                AwardCriterion(
+                    name="Experiencia en bases de datos Microsoft SQL Server",
+                    points=20,
+                    is_price=False,
+                ),
+                AwardCriterion(name="Criterios económicos", points=40, is_price=True),
+            ],
+            citation=Citation(
+                clause="6.2",
+                page=17,
+                quote="El contrato se adjudicará conforme a los siguientes criterios:\n"
+                "6.2.1. CRITERIOS AUTOMÁTICOS DISTINTOS DEL PRECIO",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=5.0,
+            description="Sin garantía provisional. Garantía definitiva del 5% del precio del "
+            "contrato, IVA excluido; retención adicional del 10% si la oferta estuvo "
+            "incursa en presunción de anormalidad.",
+            citation=Citation(
+                clause="11.2",
+                page=41,
+                quote="la garantía definitiva correspondiente al CINCO\nPOR CIENTO (5%) del "
+                "precio del contrato, excluido el Impuesto sobre el Valor Añadido",
+            ),
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="Duración inicial de 3 meses, con dos posibles prórrogas de 12 meses "
+            "cada una (hasta 27 meses en total).",
+            citation=Citation(
+                clause="2.1",
+                page=7,
+                quote="Duración Inicial 1 3 MESES 400 h 18.800,00 €",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="No se fija una fecha explícita en el PCAP; remite al plazo señalado "
+            "en el anuncio de licitación de la Plataforma de Contratación del Sector "
+            "Público.",
+            citation=Citation(
+                clause="10",
+                page=40,
+                quote="Las proposiciones, junto con la documentación preceptiva prevista en "
+                "el presente Pliego se presentarán,\ndentro del plazo señalado en el anuncio",
+            ),
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida conforme al art. 215 LCSP, salvo para las tareas críticas "
+            "que deben ejecutarse directamente por el contratista.",
+            citation=Citation(
+                clause="17",
+                page=44,
+                quote="El contratista podrá concertar con terceros la realización parcial de "
+                "la prestación en los términos previstos\nen el artículo 215 de la LCSP.",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="No dividido en lotes: la coordinación entre distintos contratistas "
+            "podría socavar la correcta ejecución del contrato.",
+            citation=Citation(
+                clause="4",
+                page=6,
+                quote="Isdefe no ha dividido el presente contrato en lotes debido a que la "
+                "citada división haría que la\ncoordinación de los diferentes contratistas "
+                "pueda conllevar el riesgo de socavar la adecuada eje-\ncución del contrato.",
+            ),
+        ),
+    ),
+    # ACOSOL (Aguas y Saneamientos, Costa del Sol) -- adquisición, implantación,
+    # mantenimiento y soporte de plataforma de comunicaciones y software de
+    # transferencia segura. Narrativo, 79 páginas, publicado vía plataforma de firma
+    # electrónica sedipualba (huella de firma en el pie de página, cuerpo intacto).
+    "69-26": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=60000.00,
+            description="Volumen anual de negocios de al menos una vez y media el valor "
+            "estimado del contrato (40.000 € x 1,5 = 60.000 €). El pliego da la fórmula, no "
+            "la cifra final ya calculada.",
+            citation=Citation(
+                clause="4.B",
+                page=48,
+                quote="de la persona licitadora y de presentación de ofertas por importe "
+                "mínimo una vez y media el valor\nestimado del contrato.",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=None,
+            description="Al menos tres certificados que acrediten la participación en "
+            "proyectos iguales o similares, sin umbral económico explícito.",
+            citation=Citation(
+                clause="4.C",
+                page=49,
+                quote="al menos TRES (3.-) CERTIFICADOS que\nacrediten la participación en "
+                "proyectos de construcción iguales o similares vinculados al\nobjeto "
+                "principal del contrato",
+            ),
+        ),
+        certifications=["Esquema Nacional de Seguridad (ENS)"],
+        certifications_citation=Citation(
+            clause="4.A.2",
+            page=48,
+            quote="El ENS actúa como condición mínima de acceso y ejecución.",
+        ),
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(name="Implantación", points=17, is_price=False),
+                AwardCriterion(name="Plan de Mantenimiento y Soporte", points=15, is_price=False),
+                AwardCriterion(name="Plan de Formación", points=3, is_price=False),
+                AwardCriterion(name="Proposición económica", points=65, is_price=True),
+            ],
+            citation=Citation(
+                clause="8.A",
+                page=52,
+                quote="CRITERIOS DE ADJUDICACIÓN PONDERABLES EN FUNCIÓN DE UN JUICIO\nDE "
+                "VALOR. Hasta 35 puntos:",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=5.0,
+            description="Sin garantía provisional. Garantía definitiva del 5% del precio "
+            "final ofertado, IVA excluido.",
+            citation=Citation(
+                clause="7",
+                page=50,
+                quote="Garantía Provisional: No\nGarantía definitiva: Sí. En caso "
+                "afirmativo: 5 % del precio final ofertado (excluido el IVA)",
+            ),
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="36 meses de mantenimiento desde la implantación, más 2 meses para "
+            "la implantación; sin posibilidad de prórroga.",
+            citation=Citation(
+                clause="3",
+                page=47,
+                quote="36 meses el mantenimiento, desde la implantación\n- 2 meses para la "
+                "implantacion",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="No se fija una fecha explícita en el PCAP; remite al anuncio del "
+            "expediente.",
+            citation=Citation(
+                clause="6",
+                page=50,
+                quote="Plazo de publicación: indicada en el anuncio del expediente",
+            ),
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida, salvo determinadas partes o trabajos que deben ser "
+            "ejecutados directamente por el contratista.",
+            citation=Citation(
+                clause="10",
+                page=53,
+                quote="Determinadas partes o trabajos deberán ser ejecutadas directamente "
+                "por la persona\ncontratista o, en el caso de una oferta presentada por una "
+                "unión de empresarios, por un",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="No dividido en lotes: razones de unidad funcional, coherencia "
+            "técnica, coordinación documental y responsabilidad única.",
+            citation=Citation(
+                clause="1",
+                page=46,
+                quote="Se considera técnicamente justificada la no división en lotes del "
+                "presente contrato, al concurrir\nrazones de unidad funcional, coherencia "
+                "técnica, coordinación documental y necesidad de\nresponsabilidad única en "
+                "la prestación.",
+            ),
+        ),
+    ),
+    # Ayuntamiento de Gilet (Valencia) -- solución tecnológica integral para la
+    # prevención, monitorización y gestión del riesgo de incendio. Narrativo, 53
+    # páginas, procedimiento abierto simplificado abreviado de bajo valor: único de
+    # este lote sin ninguna exigencia de solvencia ni garantía en absoluto.
+    "CMA 04/2026": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=None,
+            description="No se exige acreditación de solvencia económica y financiera: "
+            "procedimiento abierto simplificado abreviado (art. 159.6 LCSP), contrato de "
+            "bajo valor. La palabra 'solvencia' no aparece en ningún punto del pliego.",
+            citation=None,
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=None,
+            description="No se exige acreditación de solvencia técnica o profesional, misma "
+            "razón que la solvencia económica.",
+            citation=None,
+        ),
+        certifications=[],
+        certifications_citation=None,
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(name="Proposición económica", points=25, is_price=True),
+                AwardCriterion(
+                    name="Criterios técnicos y de calidad de la solución",
+                    points=15,
+                    is_price=False,
+                ),
+                AwardCriterion(
+                    name="Valoración de la plataforma y del Dashboard", points=15, is_price=False
+                ),
+                AwardCriterion(
+                    name="Participación del fabricante/desarrollador y del equipo técnico "
+                    "especializado",
+                    points=15,
+                    is_price=False,
+                ),
+                AwardCriterion(
+                    name="Condición de empresa desarrolladora, fabricante o responsable "
+                    "tecnológico",
+                    points=15,
+                    is_price=False,
+                ),
+                AwardCriterion(
+                    name="Proyectos con tecnología idéntica, similar o compatible en "
+                    "municipios o territorios cercanos",
+                    points=15,
+                    is_price=False,
+                ),
+            ],
+            citation=Citation(
+                clause="7.A",
+                page=31,
+                quote="7.A. Criterios de adjudicación valorados mediante la aplicación de fórmulas",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=None,
+            description="El pliego no exige garantía provisional ni definitiva -- ninguna de "
+            "las dos palabras aparece en ningún punto del documento, coherente con un "
+            "procedimiento simplificado de bajo valor.",
+            citation=None,
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="4 años desde la notificación de la Resolución de Adjudicación; 3 "
+            "meses para el suministro y puesta en funcionamiento inicial. Sin "
+            "posibilidad de prórroga.",
+            citation=Citation(
+                clause="3",
+                page=29,
+                quote="Plazo total (en meses): 4 años a contar desde la notificación de la "
+                "Resolución de Adjudicación del\ncontrato.",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="No se fija una fecha explícita en el PCAP; remite al plazo señalado "
+            "en el anuncio publicado en el perfil de contratante.",
+            citation=Citation(
+                clause="9.1",
+                page=5,
+                quote="Las proposiciones, junto con la documentación preceptiva, se "
+                "presentarán únicamente por medios\nelectrónicos a través de la plataforma "
+                "de contratación del sector público dentro del plazo señalado en\nel anuncio "
+                "realizado en el perfil de contratante del órgano de contratación.",
+            ),
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida: no hay partes que deban ejecutarse obligatoriamente de "
+            "forma directa por el contratista.",
+            citation=Citation(
+                clause="9",
+                page=35,
+                quote="Determinadas partes o trabajos deberán ser ejecutadas directamente "
+                "por la\npersona contratista o, en el caso de una oferta presentada por una "
+                "unión de\nempresarios, por un participante en la misma: No.",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="No dividido en lotes: la realización independiente de las "
+            "prestaciones dificultaría la coordinación de un sistema único de seguridad.",
+            citation=Citation(
+                clause="1",
+                page=28,
+                quote="Se justifica la no división en lotes de este contrato, atendiendo a "
+                "lo establecido en el articulo 99.3 de la\nLey de Contratos del Sector "
+                "Publico",
+            ),
+        ),
+    ),
+    # CETEDEX (Centro Tecnológico de la Defensa, INTA) -- desarrollo de un prototipo de
+    # análisis de vulnerabilidades. Narrativo, 53 páginas, organismo vinculado a la
+    # seguridad del Estado: subcontratación siempre sujeta a autorización previa.
+    "582026020000": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=50000.00,
+            description="Volumen anual de negocios de al menos el 50% del valor estimado "
+            "del contrato (100.000 € x 0,5 = 50.000 €). El pliego da la fórmula, no la "
+            "cifra final ya calculada.",
+            citation=Citation(
+                clause="12.1.a)",
+                page=32,
+                quote="El requisito mínimo será que el volumen anual de negocios del "
+                "licitador, que referido\nal año de mayor volumen de negocio de los tres "
+                "últimos concluidos deberá ser igual\no superior al 50% del valor estimado "
+                "del contrato o del/los lote/s al/los que licite.",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=50000.00,
+            description="Importe anual acumulado en el año de mayor ejecución de al menos "
+            "el 50% de la anualidad media del contrato -- aproximado aquí al 50% del "
+            "valor estimado (100.000 €), dado que el contrato no tiene anualidades "
+            "distintas (14 meses, sin prórroga).",
+            citation=Citation(
+                clause="12.2.a)",
+                page=33,
+                quote="El requisito mínimo será que el importe anual acumulado en el año "
+                "de mayor ejecu-\nción sea igual o superior al 50% de la anualidad media "
+                "del contrato o del/los lote/s\nal/los que licite.",
+            ),
+        ),
+        certifications=[],
+        certifications_citation=None,
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(name="Precio", points=40, is_price=True),
+                AwardCriterion(name="Lenguajes adicionales", points=30, is_price=False),
+                AwardCriterion(name="Modelo", points=15, is_price=False),
+                AwardCriterion(name="Capacidad de detección", points=15, is_price=False),
+            ],
+            citation=Citation(
+                clause="7",
+                page=30,
+                quote="7.- CRITERIOS DE VALORACIÓN DE LAS OFERTAS.\n- Criterio 1.- Precio: 40%",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=5.0,
+            description="Sin garantía provisional. Garantía definitiva del 5% del "
+            "presupuesto del contrato, IVA/IGIC excluido; garantía complementaria "
+            "adicional del 5%.",
+            citation=Citation(
+                clause="13",
+                page=33,
+                quote="13.- GARANTÍAS.\nProvisional: No procede.\nDefinitiva: Sí procede. "
+                "5.00% del presupuesto del contrato (IVA/IGIC no incluido).",
+            ),
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="14 meses desde la formalización, con hitos parciales a los 3 meses "
+            "(40% del importe) y 14 meses (60% del importe). Sin posibilidad de prórroga.",
+            citation=Citation(
+                clause="14",
+                page=33,
+                quote="El plazo de ejecución del contrato será de 14 meses o, en su caso, "
+                "el que oferte el\ncontratista, si fuese menor que aquel.",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="No se fija una fecha explícita en el PCAP; remite al plazo "
+            "señalado en el anuncio de licitación de la Plataforma de Contratación del "
+            "Sector Público.",
+            citation=Citation(
+                clause="10",
+                page=8,
+                quote="fecha, en la que concluya el plazo de presentación de ofertas que "
+                "figura en el",
+            ),
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida, salvo las tareas críticas para la ejecución del "
+            "contrato (documentación de diseño preliminar y final, preparación de datos, "
+            "integración de software y modelos, formación), que no pueden subcontratarse. "
+            "Requiere siempre autorización por tratarse de un organismo vinculado a la "
+            "seguridad del Estado.",
+            citation=Citation(
+                clause="16",
+                page=34,
+                quote="Las tareas que no pueden ser objeto de subcontratación por ser "
+                "críticas para la\nejecución del contrato son: documentación del diseño "
+                "preliminar, preparación de\ndatos y datasets, documentación de diseño "
+                "final (modelos), integración del software\ny modelos y, formación.",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="No dividido en lotes: las ofertas deben cubrir la totalidad del "
+            "expediente.",
+            citation=Citation(
+                clause="6",
+                page=30,
+                quote="Las ofertas deberán ser hechas por: la totalidad del expediente",
+            ),
+        ),
+    ),
+    # Gobierno del Principado de Asturias -- visor web GIS del Registro de Derechos
+    # Mineros. Narrativo, 122 páginas: el más largo del conjunto. Único con una fecha
+    # de cierre de presentación expresada como hora exacta ("23:59:59").
+    "2026000731": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=170280.00,
+            description="Volumen anual de negocios de al menos una vez y media el valor "
+            "estimado del contrato (170.280,00 €).",
+            citation=Citation(
+                clause="9.5.1",
+                page=28,
+                quote="deberá ser igual o superior a una vez y media el valor estimado\ndel "
+                "contrato (170.280,00€).",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=79464.00,
+            description="Trabajos de igual o similar naturaleza en los últimos 3 años, por "
+            "un importe igual o superior al 70% del valor estimado del contrato "
+            "(79.464,00 €).",
+            citation=Citation(
+                clause="9.5.2",
+                page=28,
+                quote="por un\nimporte igual o superior al 70% del valor estimado del "
+                "contrato (79.464,00 €).",
+            ),
+        ),
+        certifications=[],
+        certifications_citation=None,
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(name="Oferta Económica", points=41, is_price=True),
+                AwardCriterion(name="Mejoras", points=10, is_price=False),
+                AwardCriterion(name="Solución técnica", points=49, is_price=False),
+            ],
+            citation=Citation(
+                clause="11.1",
+                page=43,
+                quote="CRITERIOS DE VALORACIÓN PUNTUACIÓN\nCriterios automáticos 51\nOferta "
+                "Económica 41",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=5.0,
+            description="Sin garantía provisional. Garantía definitiva del 5% del precio "
+            "final ofertado, IVA excluido.",
+            citation=Citation(
+                clause="12.4.d)",
+                page=62,
+                quote="El licitador propuesto como adjudicatario deberá acreditar la "
+                "constitución a favor del órgano de\ncontratación de una garantía "
+                "definitiva de un 5% del precio final ofertado, excluido el Impuesto\nsobre "
+                "el Valor Añadido.",
+            ),
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="Periodo de ejecución máxima de 8 meses, con hitos consecutivos "
+            "(análisis y diseño, migración y publicación, configuración del visor, etc.).",
+            citation=Citation(
+                clause="6.1",
+                page=17,
+                quote="El contrato tendrá un periodo de ejecución máxima de OCHO (8) MESES, "
+                "con los siguientes\nhitos de ejecución consecutivos:",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="Finaliza a las 23:59:59 horas del día señalado en el anuncio de "
+            "licitación, no inferior a quince días desde la publicación del anuncio en el "
+            "perfil de contratante.",
+            citation=Citation(
+                clause="8.1",
+                page=34,
+                quote="El plazo de presentación de proposiciones finalizará a las 23:59:59 "
+                "horas del día señalado en el\nanuncio de licitación del contrato, que no "
+                "será inferior a quince días contados desde el día\nsiguiente al de la "
+                "publicación del anuncio en el perfil de contratante.",
+            ),
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida conforme al art. 215 LCSP, salvo los medios personales "
+            "de adscripción a la ejecución del contrato, que no son subcontratables.",
+            citation=Citation(
+                clause="22.2",
+                page=92,
+                quote="Se admite la subcontratación de las prestaciones, no siendo "
+                "susceptibles de subcontratación los\nmedios personales de adscripción a la "
+                "ejecución del presente contrato descritos en la cláusula\n9.5 del pliego.",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="No dividido en lotes: fuerte interdependencia técnica entre "
+            "componentes (geodatabase, servicios, visores, normalización y migración).",
+            citation=Citation(
+                clause="1.3",
+                page=5,
+                quote="En este caso, no resulta procedente dividir el contrato en lotes "
+                "debido a la fuerte\ninterdependencia entre los componentes técnicos "
+                "(geodatabase, servicios, visores,\nnormalización y migración).",
+            ),
+        ),
+    ),
+    # Mogán Gestión Municipal, S.L. (GESTIONA) -- servicio integral de gestión del
+    # tiempo de trabajo y control horario, en modalidad SaaS. Narrativo, 57 páginas.
+    "L26-SERV-06": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=27000.00,
+            description="Volumen anual de negocios mínimo de 27.000,00 €, equivalente a una "
+            "vez y media el importe correspondiente a una anualidad del contrato.",
+            citation=Citation(
+                clause="4.3.1",
+                page=5,
+                quote="El volumen anual de negocios mínimo exigido será de VEINTISIETE MIL "
+                "EUROS (27.000,00 €),\nequivalente a una vez y media el importe "
+                "correspondiente a una anualidad del contrato, IVA/IGIC\nexcluido.",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=12600.00,
+            description="Importe anual acumulado de servicios similares en el año de mayor "
+            "ejecución de al menos 12.600,00 € (70% de la anualidad media del contrato).",
+            citation=Citation(
+                clause="4.3.2",
+                page=6,
+                quote="El requisito mínimo será que el importe anual acumulado de los "
+                "servicios de igual o similar naturaleza\nejecutados durante el año de "
+                "mayor ejecución de los tres últimos años sea igual o superior a DOCE "
+                "MIL\nSEISCIENTOS EUROS (12.600,00 €).",
+            ),
+        ),
+        certifications=[],
+        certifications_citation=None,
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(name="Oferta económica", points=35, is_price=True),
+                AwardCriterion(
+                    name="Mejoras funcionales de la plataforma", points=45, is_price=False
+                ),
+                AwardCriterion(
+                    name="Tres terminales adicionales sin coste", points=10, is_price=False
+                ),
+                AwardCriterion(
+                    name="Reducción del plazo máximo de implantación", points=10, is_price=False
+                ),
+            ],
+            citation=Citation(
+                clause="12",
+                page=13,
+                quote="La puntuación máxima será de CIEN (100) PUNTOS, distribuidos de la "
+                "siguiente forma:\nCriterio Puntuación máxima\n1. Oferta económica 35 "
+                "puntos",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=5.0,
+            description="Sin garantía provisional. Garantía definitiva del 5% del precio "
+            "final ofertado.",
+            citation=Citation(
+                clause="14",
+                page=20,
+                quote="no se exige la constitución de garantía provisional para participar\n"
+                "en la presente licitación.",
+            ),
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="Duración inicial de un año desde la formalización, prorrogable "
+            "conforme al art. 29.2 LCSP.",
+            citation=Citation(
+                clause="10.1",
+                page=11,
+                quote="El contrato tendrá una duración inicial de UN (1) AÑO, contado "
+                "desde el día siguiente al de su\nformalización o desde la fecha que "
+                "expresamente se determine en el documento contractual.",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="No se fija una fecha explícita en el PCAP; remite al plazo "
+            "señalado en el anuncio de licitación.",
+            citation=Citation(
+                clause="13.1",
+                page=19,
+                quote="Las proposiciones y la documentación complementaria se presentarán "
+                "dentro del plazo\nseñalado en el anuncio de licitación y en la forma "
+                "indicada en los apartados siguientes.",
+            ),
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida conforme a los artículos 215 y siguientes LCSP, sin "
+            "alterar la responsabilidad exclusiva de la empresa contratista.",
+            citation=Citation(
+                clause="29",
+                page=42,
+                quote="La empresa contratista podrá concertar con terceros la realización "
+                "parcial de las prestaciones\nobjeto del contrato, de conformidad con lo "
+                "previsto en los artículos 215 y siguientes de la Ley 9/2017,\nde 8 de "
+                "noviembre, de Contratos del Sector Público.",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="No dividido en lotes: unidad funcional que requiere ejecución "
+            "coordinada e integrada entre la plataforma SaaS, la app móvil y los "
+            "terminales de fichaje.",
+            citation=Citation(
+                clause="1.2",
+                page=2,
+                quote="el presente contrato no se divide en lotes,\nal constituir las "
+                "prestaciones que\nintegran su objeto una unidad funcional que requiere "
+                "una ejecución coordinada e integrada.",
+            ),
+        ),
+    ),
+    # Sociedad Estatal Correos y Telégrafos -- plataforma SaaS para gestión de redes
+    # sociales integrada con Salesforce Service Cloud. Formato "instrucciones"
+    # tabular con checkboxes, 84 páginas. Único criterio de adjudicación: precio.
+    "MT260312": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=80683.20,
+            description="Volumen anual de negocios en el ámbito del contrato, referido al "
+            "mejor de los tres últimos ejercicios, de al menos 80.683,20 €.",
+            citation=Citation(
+                clause="5",
+                page=6,
+                quote="Volumen anual de negocios en el ámbito al que se refiere\nel "
+                "contrato, referido al mejor ejercicio de los tres últimos, de\nal menos "
+                "80.683,20 euros.",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=80683.20,
+            description="Haber realizado un servicio de igual o similar naturaleza en los "
+            "tres últimos años, cuyo importe anual acumulado en el año de mayor ejecución "
+            "sea igual o superior a 80.683,20 €.",
+            citation=Citation(
+                clause="5",
+                page=7,
+                quote="Haber realizado un servicio de igual o similar naturaleza\nque los "
+                "que constituyen el objeto del contrato en los tres\núltimos años, cuyo "
+                "importe anual acumulado en el año de\nmayor ejecución sea igual o "
+                "superior a 80.683,20 €.",
+            ),
+        ),
+        certifications=[],
+        certifications_citation=None,
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(
+                    name="Precio (mejor relación coste-eficacia)", points=100, is_price=True
+                ),
+            ],
+            citation=Citation(
+                clause="6.5.1.1",
+                page=9,
+                quote="Como criterio de adjudicación se considera la mejor relación "
+                "coste-eficacia al ser\nempleados únicamente criterios automáticos y no "
+                "utilizarse criterios sujetos a juicio de\nvalor.",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=5.0,
+            description="Sin garantía provisional. Garantía definitiva del 5% del importe "
+            "de adjudicación del contrato, IVA excluido; garantía complementaria "
+            "adicional del 5% si la oferta ganadora fue considerada anormalmente baja.",
+            citation=Citation(
+                clause="7.6",
+                page=13,
+                quote="5% del importe de",
+            ),
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="Duración inicial de 20 meses desde la fecha del acuerdo de "
+            "aceptación, con inicio previsto el 1 de octubre de 2026 y fin el 31 de mayo "
+            "de 2028; no prorrogable.",
+            citation=Citation(
+                clause="3",
+                page=5,
+                quote="El plazo máximo de ejecución será de 20 meses, a contar desde la "
+                "fecha que conste\nen el documento de acuerdo de aceptación, suponiendo su "
+                "inicio el 1 de octubre del\n2026 y en todo caso finalizará el 31 de mayo "
+                "del 2028, inclusive.",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="30 días naturales a contar desde el día siguiente a la "
+            "publicación del anuncio de licitación en el perfil de contratante.",
+            citation=Citation(
+                clause="6.3",
+                page=8,
+                quote="Las ofertas se presentarán en plazo de 30 días naturales a contar "
+                "desde el día\nsiguiente a aquél en que se publique el anuncio de "
+                "licitación en el perfil de contratante.",
+            ),
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida, con obligación de identificar en la oferta la parte a "
+            "subcontratar, su importe y el perfil del subcontratista.",
+            citation=Citation(
+                clause="8.3.2",
+                page=21,
+                quote="El contratista podrá concertar con terceros la realización parcial "
+                "de la prestación bajo\nlas siguientes condiciones:",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="No dividido en lotes: se mantiene un único sistema de "
+            "suscripciones que afecta a producción, preproducción y desarrollo, conforme "
+            "al art. 99.3.b) LCSP.",
+            citation=Citation(
+                clause="Lotes",
+                page=4,
+                quote="El presente procedimiento de licitación, no se divide en lotes.\nLa "
+                "no división en lotes se justifica en el artículo 99.3 b) LCSP,\n“El hecho "
+                "de que, la realización independiente de las",
+            ),
+        ),
+    ),
+    # Ayuntamiento de Granada -- soporte especializado y mantenimiento de la
+    # plataforma de seguridad ZENworks. Formato "Anexo I" con apartados numerados, 74
+    # páginas. Solvencia expresada como fórmula sobre el valor anual medio, no como
+    # cifra ya calculada.
+    "SERV-2026000088": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=7869.98,
+            description="Volumen anual de negocios de al menos el valor anual medio del "
+            "contrato (15.739,96 € de valor estimado / 2 años de duración = 7.869,98 €). "
+            "El pliego da la fórmula, no la cifra final ya calculada.",
+            citation=Citation(
+                clause="12.B)",
+                page=43,
+                quote="a) Volumen anual de negocios del licitador, que referido al año de "
+                "mayor volumen de negocio\nde los tres últimos concluidos deberá ser al "
+                "menos igual al valor anual medio del contrato.",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=5508.99,
+            description="Importe acumulado en el año de mayor ejecución de al menos el 70% "
+            "del valor medio anual del contrato (70% de 7.869,98 € = 5.508,99 €).",
+            citation=Citation(
+                clause="12.B)",
+                page=43,
+                quote="a) Una relación de los principales servicios o trabajos realizados "
+                "en los últimos tres años, de igual\no similar naturaleza que los que "
+                "constituyen el objeto del contrato, que incluya importe, fechas\ny el "
+                "destinatario, público o privado, de los mismos y donde el importe "
+                "acumulado en el año de\nmayor ejecución sea igual o superior al 70% del "
+                "valor medio anual del contrato que se licita.",
+            ),
+        ),
+        certifications=["Esquema Nacional de Seguridad (ENS)"],
+        certifications_citation=Citation(
+            clause="12.A)",
+            page=43,
+            quote="Certificación ENS (Esquema Nacional de Seguridad) nivel medio o alto",
+        ),
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(name="Oferta económica", points=49, is_price=True),
+                AwardCriterion(
+                    name="Mejoras (horas adicionales de bolsa dinámica y cualificación "
+                    "técnica especializada)",
+                    points=51,
+                    is_price=False,
+                ),
+            ],
+            citation=Citation(
+                clause="20",
+                page=49,
+                quote="Pluralidad de criterios\nCriterios evaluables de forma automática",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=5.0,
+            description="Sin garantía provisional. Garantía definitiva del 5% del importe "
+            "de adjudicación (tareas fijas anuales) y del 5% del presupuesto de licitación "
+            "(bolsa dinámica), IVA excluido en ambos casos.",
+            citation=Citation(
+                clause="8",
+                page=41,
+                quote="Tareas fijas anuales: 5 por 100 del importe de adjudicación del "
+                "contrato para el periodo de duración\ntotal del mismo (IVA excluido).",
+            ),
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="Duración de dos años desde la formalización del contrato, sin "
+            "posibilidad de prórroga.",
+            citation=Citation(
+                clause="4",
+                page=40,
+                quote="El contrato tendrá una duración de DOS años, a contar desde la "
+                "fecha de formalización del\nmismo.",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="Al menos quince días naturales desde la publicación del anuncio "
+            "de licitación en el perfil de contratante.",
+            citation=Citation(
+                clause="28.4",
+                page=59,
+                quote="El plazo de presentación de proposiciones será como mínimo de "
+                "QUINCE días naturales, contados a\npartir del siguiente a aquel en que "
+                "aparezca la inserción del anuncio de licitación en el Perfil de\n"
+                "Contratante.",
+            ),
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida, con comunicación previa al órgano de contratación "
+            "identificando la parte a subcontratar y el subcontratista.",
+            citation=Citation(
+                clause="18",
+                page=46,
+                quote="Procede: Sí\nEl contratista deberá comunicar por escrito, tras la "
+                "adjudicación del contrato y, a más tardar, cuando\ninicie la ejecución de "
+                "este, al órgano de contratación la intención de celebrar los "
+                "subcontratos,",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="No dividido en lotes: el objeto se refiere a un único tipo de "
+            "servicios profesionales (soporte especializado en ZENworks) sin posibilidad "
+            "de división.",
+            citation=Citation(
+                clause="1",
+                page=38,
+                quote="División en lotes: No procede, ya que el objeto de contrato hace "
+                "referencia a un mismo tipo de\nservicios profesionales (soporte "
+                "especializado en ZENworks) sin posibilidad de división.",
+            ),
+        ),
+    ),
+    # Conselleria de Famílies, Benestar Social i Atenció a la Dependència (Illes
+    # Balears) -- suport i manteniment de l'aplicació de gestió de pensions no
+    # contributives. Formato "Quadre de característiques" en catalán, 96 páginas.
+    "CONTR 2026 17947": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=43942.36,
+            description="Volumen anual de negocios en el ámbito del contrato de al menos "
+            "43.942,36 € (IVA excluido), referido al mejor de los tres últimos ejercicios.",
+            citation=Citation(
+                clause="F.2",
+                page=5,
+                quote="Es considerarà que es disposa de solvència econòmica suficient per "
+                "executar el\ncontracte quan el volum anual de negocis en l’àmbit a què es "
+                "refereix el contracte\nsigui igual o superior a 43.942,36 € (IVA exclòs).",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=43942.36,
+            description="Experiencia en servicios de igual naturaleza con un importe anual "
+            "acumulado, en el mejor de los tres últimos años, igual o superior al 70% del "
+            "presupuesto base de licitación (43.942,36 €).",
+            citation=Citation(
+                clause="F.3",
+                page=6,
+                quote="És requisit mínim de solvència tècnica l’experiència en la "
+                "prestació de serveis del\nmateix tipus o naturalesa de l’objecte del "
+                "contracte per un import anual acumulat,\nen el millor dels últims tres "
+                "anys, igual o superior al 70% del pressupost base de\nlicitació (IVA "
+                "exclòs), això és, 43.942,36 €.",
+            ),
+        ),
+        certifications=[],
+        certifications_citation=None,
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(name="Oferta econòmica", points=45, is_price=True),
+                AwardCriterion(
+                    name="Compromís de contractació indefinida del personal",
+                    points=15,
+                    is_price=False,
+                ),
+                AwardCriterion(name="Qualitat del projecte tècnic", points=40, is_price=False),
+            ],
+            citation=Citation(
+                clause="A",
+                page=17,
+                quote="Criteri Ponderació\nCriteris avaluables automàticament mitjançant "
+                "fórmula (60 punts)\n1. Oferta econòmica 45 punts\n2. Compromís de "
+                "contractació indefinida del personal 15 punts",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=5.0,
+            description="Garantia provisional no exigida ('Import: No és procedent'). "
+            "Garantia definitiva del 5% del pressupost base de licitació, IVA exclòs.",
+            citation=Citation(
+                clause="H.2",
+                page=7,
+                quote="H.2. GARANTIA DEFINITIVA: 5% del pressupost base de licitació (IVA exclòs)",
+            ),
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="Duración de 1 año, con inicio previsto el 16 de septiembre de "
+            "2026 (o el día siguiente a la formalización, si fuera posterior); prorrogable "
+            "hasta dos años más en prórrogas sucesivas de un año.",
+            citation=Citation(
+                clause="D",
+                page=5,
+                quote="D. DURADA DEL CONTRACTE. TERMINI D’EXECUCIÓ. PRÒRROGA\nDurada del "
+                "contracte. Termini d’execució\nDurada del contracte: 1 any",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="8 días naturales a contar desde el día siguiente a la publicación "
+            "del anuncio de licitación en el perfil de contratante.",
+            citation=Citation(
+                clause="I",
+                page=7,
+                quote="Data límit: 8 dies naturals a comptar des del dia següent de la "
+                "publicació de l’anunci de\nlicitació en el perfil de contractant.",
+            ),
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida, con obligación de declarar en la oferta la parte a "
+            "subcontratar y de comunicar la identidad del subcontratista tras la "
+            "adjudicación.",
+            citation=Citation(
+                clause="P",
+                page=11,
+                quote="S’exigeix la presentació amb l’oferta d’una declaració sobre la "
+                "part del contracte\nque el licitador tengui previst subcontractar en els "
+                "termes de l’article 215.2.a) de la\nLCSP.",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="No dividido en lotes: el apartado C del cuadro de características "
+            "no describe ningún lote, lo que indica que el contrato se licita como un todo.",
+            citation=Citation(
+                clause="C",
+                page=4,
+                quote="C. LOTS (art. 99 LCSP)\nDivisió del contracte en lots",
+            ),
+        ),
+    ),
+    # Fundació Turisme Palma 365 (Ajuntament de Palma) -- allotjament web i
+    # manteniment integral del portal www.visitpalma.com. Narrativo en catalán, 98
+    # páginas, publicado vía plataforma de firma electrónica sedipualba (huella de
+    # firma reversa/garbled en el pie de página, cuerpo intacto).
+    "INN 26 002": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=13238.55,
+            description="Volumen anual de negocios de al menos 1,5 veces el valor anual "
+            "medio del contrato (8.825,70 € x 1,5 = 13.238,55 €). El pliego da la "
+            "fórmula, no la cifra final ya calculada.",
+            citation=Citation(
+                clause="F.2",
+                page=5,
+                quote="Requisit mínim: el volum anual de negocis del licitador, referit a "
+                "l’any de major volum de negoci dels 3 últims\nconclosos, ha de ser al "
+                "menys 1,5 vegades el valor anual mitjà del contracte.",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=6177.99,
+            description="Importe anual acumulado de servicios similares en el año de "
+            "mayor ejecución de al menos el 70% de la anualidad media del contrato (70% "
+            "de 8.825,70 € = 6.177,99 €).",
+            citation=Citation(
+                clause="F.3",
+                page=6,
+                quote="Requisit mínim: l’import anual acumulat dels principals serveis "
+                "realitzats, a l’any de major execució dels 3 últims\nexercicis, ha de "
+                "ser de al manco del 70% de l’anualitat mitjana sense IVA.",
+            ),
+        ),
+        certifications=[],
+        certifications_citation=None,
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(name="Preu de l’oferta", points=40, is_price=True),
+                AwardCriterion(
+                    name="Proposta tècnica i metodologia de treball", points=20, is_price=False
+                ),
+                AwardCriterion(
+                    name="Metodologia de manteniment (correctiu, evolutiu i preventiu)",
+                    points=15,
+                    is_price=False,
+                ),
+                AwardCriterion(
+                    name="Pla de seguretat i continuïtat del servei", points=10, is_price=False
+                ),
+                AwardCriterion(name="Normes de qualitat", points=6, is_price=False),
+                AwardCriterion(
+                    name="Ampliació de la capacitat de l’allotjament", points=5, is_price=False
+                ),
+                AwardCriterion(name="Millores funcionals proposades", points=4, is_price=False),
+            ],
+            citation=Citation(
+                clause="A",
+                page=15,
+                quote="Els criteris que serveixen de base per a l’adjudicació del "
+                "contracte, d’acord amb la puntuació següent, són:\nCriteris Puntuació",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=5.0,
+            description="Garantia provisional no exigida ('NO ESCAU'). Garantia "
+            "definitiva del 5% del importe de adjudicación, IVA excluido.",
+            citation=Citation(
+                clause="H.2",
+                page=7,
+                quote="H.2 Garantia definitiva: 5 % de l’import d’adjudicació (IVA exclòs)",
+            ),
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="Duración de 1 año desde la formalización, prorrogable hasta 4 "
+            "años adicionales conforme al art. 29.2 LCSP.",
+            citation=Citation(
+                clause="C",
+                page=5,
+                quote="C. DURADA DEL CONTRACTE. TERMINI D’EXECUCIÓ\nDurada del contracte: 1 any",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="No se fija una fecha explícita en el PCAP; remite a la fecha y "
+            "hora indicadas en el anuncio de licitación.",
+            citation=Citation(
+                clause="I",
+                page=8,
+                quote="I. PRESENTACIÓ DE PROPOSICIONS. Lloc i forma de presentació "
+                "(Clàusula 13.1).\nLicitació electrònica. A la Plataforma de "
+                "Contractació del Sector Públic.\nData i hora límit: La indicada a "
+                "l'anunci de licitació.",
+            ),
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida para tareas no esenciales que no afecten a las "
+            "funciones críticas del mantenimiento, con autorización previa del órgano de "
+            "contratación.",
+            citation=Citation(
+                clause="Q",
+                page=9,
+                quote="Q. SUBCONTRACTACIÓ. Art. 215 LCSP 9/2017\nEs permet la "
+                "subcontractació de determinades prestacions del contracte, sempre que "
+                "siguin tasques no essencials\ni que no afectin les funcions crítiques "
+                "del manteniment integral del portal www.visitpalma.com.",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="No dividido en lotes, declarado explícitamente en la portada del pliego.",
+            citation=Citation(
+                clause="Objecte del contracte",
+                page=1,
+                quote="Divisió del contracte en lots: : NO",
+            ),
+        ),
+    ),
+    # Grupo Tragsa (Tragsatec), para el Ministerio para la Transición Ecológica y el
+    # Reto Demográfico -- soporte y mantenimiento del Registro de Aguas electrónico
+    # (RAe). Formato "Anexo I" con letras A-P, 79 páginas. Único sin ninguna garantía
+    # exigida (ni provisional ni definitiva) y con un valor de tabla desplazado por el
+    # layout de dos columnas que, sumado al resto, confirma un total exacto de 100.
+    "TEC0007188": PliegoExtraction(
+        economic_solvency=EconomicSolvency(
+            minimum_annual_turnover_eur=150000.00,
+            description="Cifra anual de negocios referida al mejor de los tres últimos "
+            "ejercicios disponibles de al menos 150.000,00 €, impuestos indirectos no "
+            "incluidos.",
+            citation=Citation(
+                clause="E",
+                page=44,
+                quote="Solvencia que indique una cifra anual de negocios referida al "
+                "mejor ejercicio de los últimos tres años disponibles\neconómica y "
+                "(2023, 2024 y 2025) en función de las fechas de constitución o de "
+                "inicio de actividades del licitador y\nfinanciera de presentación de "
+                "las ofertas por importe igual o superior a CIENTO CINCUENTA MIL EUROS\n"
+                "(150.000,00 €), Impuestos indirectos no incluidos.",
+            ),
+        ),
+        technical_solvency=TechnicalSolvency(
+            minimum_amount_eur=79070.00,
+            description="Servicios de igual o similar naturaleza (mismo código CPV) en el "
+            "año de mayor ejecución de los últimos tres años, por un importe acumulado de "
+            "al menos 79.070,00 €, impuestos indirectos no incluidos.",
+            citation=Citation(
+                clause="E",
+                page=44,
+                quote="que indique que han realizado servicios de igual o similar "
+                "naturaleza que los que constituyen el objeto\nSolvencia\ndel contrato "
+                "(relativos al mismo código CPV: 72267000-4 ─ Servicios de "
+                "mantenimiento y reparación\nTécnica o\nde software), en el año de "
+                "mayor ejecución de los últimos tres (3) años naturales (2023, 2024 y "
+                "2025)\nProfesional\npor un importe acumulado igual o superior a "
+                "SETENTA Y NUEVE MIL SETENTA EUROS (79.070,00 €),",
+            ),
+        ),
+        certifications=["Esquema Nacional de Seguridad (ENS), categoría media o superior"],
+        certifications_citation=Citation(
+            clause="E",
+            page=43,
+            quote="Declaración responsable, firmada electrónicamente por el "
+            "representante legal de la empresa licitante,\nindicando que está en "
+            "posesión y, en caso de resultar seleccionado para participar en este "
+            "acuerdo\nHabilitación\nmarco, aportará: Certificación de Conformidad con "
+            "el Esquema Nacional de Seguridad referida a sus\nempresarial\nsistemas de "
+            "información, incluidos los aportados por terceros, que dan soporte a los "
+            "servicios objeto\ndel contrato, en la Categoría MEDIA o superior, conforme "
+            "al RD 311/2022 de 3 de mayo.",
+        ),
+        award_criteria=AwardCriteria(
+            total_points=100,
+            criteria=[
+                AwardCriterion(name="Precio de la oferta", points=49, is_price=True),
+                AwardCriterion(
+                    name="Experiencia adicional del jefe de equipo", points=12, is_price=False
+                ),
+                AwardCriterion(
+                    name="Experiencia adicional del analista programador",
+                    points=10,
+                    is_price=False,
+                ),
+                AwardCriterion(
+                    name="Mejora del período de garantía del software", points=10, is_price=False
+                ),
+                AwardCriterion(name="Extensión del horario de servicio", points=10, is_price=False),
+                AwardCriterion(name="Mejora de entrega de manuales", points=4.5, is_price=False),
+                AwardCriterion(name="Mejora de formación", points=4.5, is_price=False),
+            ],
+            citation=Citation(
+                clause="I",
+                page=46,
+                quote="I. CRITERIOS DE ADJUDICACIÓN\nCriterios evaluables de forma "
+                "automática mediante fórmulas:",
+            ),
+        ),
+        guarantees=Guarantees(
+            provisional_required=False,
+            definitive_percentage=None,
+            description="Ni la garantía provisional ('No aplica') ni la definitiva "
+            "('Exigible: No') son exigidas en este contrato.",
+            citation=Citation(
+                clause="F",
+                page=45,
+                quote="Garantía provisional:\nNo aplica.\nGarantía definitiva:\nExigible: "
+                "Sí ☐ No ☒",
+            ),
+        ),
+        execution_deadline=ExecutionDeadline(
+            description="Plazo de ejecución de 5 meses desde la formalización del "
+            "contrato, con posibilidad de una prórroga de 2 meses ya prevista.",
+            citation=Citation(
+                clause="K",
+                page=49,
+                quote="K. PLAZO DE VIGENCIA Y EJECUCIÓN DEL CONTRATO\nPlazo de vigencia "
+                "del contrato 5 Meses",
+            ),
+        ),
+        submission_deadline=SubmissionDeadline(
+            description="Fecha máxima de presentación de ofertas: 02/09/2026 a las 14:00.",
+            citation=Citation(
+                clause="D",
+                page=42,
+                quote="Fecha máxima de presentación de ofertas:\n02/09/2026 14:00",
+            ),
+        ),
+        subcontracting=Subcontracting(
+            allowed=True,
+            description="Permitida, salvo la interlocución y coordinación con el Grupo "
+            "Tragsa, considerada tarea crítica no subcontratable.",
+            citation=Citation(
+                clause="P",
+                page=57,
+                quote="Se permite la subcontratación parcial de la prestación objeto del "
+                "presente pliego, a excepción de la interlocución y\ncoordinación con el "
+                "Grupo Tragsa, por considerarse tarea crítica.",
+            ),
+        ),
+        lots=Lots(
+            divided_into_lots=False,
+            can_bid_partial_lots=None,
+            description="No dividido en lotes: la oferta debe cubrir la totalidad del "
+            "objeto del contrato.",
+            citation=Citation(
+                clause="G",
+                page=46,
+                quote="G. ÁMBITO DE LA OFERTA\nTotalidad: Sí ☒ No ☐",
             ),
         ),
     ),
