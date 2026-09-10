@@ -17,7 +17,7 @@ from compass.analysis import graph
 from compass.analysis.document import hash_document
 from compass.analysis.enums import AnalysisStatus
 from compass.analysis.extraction_schema import PliegoExtraction
-from compass.analysis.graph import analyze_pliego
+from compass.analysis.graph import analyze_pliego, build_prompt
 from compass.analysis.openrouter import CHAT_COMPLETIONS_URL
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -115,6 +115,19 @@ def _client(
     return httpx2.AsyncClient(
         transport=httpx2.MockTransport(cast(Callable[[httpx2.Request], httpx2.Response], handler))
     )
+
+
+def test_build_prompt_wraps_the_untrusted_pcap_text_in_delimiters() -> None:
+    """Protects the 4.5 prompt-injection boundary: the PDF text (a third party's
+    document, never fully trusted) is wrapped in <PLIEGO>/</PLIEGO> so `SYSTEM_PROMPT`
+    has something concrete to tell the model to treat as inert data.
+    """
+    prompt = build_prompt(["texto de la página uno", "texto de la página dos"])
+
+    assert prompt.startswith("<PLIEGO>\n")
+    assert prompt.endswith("\n</PLIEGO>")
+    assert "texto de la página uno" in prompt
+    assert "texto de la página dos" in prompt
 
 
 async def test_analyze_pliego_completes_with_extraction_and_real_faithfulness_fraction() -> None:
