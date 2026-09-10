@@ -21,11 +21,11 @@ its own catch-all around this.
 
 import asyncio
 import json
-import logging
 from dataclasses import dataclass
 from typing import TypedDict, cast
 
 import httpx2
+from langfuse.langchain import CallbackHandler
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.runtime import Runtime
@@ -36,9 +36,8 @@ from compass.analysis.document import extract_pages, has_text_layer, hash_docume
 from compass.analysis.enums import AnalysisStatus
 from compass.analysis.extraction_schema import PliegoExtraction
 from compass.analysis.openrouter import OpenRouterError, extract_structured
+from compass.analysis.tracing import get_langfuse_client
 from compass.analysis.verification import citation_faithfulness
-
-logger = logging.getLogger(__name__)
 
 # Decided in 3.4 against a real golden set: 100% of the 36 checks, faster than the
 # other free-tier candidate on the same document (phase3.4.md).
@@ -133,37 +132,48 @@ async def _extract(
     `_EXTRACT_TOTAL_TIMEOUT_SECONDS` regardless of how the underlying stream behaves --
     see that constant's docstring for why `extract_structured`'s own timeout doesn't
     already guarantee this.
+
+    Traced as a Langfuse generation (Fase 4) with real tokens/cost -- replaces the
+    3.9 stopgap of logging usage as plain text, the only place that number was visible
+    at all before this (`TenderAnalysis` persists no usage/cost column: an extraction
+    is cached by hash, not by call, so there's nothing to attach a running cost to).
     """
     prompt = build_prompt(state["pages"])
-    try:
-        response = await asyncio.wait_for(
-            extract_structured(
-                model=runtime.context.model,
-                system_prompt=SYSTEM_PROMPT,
-                user_prompt=prompt,
-                schema=PliegoExtraction,
-                api_key=runtime.context.api_key,
-                client=runtime.context.client,
+    langfuse = get_langfuse_client()
+    with langfuse.start_as_current_observation(
+        name="extract", as_type="generation", model=runtime.context.model
+    ) as generation:
+        try:
+            response = await asyncio.wait_for(
+                extract_structured(
+                    model=runtime.context.model,
+                    system_prompt=SYSTEM_PROMPT,
+                    user_prompt=prompt,
+                    schema=PliegoExtraction,
+                    api_key=runtime.context.api_key,
+                    client=runtime.context.client,
+                ),
+                timeout=_EXTRACT_TOTAL_TIMEOUT_SECONDS,
+            )
+        except TimeoutError:
+            # asyncio.wait_for raises a bare TimeoutError with no message -- str(exc)
+            # would land in TenderAnalysis.error_message as an empty string otherwise.
+            raise TimeoutError(
+                f"extraction call exceeded {_EXTRACT_TOTAL_TIMEOUT_SECONDS:.0f}s wall-clock cap"
+            ) from None
+        generation.update(
+            usage_details={
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens,
+            },
+            # OpenRouter reports one total cost, not separate input/output prices --
+            # Langfuse's own OpenRouter integration uses this same {"total": ...} shape
+            # for exactly that reason (langfuse/openai.py's _parse_cost).
+            cost_details=(
+                {"total": response.usage.cost} if response.usage.cost is not None else None
             ),
-            timeout=_EXTRACT_TOTAL_TIMEOUT_SECONDS,
         )
-    except TimeoutError:
-        # asyncio.wait_for raises a bare TimeoutError with no message -- str(exc)
-        # would land in TenderAnalysis.error_message as an empty string otherwise.
-        raise TimeoutError(
-            f"extraction call exceeded {_EXTRACT_TOTAL_TIMEOUT_SECONDS:.0f}s wall-clock cap"
-        ) from None
-    # The only place this is visible at all: `TenderAnalysis` persists no usage/cost
-    # column (3.9 -- an extraction is cached by hash, not the per-call number), so the
-    # worker log is the sole real record of what an analysis actually costs -- the
-    # figure the design doc wants tracked once Fase 4 adds a cost line to the README.
-    logger.info(
-        "extract: model=%s prompt_tokens=%d completion_tokens=%d cost=%s",
-        runtime.context.model,
-        response.usage.prompt_tokens,
-        response.usage.completion_tokens,
-        response.usage.cost,
-    )
     return {"extraction": PliegoExtraction.model_validate_json(response.content)}
 
 
@@ -240,10 +250,27 @@ async def analyze_pliego(
         (with `error_message`).
     """
     context = AnalysisContext(client=client, api_key=api_key, model=model)
+    langfuse = get_langfuse_client()
+    # CallbackHandler routes LangGraph's own per-node run events to Langfuse --
+    # `fetch`/`check_text_layer`/`extract`/`verify` each land as a child span under the
+    # trace opened below, for free, since LangGraph propagates `config["callbacks"]`
+    # to every node the same way any LangChain Runnable would.
+    handler = CallbackHandler()
     try:
-        result = await _GRAPH.ainvoke({"pcap_url": pcap_url}, context=context)
+        with langfuse.start_as_current_observation(
+            name="analyze_pliego", input={"pcap_url": pcap_url}, metadata={"model": model}
+        ) as trace:
+            result = await _GRAPH.ainvoke(
+                {"pcap_url": pcap_url}, context=context, config={"callbacks": [handler]}
+            )
+            trace.update(output={"status": result.get("status")})
     except Exception as exc:  # deliberately broad: this call site *is* the graph's error boundary
         return {"pcap_url": pcap_url, "status": AnalysisStatus.FAILED, "error_message": str(exc)}
+    finally:
+        # A Celery task's process can recycle between runs -- flush synchronously
+        # here rather than trusting the client's background flush interval to fire
+        # before that happens (same reasoning as the explicit commits in tasks.py).
+        langfuse.flush()
     # ainvoke's declared return type erases back to `dict[str, Any] | Any` regardless
     # of the state schema passed to `StateGraph` -- safe to narrow back here, since
     # every key it can contain is one our own nodes wrote.

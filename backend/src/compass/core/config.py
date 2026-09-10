@@ -22,6 +22,13 @@ class Settings(BaseSettings):
             checkpoint store.
         openrouter_api_key: OpenRouter API key used by the pliego analyst
             agent (Fase 3) to call its extraction models.
+        langfuse_public_key: Langfuse Cloud public key (Fase 4) -- identifies
+            the project, safe to appear in client-side code, but still kept
+            here so a missing one fails at startup rather than silently.
+        langfuse_secret_key: Langfuse Cloud secret key (Fase 4).
+        langfuse_base_url: Langfuse API host. Defaults to the EU Cloud
+            region; override in `.env` if the account lives in another
+            region (e.g. `https://us.cloud.langfuse.com`).
     """
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -31,6 +38,9 @@ class Settings(BaseSettings):
     database_url: str
     redis_url: str
     openrouter_api_key: str
+    langfuse_public_key: str
+    langfuse_secret_key: str
+    langfuse_base_url: str = "https://cloud.langfuse.com"
 
 
 @lru_cache
