@@ -123,6 +123,25 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # The dashboard, so that running Compass needs Docker and nothing else. Until 5.5 this
+  # was `npm run dev` on the host, which meant a development server plus a Node install
+  # on top of the Docker requirement.
+  dashboard:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the client bundle at build time, and it has to be `localhost`: this
+        # URL is resolved by the browser, which cannot see Docker's internal network. The
+        # api service publishes its port on the host for exactly this reason.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "[::1]:3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   compass_db_data:
   compass_beat_state:

@@ -28,7 +28,7 @@ from compass.analysis.golden_set import GOLDEN_SET
 from compass.analysis.graph import SYSTEM_PROMPT, build_prompt
 from compass.analysis.openrouter import OpenRouterError, extract_structured
 from compass.analysis.scoring import FieldCheck, score_extraction
-from compass.core.config import get_settings
+from compass.core.config import require_openrouter_key
 from compass.core.db import async_session_factory
 from compass.tenders.models import Tender
 
@@ -125,7 +125,6 @@ async def _evaluate_one(
 
 
 async def _main() -> None:
-    settings = get_settings()
     async with httpx2.AsyncClient(timeout=300.0, follow_redirects=True) as client:
         for model in CANDIDATE_MODELS:
             print(f"\n{'=' * 60}\n{model}\n{'=' * 60}", flush=True)
@@ -136,7 +135,7 @@ async def _main() -> None:
                 started = time.monotonic()
                 print(f"  {expediente}: calling...", flush=True)
                 result = await _evaluate_one(
-                    expediente, expected, model, settings.openrouter_api_key, client
+                    expediente, expected, model, require_openrouter_key(), client
                 )
                 elapsed = time.monotonic() - started
                 print(f"  {expediente}: done in {elapsed:.1f}s", flush=True)

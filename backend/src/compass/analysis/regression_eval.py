@@ -29,7 +29,7 @@ from compass.analysis.extraction_schema import PliegoExtraction
 from compass.analysis.golden_set import GOLDEN_SET
 from compass.analysis.graph import analyze_pliego
 from compass.analysis.scoring import FieldCheck, score_extraction
-from compass.core.config import get_settings
+from compass.core.config import require_openrouter_key
 from compass.core.db import async_session_factory
 from compass.tenders.models import Tender
 
@@ -87,7 +87,6 @@ async def _evaluate_one(
 
 
 async def _main() -> None:
-    settings = get_settings()
     pcap_urls = await _fetch_pcap_urls(list(GOLDEN_SET.keys()))
     results: list[DocumentResult] = []
     skipped: list[str] = []
@@ -96,7 +95,7 @@ async def _main() -> None:
         items = list(GOLDEN_SET.items())
         for index, (expediente, expected) in enumerate(items):
             result = await _evaluate_one(
-                expediente, expected, pcap_urls.get(expediente), settings.openrouter_api_key, client
+                expediente, expected, pcap_urls.get(expediente), require_openrouter_key(), client
             )
             results.append(result)
             if result.error and _QUOTA_ERROR_MARKER in result.error:

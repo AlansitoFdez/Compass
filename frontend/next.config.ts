@@ -14,6 +14,11 @@ import type { NextConfig } from "next";
  * value. That belongs with the deployment decision in 5.4, not guessed at here.
  */
 const nextConfig: NextConfig = {
+  // Traces the files the server actually needs into `.next/standalone`, so the runtime
+  // image can drop `node_modules` entirely -- 40 MB instead of ~500. Only used by the
+  // Docker build; `npm run dev` ignores it.
+  output: "standalone",
+
   async headers() {
     return [
       {

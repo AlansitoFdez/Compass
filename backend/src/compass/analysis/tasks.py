@@ -25,7 +25,7 @@ from compass.analysis.repository import (
     get_or_create_analysis,
 )
 from compass.core.celery_app import celery_app
-from compass.core.config import get_settings
+from compass.core.config import MissingOpenRouterKeyError, require_openrouter_key
 from compass.core.db import create_task_engine
 from compass.core.redis_client import get_redis_client
 from compass.tenders.models import Tender
@@ -149,10 +149,21 @@ async def analyze_tender(
     analysis.error_message = None
     await session.commit()
 
-    settings = get_settings()
+    try:
+        api_key = require_openrouter_key()
+    except MissingOpenRouterKeyError as exc:
+        # Recorded, not raised. `POST /analyze` already refuses without a key, so getting
+        # here means the task was enqueued some other way -- and a row saying why beats a
+        # traceback in a log the user is not reading.
+        analysis.status = AnalysisStatus.FAILED
+        analysis.error_message = str(exc)
+        await session.commit()
+        logger.warning("analyze_tender: %s has no OpenRouter key configured", expediente)
+        return analysis.status
+
     result = await analyze_pliego(
         tender.pcap_url,
-        api_key=settings.openrouter_api_key,
+        api_key=api_key,
         client=client,
         model=EXTRACTION_MODEL,
         content=content,

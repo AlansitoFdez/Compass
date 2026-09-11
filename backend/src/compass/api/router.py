@@ -2,10 +2,19 @@
 
 from fastapi import APIRouter
 
-from compass.api.routes import analysis, health, ingestion, matches, providers, tenders
+from compass.api.routes import (
+    analysis,
+    capabilities,
+    health,
+    ingestion,
+    matches,
+    providers,
+    tenders,
+)
 
 api_router = APIRouter()
 api_router.include_router(health.router)
+api_router.include_router(capabilities.router)
 # Before `tenders`, and that order is load-bearing: FastAPI matches routes in
 # declaration order, and `GET /tenders/{expediente:path}` (5.1) matches slashes --
 # including the one in `/tenders/{expediente}/analysis`. Registered the other way

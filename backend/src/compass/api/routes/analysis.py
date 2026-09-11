@@ -14,6 +14,7 @@ from compass.analysis.repository import get_analysis_for_tender, is_stale
 from compass.analysis.schemas import TenderAnalysisResultSchema
 from compass.analysis.tasks import analyze_tender_task
 from compass.analysis.verdict import compute_verdict
+from compass.core.config import get_settings
 from compass.core.db import get_db
 from compass.providers.repository import get_provider
 from compass.tenders.models import Tender
@@ -52,7 +53,8 @@ async def trigger_analysis(
 
     Raises:
         HTTPException: 404 if `expediente` doesn't exist; 422 if it has no
-            `pcap_url` to analyze.
+            `pcap_url` to analyze; 503 if this installation has no OpenRouter
+            key, which is optional (5.5) and only the analyst needs.
 
     Returns:
         A plain acknowledgement -- there is no result backend (see
@@ -64,6 +66,17 @@ async def trigger_analysis(
         raise HTTPException(status_code=404, detail="Tender not found")
     if tender.pcap_url is None:
         raise HTTPException(status_code=422, detail="Tender has no pcap_url to analyze")
+    if get_settings().openrouter_api_key is None:
+        # 503, not 500: nothing is broken, the installation simply isn't configured for
+        # this. Refused here rather than enqueued and failed later, so the dashboard can
+        # say what is missing instead of showing a run that dies a minute in.
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Falta OPENROUTER_API_KEY en el .env. Es gratuita en openrouter.ai y sólo "
+                "hace falta para analizar pliegos."
+            ),
+        )
 
     analyze_tender_task.delay(expediente)
     return {"detail": f"Analysis queued for {expediente}"}
