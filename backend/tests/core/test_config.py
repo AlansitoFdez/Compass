@@ -8,15 +8,15 @@ to give up before seeing it work.
 from unittest.mock import patch
 
 import pytest
-from pydantic import ValidationError
 
 from compass.analysis.tracing import get_langfuse_client
-from compass.core.config import Settings
+from compass.core.config import MissingOpenRouterKeyError, Settings, require_openrouter_key
 
+# Only what `Settings` actually requires. Since 5.5 that is the database and Redis and
+# nothing else: every key is optional, which is the whole point of the tests below.
 _MINIMUM_ENVIRONMENT = {
     "DATABASE_URL": "postgresql://u:p@localhost:5432/db",
     "REDIS_URL": "redis://localhost:6379/0",
-    "OPENROUTER_API_KEY": "test-key",
 }
 
 
@@ -39,18 +39,44 @@ def test_langfuse_is_optional() -> None:
     assert settings.langfuse_secret_key is None
 
 
-def test_the_openrouter_key_is_required() -> None:
-    """The other half of the same decision: this one *is* demanded, because without it the
-    analyst agent has nothing to call and the product cannot do what it promises.
-    """
-    with patch.dict("os.environ", {}, clear=True), pytest.raises(ValidationError) as error:
-        Settings(
-            _env_file=None,
-            database_url="postgresql://u:p@localhost:5432/db",
-            redis_url="redis://localhost:6379/0",
-        )
+def test_no_key_is_required_to_start() -> None:
+    """Protects the decision 5.5 took: Compass starts with nothing configured.
 
-    assert "openrouter_api_key" in str(error.value)
+    Everything that is not the analyst agent -- ingestion, the funnel, the hybrid ranking,
+    every screen -- works without a single key, and that is most of the project. Demanding
+    an account from someone who only wants to see it run charges them before they have
+    seen anything.
+    """
+    settings = _settings()
+
+    assert settings.openrouter_api_key is None
+    assert settings.database_url
+
+
+def test_require_openrouter_key_raises_with_a_message_that_says_where_to_get_one() -> None:
+    """Protects the boundary where the key stops being optional.
+
+    `Settings` allows its absence so the process starts; this is the one place that
+    refuses to continue, so its message is what a user will see -- it has to name the
+    variable, say it is free, and say the rest of Compass works without it.
+    """
+    with (
+        patch("compass.core.config.get_settings", return_value=_settings()),
+        pytest.raises(MissingOpenRouterKeyError) as error,
+    ):
+        require_openrouter_key()
+
+    message = str(error.value)
+    assert "OPENROUTER_API_KEY" in message
+    assert "openrouter.ai" in message
+
+
+def test_require_openrouter_key_returns_the_configured_key() -> None:
+    """The other direction: with a key set, the boundary is transparent."""
+    configured = _settings(OPENROUTER_API_KEY="sk-test")
+
+    with patch("compass.core.config.get_settings", return_value=configured):
+        assert require_openrouter_key() == "sk-test"
 
 
 def _tracing_enabled_for(**environment: str) -> bool:
