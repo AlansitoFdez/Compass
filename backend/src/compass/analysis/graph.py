@@ -61,6 +61,32 @@ SYSTEM_PROMPT = (
 )
 
 
+# The delimiters untrusted PCAP text is wrapped in, and what any occurrence of them
+# inside that text is replaced with. A delimiter only works while the content it
+# delimits cannot contain it: a crafted pliego carrying a literal `</PLIEGO>` would
+# otherwise close the block early and have everything after it read as trusted
+# instructions -- defeating the very hardening 4.5 added (found in the 4.7 review).
+# Neutralizing the marks is deliberate over a random per-call nonce: it keeps the
+# prompt byte-for-byte reproducible for a given document, which is what makes two
+# regression runs (4.4) comparable, and an unguessable marker buys nothing once the
+# marker cannot appear inside the text at all.
+_PLIEGO_OPEN = "<PLIEGO>"
+_PLIEGO_CLOSE = "</PLIEGO>"
+_NEUTRALIZED_DELIMITER = "[marca eliminada]"
+
+
+def _neutralize_delimiters(page: str) -> str:
+    """Replaces any literal <PLIEGO>/</PLIEGO> the PDF text itself carries.
+
+    Applied to the prompt copy only: `PliegoAnalysisState["pages"]` keeps the original
+    text, so `verification.verify_citation` still checks the model's quotes against what
+    the document really says.
+    """
+    return page.replace(_PLIEGO_CLOSE, _NEUTRALIZED_DELIMITER).replace(
+        _PLIEGO_OPEN, _NEUTRALIZED_DELIMITER
+    )
+
+
 def build_prompt(pages: list[str]) -> str:
     """The full PCAP text, one labeled block per page, wrapped in <PLIEGO> delimiters.
 
@@ -73,10 +99,15 @@ def build_prompt(pages: list[str]) -> str:
     starts and ends -- the model ingests PDFs it has no control over, so this prompt
     is the one boundary that can tell "instructions from us" apart from "text a
     pliego happens to contain" (see `SYSTEM_PROMPT`, which tells the model to treat
-    anything inside these marks as inert data, never as instructions).
+    anything inside these marks as inert data, never as instructions). Any occurrence
+    of those same marks inside the document is neutralized first, so the boundary
+    cannot be closed by the very content it delimits.
     """
-    body = "\n\n".join(f"===== PÁGINA {i} =====\n{page}" for i, page in enumerate(pages, start=1))
-    return f"<PLIEGO>\n{body}\n</PLIEGO>"
+    body = "\n\n".join(
+        f"===== PÁGINA {i} =====\n{_neutralize_delimiters(page)}"
+        for i, page in enumerate(pages, start=1)
+    )
+    return f"{_PLIEGO_OPEN}\n{body}\n{_PLIEGO_CLOSE}"
 
 
 class PliegoAnalysisState(TypedDict, total=False):
