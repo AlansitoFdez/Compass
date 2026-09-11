@@ -14,6 +14,7 @@ from compass.core.db import create_task_engine
 from compass.core.redis_client import get_redis_client
 from compass.ingestion.daily_ingestion import run_daily_ingestion
 from compass.ingestion.historical_loader import load_recent_months
+from compass.matching.tasks import generate_embeddings_task
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +146,17 @@ def backfill_historical_task(months: int = 3) -> int:
 
         elapsed = time.monotonic() - start
         logger.info("backfill_historical: finished, %d tenders in %.1fs", count, elapsed)
+
+        # Chained, not left to beat's own 15-minute tick. A freshly loaded corpus has no
+        # embeddings at all, and the vector half of the ranking skips rows that lack one --
+        # so a first run would sit on a thin, lexical-only list of matches for up to a
+        # quarter of an hour, with nothing on screen explaining why. Found walking the
+        # whole first-run path end to end (5.5), which is the only way this shows up.
+        #
+        # `.delay()` rather than calling it inline: it is a separate unit of work with its
+        # own logging, and chaining it this way keeps it outside this task's Redis lock.
+        generate_embeddings_task.delay()
+
         return count
     finally:
         try:
