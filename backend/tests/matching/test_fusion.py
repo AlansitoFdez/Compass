@@ -2,7 +2,7 @@
 means anything over real rankings from lexical_matches/vector_matches, not stand-ins.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,6 +42,10 @@ def _tender(expediente: str, title: str, *, embedded: bool = True, **overrides: 
         "contract_type": ContractType.SERVICES,
         "procedure_type": "Abierto",
         "status": TenderStatus.OPEN_FOR_SUBMISSION,
+        # A deadline in the future, not just an open status: since 5.4 Etapa 1 requires
+        # both, because PLACSP leaves the status code stale on 84% of the tenders it
+        # still calls open (see `matching.repository._status_filter`).
+        "submission_deadline": datetime.now(UTC) + timedelta(days=30),
         "budget_with_vat": Decimal("50000.00"),
         "published_at": datetime.now(UTC),
         "updated_at_source": datetime.now(UTC),

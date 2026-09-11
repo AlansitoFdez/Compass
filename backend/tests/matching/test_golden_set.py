@@ -25,11 +25,21 @@ def test_golden_set_categories_are_pairwise_disjoint() -> None:
 async def test_golden_set_covers_exactly_the_real_etapa1_survivors(
     db_session: AsyncSession,
 ) -> None:
-    """Protects the golden set from silently going stale.
+    """Protects the golden set from silently going stale: every tender the funnel ranks
+    today must be one a human actually annotated.
 
-    If the real corpus or the seeded provider profile ever changes enough to
-    shift who survives Etapa 1, this fails loudly instead of quietly
-    measuring recall@k against a population that no longer matches reality.
+    Checked as containment, not equality, and the reason is worth writing down. The golden
+    set was annotated by hand against the Etapa 1 survivors as they stood in 2.3. Equality
+    held only while that population was frozen, and it never could have held for long: a
+    tender leaves Etapa 1 on its own the moment its deadline passes or PLACSP marks it
+    awarded. 5.4 made that explicit by adding the deadline condition to the filter -- the
+    live population dropped from 61 to a handful, all of them annotated.
+
+    What actually matters for a recall@k measurement is this direction: no tender may be
+    ranked that the golden set has no label for, because such a tender would count as a
+    miss no matter how good the ranking is. The opposite direction -- annotated tenders
+    that have since closed -- is just time passing, and silently re-annotating to chase it
+    would destroy the hand-made labels this whole file exists to protect.
     """
     provider = await get_provider(db_session)
     assert provider is not None
@@ -38,4 +48,7 @@ async def test_golden_set_covers_exactly_the_real_etapa1_survivors(
     real_survivors = {tender.expediente for tender in items}
     golden_set_population = RELEVANT_EXPEDIENTES | NOT_RELEVANT_EXPEDIENTES | EXCLUDED_EXPEDIENTES
 
-    assert golden_set_population == real_survivors
+    assert real_survivors <= golden_set_population, (
+        "estas licitaciones sobreviven a Etapa 1 pero nadie las ha anotado: "
+        f"{sorted(real_survivors - golden_set_population)}"
+    )
