@@ -13,7 +13,7 @@ No es un buscador de subvenciones ni de ayudas: es un radar de contratos que la 
 - ✅ **Fase 1 — Ingesta y normalización.** El feed de PLACSP se ingiere de forma incremental (marca de agua sobre `atom:updated`, sin re-recorrer el feed en cada corrida), se parsea el CODICE, se filtra por el vertical de servicios informáticos (CPV división 72) y se persiste con upsert idempotente por `expediente` — una licitación republicada actualiza la misma fila, nunca crea una nueva ni se borra físicamente.
 - ✅ **Fase 2 — Matching híbrido y perfil de proveedor.** Un embudo de tres etapas reduce el corpus completo al puñado que de verdad encaja con un proveedor: filtros duros en SQL, recuperación híbrida (léxica + vectorial) y fusión por Reciprocal Rank Fusion. Nada de esto pasa por un LLM todavía — es determinista y auditable.
 - ✅ **Fase 3 — Agente analista de pliegos.** Un grafo LangGraph descarga el PCAP de una licitación bajo demanda, detecta si tiene capa de texto, extrae los campos que deciden el encaje (solvencia, certificaciones, criterios, garantías, plazos, lotes) contra un esquema Pydantic cerrado, verifica en Python que cada cita existe de verdad en el texto parseado, y calcula el veredicto — nunca el LLM — comparando la extracción contra el perfil del proveedor. Resultado cacheado por hash de documento; el segundo usuario que mire la misma licitación no vuelve a pagar el análisis.
-- 🚧 **Fase 4 — Trazas, coste y evals.** En curso: cada análisis ya queda trazado en Langfuse con tokens y coste reales (4.1-4.2), el golden set alcanzó las 25 entradas hand-anotadas (4.3) y se corre contra el grafo de producción como gate de regresión (4.4), el prompt está endurecido contra inyección (4.5) y cada push pasa por CI — lint, tipos y la suite contra Postgres y Redis reales (4.6). Pendiente: la revisión completa de la fase.
+- ✅ **Fase 4 — Trazas, coste y evals.** Cada análisis queda trazado en Langfuse con tokens y coste reales; el golden set llegó a 25 pliegos anotados a mano y se corre contra el grafo de producción como gate de regresión; el prompt está endurecido contra inyección (delimitadores que el propio documento no puede cerrar); y cada push pasa por CI con lint, tipos y la suite contra Postgres y Redis reales.
 
 El detalle completo de cada subfase, con la evidencia y el razonamiento detrás de cada decisión, vive en `docs/phases/`.
 
@@ -62,15 +62,18 @@ Medido con tres análisis end-to-end reales (`POST /tenders/{expediente}/analyze
 
 ### Fase 4 — Coste real, medido con Langfuse
 
-Desde la 4.1, cada análisis queda trazado en [Langfuse](https://langfuse.com) con tokens y coste reales por llamada -- ya no una medición manual puntual como en la 3.9, sino observabilidad real que crece sola con cada análisis que se dispara. Números reales sobre los análisis trazados hasta ahora (`uv run python -m compass.analysis.cost_report`):
+Desde la 4.1, cada análisis queda trazado en [Langfuse](https://langfuse.com) con tokens y coste reales por llamada -- ya no una medición manual puntual como en la 3.9, sino observabilidad real que crece sola con cada análisis que se dispara. Números sobre las **64 trazas reales acumuladas** hasta hoy (`uv run python -m compass.analysis.cost_report`):
 
-| Análisis | Tokens (entrada / salida) | Coste | Tiempo real |
-|---|---|---|---|
-| 1º | 41.724 (32.985 / 8.739) | 0,00 € | 194 s |
-| 2º | 106.527 (93.834 / 12.693) | 0,00 € | 285 s |
-| **Media** | **74.126** | **0,00 €** | **240 s** |
+| Medida | Valor real |
+|---|---|
+| Análisis con extracción completada | **34** de 64 trazas |
+| Tokens por análisis | 29.988 – 118.486 (**media 58.689**: 47.931 entrada / 10.758 salida) |
+| Coste | **0,00 €** en el 100% |
+| Tiempo real de extremo a extremo | 36 – 338 s (media 161 s) |
 
-**El volumen de entrada varía mucho más de lo esperado** (33.000 a 94.000 tokens según el pliego): el prompt manda el texto completo del PCAP, página a página, sin trocear -- un pliego largo o con formato denso puede doblar o triplicar el de otro con el mismo número de páginas. **Coste real: 0,00 €** en el 100% de los análisis trazados, confirmando en producción -- ahora con tokens reales delante, no solo la cifra final -- lo que la 3.4 ya había medido contra el golden set: el nivel gratuito de OpenRouter se sostiene.
+**El volumen de entrada varía mucho más de lo esperado** (30.000 a 118.000 tokens según el pliego): el prompt manda el texto completo del PCAP, página a página, sin trocear -- un pliego largo o con formato denso puede doblar o triplicar el de otro con el mismo número de páginas. **Coste real: 0,00 €** en el 100% de los análisis trazados, confirmando en producción -- ahora con tokens reales delante, no solo la cifra final -- lo que la 3.4 ya había medido contra el golden set: el nivel gratuito de OpenRouter se sostiene.
+
+**Las otras 30 trazas quedan fuera de esa media, a propósito**: son llamadas que nunca devolvieron -- el tope de 300 s o los `429` del cupo diario gratuito, casi todas de las corridas del golden set de la 4.4. Promediar sus ceros respondería a "cuánto cuesta un intento", no a "cuánto cuesta analizar un pliego". La 4.7 encontró que el informe sí las estaba promediando, y que además contaba cada reintento como un análisis aparte.
 
 ## Stack
 
