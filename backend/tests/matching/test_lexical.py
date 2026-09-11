@@ -107,3 +107,31 @@ async def test_lexical_matches_respects_the_limit(db_session: AsyncSession) -> N
     results = await lexical_matches(db_session, PROVIDER, limit=2)
 
     assert len(results) == 2
+
+
+async def test_lexical_matches_survives_a_description_with_no_lexemes(
+    db_session: AsyncSession,
+) -> None:
+    """Protects GET /matches against a 500 from its own query builder.
+
+    The tsquery is assembled from the lexemes `to_tsvector` finds in the description. A
+    description that yields none -- empty, or nothing but stopwords -- left an empty
+    string, and `to_tsquery('')` is a syntax error, not an empty result: the endpoint
+    answered 500 rather than "the lexical half found nothing".
+    """
+    provider = Provider(
+        id="TEST-LEXICAL-EMPTY",
+        description="de la y el en",
+        cpv_codes=["72000000"],
+    )
+
+    assert await lexical_matches(db_session, provider, limit=5) == []
+
+
+async def test_lexical_matches_survives_an_empty_description(db_session: AsyncSession) -> None:
+    """The degenerate case of the same rule: an unseeded/blank description must return no
+    lexical candidates, never raise.
+    """
+    provider = Provider(id="TEST-LEXICAL-BLANK", description="", cpv_codes=["72000000"])
+
+    assert await lexical_matches(db_session, provider, limit=5) == []
