@@ -1,5 +1,6 @@
 """Tests for the golden set's internal consistency against the real Etapa 1 survivor population."""
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from compass.matching.golden_set import (
@@ -18,6 +19,9 @@ def test_golden_set_categories_are_pairwise_disjoint() -> None:
     assert not (NOT_RELEVANT_EXPEDIENTES & EXCLUDED_EXPEDIENTES)
 
 
+# Needs the real PLACSP corpus persisted locally, which a CI runner doesn't have --
+# see docs/phases/phase4/subphases/phase4.6.md.
+@pytest.mark.real_corpus
 async def test_golden_set_covers_exactly_the_real_etapa1_survivors(
     db_session: AsyncSession,
 ) -> None:

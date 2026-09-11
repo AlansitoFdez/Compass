@@ -6,9 +6,13 @@ end to end, same split as test_tenders_endpoint.py.
 
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 
+# Needs the real PLACSP corpus persisted locally, which a CI runner doesn't have --
+# see docs/phases/phase4/subphases/phase4.6.md.
+@pytest.mark.real_corpus
 def test_get_matches_returns_envelope_shape_ranked_by_rrf_score(client: TestClient) -> None:
     """Protects the wiring end to end: the real seeded provider and real embedded corpus produce
     a non-empty, correctly ordered response matching `MatchListResponse`.

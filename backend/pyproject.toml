@@ -74,5 +74,11 @@ plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+# --strict-markers: un marcador mal escrito es un error, no un marcador nuevo. Importa
+# porque `real_corpus` es lo que deselecciona tests en CI (4.6) — un typo devolvería a CI
+# un test que no puede pasar ahí, en silencio.
+addopts = "-ra --strict-markers"
 asyncio_mode = "auto"
+markers = [
+    'real_corpus: needs the real PLACSP corpus persisted locally; deselected in CI with -m "not real_corpus", where the database only has migrations and the seeded provider',
+]

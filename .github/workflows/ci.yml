@@ -1,0 +1,118 @@
+# Blocking quality gate: lint, types and the test suite on real Postgres and Redis.
+#
+# There is no evals job here on purpose. `compass.analysis.regression_eval` (4.4) reads
+# the `pcap_url` of its 25 golden-set expedientes straight from the database, and a
+# runner's database only ever has migrations -- never the real PLACSP corpus, which
+# lives on the developer's machine. On top of that, one full run spends 25 of the 50
+# daily requests OpenRouter's free tier allows, shared with the app's real usage. It
+# stays a local on-demand command: `uv run python -m compass.analysis.regression_eval`.
+# See docs/phases/phase4/subphases/phase4.6.md.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    name: Lint, types and tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      # Same services as docker-compose.yml, but on the default ports: the 5433 used
+      # locally only exists to dodge a native Windows PostgreSQL, which a Linux runner
+      # doesn't have.
+      DATABASE_URL: postgresql://compass:compass@localhost:5432/compass
+      REDIS_URL: redis://localhost:6379/0
+      # Required by `Settings`, never used for real: every OpenRouter call is mocked in
+      # the suite and conftest.py disables Langfuse tracing. Placeholders, not secrets --
+      # this job needs no GitHub secret at all, which is itself the proof that the tests
+      # never reach a paid service.
+      OPENROUTER_API_KEY: ci-placeholder
+      LANGFUSE_PUBLIC_KEY: ci-placeholder
+      LANGFUSE_SECRET_KEY: ci-placeholder
+
+    services:
+      db:
+        image: pgvector/pgvector:0.8.6-pg17
+        env:
+          POSTGRES_USER: compass
+          POSTGRES_PASSWORD: compass
+          POSTGRES_DB: compass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U compass"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10
+        with:
+          # Pinned to the uv that produced backend/uv.lock, so a uv release can never
+          # change what gets installed behind a green build.
+          version: "0.12.3"
+          python-version: "3.13"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Cache the embedding model
+        uses: actions/cache@v6
+        with:
+          # test_vector.py and test_fusion.py run the real embedding model on purpose
+          # (2.5): cosine distance over fake vectors would prove nothing. Without this
+          # cache every run would pull ~1 GB from Hugging Face. Keyed on the file that
+          # names the model, so switching models invalidates it by itself.
+          path: ~/.cache/huggingface
+          key: huggingface-${{ runner.os }}-${{ hashFiles('backend/src/compass/matching/embeddings.py') }}
+
+      - name: Install dependencies
+        # --locked fails if uv.lock is out of date with pyproject.toml, so a forgotten
+        # lock update is a red build instead of a silent re-resolution.
+        run: uv sync --locked --all-groups
+
+      # Lint and types first: seconds instead of minutes, and they fail on things that
+      # need no database to see.
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Types
+        run: uv run mypy
+
+      - name: Apply migrations
+        run: uv run alembic upgrade head
+
+      - name: Seed the provider profile
+        # The profile lives in the repo (providers/seed.py), not in the database, so it
+        # is reproducible here -- unlike the ingested corpus. Several tests read the
+        # singleton provider row and would fail against a migrated-but-empty database.
+        run: uv run python -m compass.providers.seed
+
+      - name: Tests
+        # -m "not real_corpus": three tests assert against the real PLACSP corpus
+        # persisted on the developer's machine, which no runner has. See
+        # docs/phases/phase4/subphases/phase4.6.md for the exact list and why faking
+        # that corpus would make them prove nothing.
+        run: uv run pytest -m "not real_corpus"

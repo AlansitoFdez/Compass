@@ -2,6 +2,7 @@
 from the original 4 (3.4, model decision) toward 25-30 (4.3, RAGAS golden set).
 """
 
+import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +26,9 @@ def test_certifications_citation_is_none_only_when_certifications_is_empty() -> 
         assert has_certifications == has_citation, expediente
 
 
+# Needs the real PLACSP corpus persisted locally, which a CI runner doesn't have --
+# see docs/phases/phase4/subphases/phase4.6.md.
+@pytest.mark.real_corpus
 async def test_golden_set_expedientes_still_exist_with_a_pcap_url(db_session: AsyncSession) -> None:
     """Protects the golden set from going stale.
 
