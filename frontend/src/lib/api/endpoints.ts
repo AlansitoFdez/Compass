@@ -3,7 +3,12 @@
  */
 
 import { ApiError, request } from "@/lib/api/client";
-import type { AnalysisResult, MatchList, Tender } from "@/lib/api/types";
+import type {
+  AnalysisResult,
+  MatchList,
+  Provider,
+  Tender,
+} from "@/lib/api/types";
 
 /**
  * How an expediente is written into a URL.
@@ -50,4 +55,28 @@ export function triggerAnalysis(expediente: string): Promise<{ detail: string }>
   return request(`/tenders/${tenderPath(expediente)}/analyze`, {
     method: "POST",
   });
+}
+
+/** The saved profile, or `null` when nothing has been saved yet (a fresh install). */
+export async function getProvider(): Promise<Provider | null> {
+  try {
+    return await request<Provider>("/provider");
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+/** Saves the whole profile. A PUT: the form always sends every field. */
+export function saveProvider(profile: Provider): Promise<Provider> {
+  return request("/provider", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(profile),
+  });
+}
+
+/** Enqueues the initial corpus load. Answers 202; progress is watched via `getMatches`. */
+export function triggerBackfill(): Promise<{ detail: string }> {
+  return request("/ingestion/backfill", { method: "POST" });
 }

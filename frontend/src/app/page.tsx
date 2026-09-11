@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { CorpusLoading } from "@/components/matches/CorpusLoading";
 import { FunnelSummary } from "@/components/matches/FunnelSummary";
 import { MatchList } from "@/components/matches/MatchList";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -63,14 +65,9 @@ export default async function MatchesPage() {
     // It isn't a failure, it's a setup step, so it gets an explanation rather than the
     // error boundary.
     if (error instanceof ApiError && error.status === 404) {
-      return (
-        <EmptyState title="Todavía no hay un perfil de proveedor">
-          El embudo compara cada licitación con el perfil de tu empresa, y aún no se ha
-          sembrado ninguno. Ejecuta{" "}
-          <code className="font-mono text-xs">uv run python -m compass.providers.seed</code>{" "}
-          desde <code className="font-mono text-xs">backend/</code>.
-        </EmptyState>
-      );
+      // Not a failure: it is what a fresh install looks like, so it leads to the form
+      // instead of explaining a command to run (which is what it did until 5.4).
+      redirect("/perfil");
     }
     throw error;
   }
@@ -90,11 +87,19 @@ export default async function MatchesPage() {
         </p>
       </header>
 
-      <div className="mb-8">
-        <FunnelSummary funnel={funnel} />
-      </div>
-
-      {total === 0 ? <EmptyFunnel funnel={funnel} /> : <MatchList matches={items} />}
+      {/* An empty corpus means the first load is still running (or never started), which
+          is a different thing from "the funnel filtered everything out" -- and the only
+          one of the two where the right answer is to wait. */}
+      {funnel.total === 0 ? (
+        <CorpusLoading initialTotal={funnel.total} />
+      ) : (
+        <>
+          <div className="mb-8">
+            <FunnelSummary funnel={funnel} />
+          </div>
+          {total === 0 ? <EmptyFunnel funnel={funnel} /> : <MatchList matches={items} />}
+        </>
+      )}
     </div>
   );
 }

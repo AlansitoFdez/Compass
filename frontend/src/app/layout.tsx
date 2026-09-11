@@ -48,6 +48,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               Compass
             </Link>
             <span className="text-sm text-muted">radar de licitaciones públicas</span>
+            <Link
+              href="/perfil"
+              className="ml-auto text-sm text-muted hover:text-foreground"
+            >
+              Tu perfil
+            </Link>
           </div>
         </header>
 

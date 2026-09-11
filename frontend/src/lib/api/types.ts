@@ -138,3 +138,21 @@ export type AnalysisResult = {
   error_message: string | null;
   verdict: VerdictResult | null;
 };
+
+/**
+ * The supplier's own profile -- what the funnel filters and ranks against, and what the
+ * verdict compares a pliego's requirements to.
+ *
+ * Decimals are strings for the same reason budgets are: they are `Decimal` server-side.
+ * The form keeps them as strings end to end rather than round-tripping through a JS
+ * number, which cannot represent every decimal exactly.
+ */
+export type Provider = {
+  description: string;
+  cpv_codes: string[];
+  min_budget: string | null;
+  max_budget: string | null;
+  annual_revenue: string | null;
+  certifications: string[] | null;
+  locations: string[] | null;
+};
