@@ -60,3 +60,116 @@ se hace contra una vacía, que es lo que se encuentra quien se lo descarga.
    `npm run build` limpios, y CI en verde.
 
 ## Progreso
+
+### El dashboard, servido por su propio contenedor
+
+`output: "standalone"` traza los ficheros que el servidor necesita de verdad, así que la
+imagen final no lleva `node_modules` ni herramientas de construcción: sólo el servidor y
+los estáticos. Next deja fuera `.next/static` a propósito —espera que los sirva un CDN— y
+aquí no hay ninguno, así que se copian a mano en la etapa final.
+
+**Y aquí apareció el fallo que este contenedor tenía que enseñar.** `NEXT_PUBLIC_API_URL`
+la resuelve el navegador, así que vale `http://localhost:8000`. Pero los Server Components
+**también** llaman a la API, y lo hacen desde dentro del contenedor del dashboard — donde
+`localhost:8000` es ese mismo contenedor, no la API. El resultado no fue un error visible:
+la portada se quedaba servida en su esqueleto de carga, con un 200 y sin nada dentro.
+
+Son dos direcciones distintas para la misma API, y sólo una puede ir horneada en el bundle
+del navegador. `client.ts` elige según dónde se ejecuta, y `COMPASS_INTERNAL_API_URL`
+—deliberadamente sin el prefijo `NEXT_PUBLIC_`, para que no salga del servidor— apunta al
+nombre del servicio en la red de compose.
+
+### Un fallo de construcción que costaba cinco minutos por línea
+
+En la 5.4 el `Dockerfile` copiaba `src` y después horneaba el modelo. Docker invalida toda
+capa posterior a un `COPY` que cambia, así que **cualquier edición de una línea de código
+volvía a descargar los ~570 MB de pesos**. Se nota en cuanto iteras: el primer rebuild de
+esta subfase tardó lo mismo que el build inicial.
+
+Ahora el horneado va antes, y se copia sólo el fichero que necesita —
+`matching/embedding_model.py`, que no importa nada— ejecutándolo con `runpy.run_path` en
+vez de importarlo, porque en ese punto el paquete todavía no está instalado. El nombre del
+modelo sigue leyéndose del código, sin repetirlo en el `Dockerfile`.
+
+### La clave de OpenRouter, opcional
+
+Mismo patrón que Langfuse. `Settings` ya no la exige, así que la API arranca con un `.env`
+vacío y todo lo que no es el agente funciona: ingesta, embudo, ranking, dashboard entero.
+
+Tres piezas para que eso no se convierta en un misterio:
+
+- `require_openrouter_key()` es **el único sitio** donde la opcionalidad termina, usado por
+  la tarea de análisis y los dos scripts de evals. Su mensaje nombra la variable, dice que
+  es gratuita y dice que el resto funciona sin ella.
+- `POST /analyze` responde **503** en vez de encolar una corrida condenada a morir con un
+  401 minutos después. 503 y no 500: no hay nada roto, simplemente esta instalación no está
+  configurada para eso. Y la comprobación va la última, para que una licitación inexistente
+  siga siendo un 404 — decirle a alguien que le falta la clave para una licitación que no
+  existe le manda a arreglar lo que no es.
+- `GET /capabilities` devuelve dos booleanos, nunca material de clave, para que el
+  dashboard lo diga **antes** de que nadie pulse. La ficha lo lee en el servidor junto al
+  análisis, así que el panel llega sabiéndolo y no parpadea un botón que luego desaparece.
+
+### El recorrido completo, contra una base vacía
+
+Hecho sin tocar la base de desarrollo: un proyecto de compose aparte
+(`docker compose -p compass-e2e`), con sus propios volúmenes y los mismos puertos, que se
+destruye entero al terminar. La base real, con sus 3.583 licitaciones y sus cuatro
+análisis pagados, no se toca en ningún momento.
+
+Lo que ocurrió, en orden:
+
+1. `docker compose up` levanta seis servicios, `migrate` aplica las migraciones y sale.
+2. Abrir `/` con la base vacía lleva al formulario, con el texto de primer arranque.
+3. Guardar el perfil encola la carga. **6.477 upserts en 205 s**, que quedan en 2.958
+   licitaciones distintas — el resto son republicaciones del mismo expediente.
+4. La portada enseña el embudo real de esa instalación: **2.958 → 119 → 38 → 11**.
+
+**Y el recorrido encontró lo que tenía que encontrar.** Entre los pasos 3 y 4 había un
+hueco de hasta quince minutos: el corpus recién cargado no tiene embeddings, y el
+recuperador vectorial ignora toda fila que no los tenga. Así que se veían llegar 6.477
+licitaciones y la lista seguía siendo pobre —sólo léxica— hasta que el tic de beat pasara,
+sin nada en pantalla que lo explicara. Dos tareas correctas por separado, con un agujero
+entre ellas que ningún test aislado podía ver. La carga encadena ahora la tarea de
+embeddings al terminar.
+
+### El análisis, a medias por una razón externa
+
+`POST /tenders/2026/20/analyze` —un expediente **con barra**, que es lo que la 5.2
+arregló— devuelve 202 y la tarea corre. El grafo descarga el pliego, detecta su capa de
+texto y llama al modelo. Ahí se acaba: OpenRouter devuelve **429** porque el nivel gratuito
+son 50 peticiones al día y ya estaban gastadas. Reintentado pasado el minuto, mismo
+resultado: es el tope diario, no el de ritmo.
+
+Así que el criterio 4 queda sin verificar hoy, por una razón que no es del código. Lo que
+sí quedó verificado, y no es poco, es todo el recorrido hasta la llamada al modelo y la
+vuelta entera del error: el usuario lee **"Se ha agotado la cuota de peticiones del modelo
+(nivel gratuito de OpenRouter, 50 al día). Vuelve a intentarlo mañana."**
+
+Eso es, de paso, la validación en producción del arreglo de esta misma sesión: antes, ese
+429 de `openrouter.ai` se traducía como *"el servidor de PLACSP devolvió un error"*, porque
+el mapeo casaba por tipo de excepción y las dos llamadas HTTP de un análisis lanzan la
+misma.
+
+### Lo que CI enseñó y una máquina de desarrollo no podía
+
+Los dos tests de `/capabilities` pasaban en local y fallaban en CI.
+`Settings(_env_file=None, ...)` desactiva la lectura del fichero `.env` **pero no las
+variables de entorno**, y el trabajo de CI exporta `OPENROUTER_API_KEY` como marcador. O
+sea que el objeto llamado `_NO_KEYS` llegaba allí con clave, y los dos tests afirmaban
+exactamente lo contrario de lo que dicen.
+
+Las fixtures pasan ahora todos los campos opcionales explícitamente, `None` incluido: los
+argumentos de construcción tienen la precedencia más alta, así que dejan de depender de lo
+que haya exportado alrededor. Comprobado ejecutando la suite con la variable puesta, que es
+la condición que separaba CI de una máquina de desarrollo.
+
+### Estado al cerrar
+
+258 tests en verde, `ruff`, `ruff format --check` y `mypy --strict` limpios; `npm run lint`
+y `npm run build` limpios.
+
+Criterios 1, 2, 3 y 5, cumplidos y verificados levantando la pila de verdad. El **4 queda
+pendiente** hasta que la cuota diaria de OpenRouter se renueve — el camino está verificado
+de punta a punta salvo el eslabón de una extracción con éxito, que la Fase 3 y los evals de
+la 4.4 ya cubren contra el golden set.
