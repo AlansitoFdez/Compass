@@ -16,10 +16,20 @@ from compass.core.config import Settings
 from compass.tenders.enums import ContractType, TenderStatus
 from compass.tenders.models import Tender
 
+# Every optional field is passed explicitly, including the ones being set to None, and
+# that is the point rather than verbosity. `_env_file=None` stops pydantic-settings reading
+# the dotenv file but *not* the environment, so on a machine that exports
+# OPENROUTER_API_KEY -- CI does, as a placeholder -- this object arrived with a key and the
+# tests below silently asserted the opposite of what they claim. Init arguments have the
+# highest precedence, so spelling them out makes these fixtures independent of whatever
+# happens to be exported around them.
 _NO_KEYS = Settings(
     _env_file=None,
     database_url="postgresql://u:p@localhost:5432/db",
     redis_url="redis://localhost:6379/0",
+    openrouter_api_key=None,
+    langfuse_public_key=None,
+    langfuse_secret_key=None,
 )
 _WITH_KEYS = Settings(
     _env_file=None,
