@@ -31,21 +31,33 @@ dashboard**. Las otras dos se deciden después, con el dashboard delante.
    bajo demanda y su veredicto citado. Incluye lo que falte en el backend para
    sostenerlas: la ficha de una licitación concreta y CORS.
 
-2. **5.2 — Despliegue** *(alcance por decidir)*
+2. **5.2 — Revisión completa de la aplicación y corrección de los hallazgos**
+   Revisión de las dos mitades del producto contra el corpus real, antes de desplegar:
+   37 hallazgos, de los que esta subfase corrige los del backend. El primero apagaba el
+   agente analista en dos de cada tres licitaciones (las rutas de análisis no casaban con
+   los expedientes que llevan barras). Se hace ahora y no en la revisión de fase porque
+   varios condicionan lo que se despliega y cómo.
+
+3. **5.3 — Reestructuración y rediseño del dashboard**
+   Los trece hallazgos de frontend de la revisión: organización por dominio como en el
+   backend, límites de error y estados de carga, y el rediseño que pone el veredicto y el
+   plazo donde deciden. Separado de la 5.2 porque tiene su propio criterio de "hecho".
+
+4. **5.4 — Despliegue** *(alcance por decidir)*
    Sacar la aplicación de la máquina de desarrollo. Aquí es donde aterriza la implicación
    real del diseño: la ingesta diaria y el backfill de embeddings son tareas programadas,
    así que necesitan un proceso vivo a esa hora -- no el portátil de Alan. Decisión
    pendiente entre un VPS con el `docker compose` entero (beat incluido) y desacoplar el
    reloj a un cron externo que encole la tarea, dejando vivos solo API y worker.
 
-3. **5.3 — Digest diario por email** *(candidato a quedar fuera de la v1)*
+5. **5.5 — Digest diario por email** *(candidato a quedar fuera de la v1)*
    Está en el alcance del MVP del documento de diseño y no existe nada de él: ni
    destinatario en `Provider`, ni proveedor de envío, ni marca de agua de "qué es nuevo
    desde el último envío". La maquinaria sí está (beat, embudo, perfil). Si no entra, se
    declara fuera explícitamente en el README, con el mismo criterio que las subvenciones
    y el OCR: fuera porque se decidió, no porque no dio tiempo.
 
-4. **5.4 — Revisión completa de la fase**
+6. **5.6 — Revisión completa de la fase**
    Mismo patrón que 1.11, 2.7, 3.9 y 4.7.
 
 La Fase 6 del documento de diseño original ("CI y README narrativo") ya está hecha: el CI
