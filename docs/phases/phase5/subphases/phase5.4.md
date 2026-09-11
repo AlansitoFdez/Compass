@@ -98,3 +98,127 @@ según carga. Progreso honesto sin maquinaria nueva.
    `npm run build` limpios, y CI en verde.
 
 ## Progreso
+
+### El perfil deja de ser un fichero Python
+
+`GET`/`PUT /provider` sobre el repositorio que ya existía desde la Fase 2. `PUT` y no
+`PATCH`, y la razón está en un test: mandar la lista de certificaciones vacía tiene que
+**borrarlas**, porque "no tengo ninguna" y "no las he mencionado" son hechos distintos y esa
+diferencia decide veredictos — un pliego que exige ISO 27001 bloquea a quien no la declara.
+Un `PATCH` colapsaría los dos casos.
+
+La pantalla explica, campo a campo, **qué decide cada uno**: cuáles son filtros duros
+(CPV, importe, ámbito) y cuáles sólo entran en el veredicto (facturación,
+certificaciones). No es adorno: una descripción escrita como un eslogan y otra escrita
+como una descripción del trabajo producen rankings muy distintos, y no hay forma de que
+quien rellena el formulario lo sepa si no se dice ahí. También declara el límite que no
+puede saltarse — Compass v1 sólo ingiere la división CPV 72, así que unos códigos de otra
+división no encontrarán nada por mucho que se guarden.
+
+Un detalle que no hizo falta construir: editar el perfil no invalida nada. El veredicto no
+se almacena (se recalcula en cada lectura) y la caché del embedding de la descripción está
+indexada por el propio texto, así que cambiarlo la falla por construcción. Queda escrito en
+el endpoint, antes de que a alguien le dé por añadir una caché ahí.
+
+`seed.py` se queda como ejemplo, con un test que comprueba que sigue validando contra el
+mismo esquema que postea el formulario: ya no es la fuente de verdad, pero sí es el ejemplo
+que alguien copia.
+
+### El arranque en frío, visible
+
+`POST /ingestion/backfill` encola la carga histórica con su propio lock, igual que las
+otras dos tareas. El formulario la dispara **sólo si el corpus está vacío** — con
+licitaciones ya ingeridas, rebajar tres archivos mensuales costaría minutos para insertar
+filas que ya están.
+
+El progreso no necesitó endpoint: `funnel.total` ya es el número de licitaciones en la base,
+así que la portada lo consulta cada cinco segundos y el número sube solo. Es además el mismo
+número que enseña el resumen del embudo cuando termina, así que no hay dos formas distintas
+de contar lo mismo.
+
+### La imagen, y por qué son dos etapas
+
+El `Dockerfile` hornea el modelo de embeddings en tiempo de construcción, decidido ya en la
+Fase 2. Sin eso, `sentence-transformers` se descarga ~570 MB de Hugging Face dentro de la
+primera petición que haga un usuario — en una máquina que puede estar sin internet, y
+repitiéndolo cada vez que se recree el contenedor. Con `HF_HUB_OFFLINE=1` en la etapa final,
+además, la librería deja de salir a comprobar actualizaciones de un fichero que ya tiene.
+
+El nombre del modelo se lee del propio módulo en el `RUN` que lo descarga, no se repite en
+el Dockerfile: cambiar `matching/embeddings.py` cambia lo que se hornea, sin nada que
+mantener sincronizado a mano.
+
+### Los cuatro servicios
+
+`migrate` corre `alembic upgrade head` y termina; los otros tres dependen de él con
+`service_completed_successfully`. Esa es la pieza que evita que API, worker y beat lancen
+tres migraciones a la vez al levantar en paralelo — Alembic no toma ningún lock por su
+cuenta.
+
+`beat` monta un volumen y arranca con `--schedule=/app/state/celerybeat-schedule`. Sin eso,
+cada reinicio inicializa los `last_run_at` a "ahora" y **la ingesta perdida mientras la
+máquina estaba apagada no se recupera nunca**: beat se esperaría al siguiente 03:00. Con el
+volumen, dispara la ingesta atrasada segundos después de arrancar, que es justo lo que hace
+que una herramienta que vive en un portátil siga estando al día.
+
+El worker corre con el pool `prefork` por defecto, no con `--pool=solo`: ese apaño existe
+por Windows, y dentro del contenedor esto es Linux, donde `fork()` funciona.
+
+Los puertos de la API se publican sólo en los dos loopback, igual que Postgres y Redis desde
+la 5.2, y por el mismo motivo: no tiene autenticación y no hay razón para que nadie más en
+la red la alcance.
+
+### Lo que el propio build enseñó
+
+La primera construcción de la imagen **falló**, y el error no tenía nada que ver con
+Docker: una `ValidationError` de Pydantic. El paso que hornea el modelo lee su nombre del
+código en vez de repetirlo en el `Dockerfile`, y ese nombre vivía en
+`matching/embeddings.py` — que importa la ORM, que importa `core.db`, que construye el
+engine desde `Settings` al importarse. O sea que **preguntar "¿qué modelo es?" exigía el
+entorno entero configurado**, y en tiempo de construcción no hay ninguno.
+
+El arreglo no es el `Dockerfile`: `EMBEDDING_MODEL_NAME` y `EMBEDDING_DIMENSIONS` pasan a
+un módulo sin un solo import. Estaban repartidos entre `matching/embeddings.py` (el
+nombre) y `tenders/models.py` (la dimensión), y juntarlos es además lo correcto por sí
+mismo — la dimensión no es un hecho de la tabla `tenders`, es un hecho del modelo, y la
+tabla sólo tiene que estar de acuerdo con él.
+
+### Verificación
+
+Con la pila levantada de cero:
+
+```
+migrate   Exited (0)     alembic upgrade head, y termina
+api       Up             /health 200, /matches 200
+worker    Up             celery@… ready (pool prefork)
+beat      Up             beat: Starting…
+```
+
+`GET /matches` desde el contenedor devolvió el embudo real —3.583 → 76 → 27 → 6— lo que
+prueba de paso que **el modelo horneado funciona sin red**: con `HF_HUB_OFFLINE=1`, si no
+estuviera en la imagen esa petición habría fallado en vez de responder. Y
+`/app/state/celerybeat-schedule` existe dentro del volumen, que es la condición de la que
+depende recuperar una ingesta perdida.
+
+Un número que conviene tener presente: la imagen pesa **5,36 GB**. La mayor parte es
+`torch` (la variante CPU que `pyproject.toml` ya elige en Linux) más los ~570 MB del
+modelo. Es mucho para descargar, pero es el precio de que la primera petición del usuario
+sea instantánea y de que la herramienta funcione sin conexión a Hugging Face. Reducirlo
+tiene salidas conocidas —`onnxruntime` en vez de `torch`— y ninguna barata; queda anotado.
+
+### Lo que no lleva
+
+**Un arranque sin `.env`.** `docker compose` falla nombrando el fichero que falta, que es
+mejor error que arrancar y morir después en la validación de `Settings`, pero sigue siendo
+un paso manual antes del primero. El README lo pone como línea uno.
+
+**El dashboard fuera de Docker.** El frontend se sigue levantando con `npm run dev`. Meterlo
+en el compose es un `Dockerfile` más y una variable de entorno distinta
+(`NEXT_PUBLIC_API_URL` se resuelve en el navegador, no en la red de Docker), y no hacía
+falta para el objetivo de esta subfase.
+
+### Estado al cerrar
+
+251 tests en verde, `ruff`, `ruff format --check` y `mypy --strict` limpios; `npm run lint`
+y `npm run build` limpios. Los cinco criterios de aceptación se cumplen, y el primero está
+verificado levantando la pila de verdad, no razonando sobre el YAML.

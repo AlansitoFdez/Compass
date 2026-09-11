@@ -85,26 +85,21 @@ Python 3.13 (tipado estricto, `mypy --strict`) · FastAPI async sobre Uvicorn ·
 
 ## Arrancar en local
 
-Requiere Docker y [uv](https://docs.astral.sh/uv/).
+Compass se ejecuta en tu máquina, no como servicio alojado. Requiere Docker y nada más.
 
 ```bash
-# Infraestructura (Postgres en :5433, Redis en :6379)
+cp backend/.env.example backend/.env   # y pon tu clave gratuita de openrouter.ai
 docker compose up -d
-
-# Desde backend/, con un .env configurado
-cd backend
-uv run alembic upgrade head
-uv run python -m compass --reload          # API en http://localhost:8000/docs
-
-# En otras dos terminales, para la ingesta diaria y el backfill de embeddings
-uv run celery -A compass.core.celery_app worker --pool=solo --loglevel=info
-uv run celery -A compass.core.celery_app beat --loglevel=info
-
-# Carga inicial de datos (últimos 3 meses del vertical)
-uv run python -m compass.ingestion.historical_loader
 ```
 
-Y el dashboard, desde `frontend/` (necesita la API levantada, y el worker para analizar pliegos):
+Eso levanta Postgres, Redis, la API, el worker y el planificador, y aplica las migraciones
+por el camino. La API queda en http://localhost:8000/docs.
+
+Sólo `OPENROUTER_API_KEY` es obligatoria: es la única sin la que el agente no tiene a quién
+preguntar. Las de Langfuse son opcionales — sirven para ver el coste real de cada análisis,
+y sin ellas todo funciona igual, sin trazas.
+
+Y el dashboard, desde `frontend/`:
 
 ```bash
 npm install
@@ -112,7 +107,28 @@ cp .env.example .env.local
 npm run dev   # http://localhost:3000
 ```
 
-`uv run pytest` corre la suite completa contra Postgres y Redis reales (necesita la infraestructura de arriba levantada).
+La primera vez te pedirá el perfil de tu empresa —a qué te dedicas, tus CPV, tu rango de
+importe, tu facturación y tus certificaciones—, que es con lo que el embudo filtra y con lo
+que se calcula cada veredicto. Al guardarlo se descargan los últimos tres meses de
+licitaciones de PLACSP; tarda unos minutos y el avance se ve en la propia portada.
+
+### Desarrollo, sin contenedores
+
+Con [uv](https://docs.astral.sh/uv/) instalado, y levantando sólo la infraestructura:
+
+```bash
+docker compose up -d db redis
+cd backend
+uv run alembic upgrade head
+uv run python -m compass --reload          # API en http://localhost:8000/docs
+
+# En otras dos terminales
+uv run celery -A compass.core.celery_app worker --pool=solo --loglevel=info
+uv run celery -A compass.core.celery_app beat --loglevel=info
+```
+
+`uv run pytest` corre la suite completa contra Postgres y Redis reales (necesita esa
+infraestructura levantada).
 
 ## CI
 
