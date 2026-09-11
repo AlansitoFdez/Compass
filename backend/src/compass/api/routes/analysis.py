@@ -18,7 +18,15 @@ from compass.core.db import get_db
 from compass.providers.repository import get_provider
 from compass.tenders.models import Tender
 
-router = APIRouter(prefix="/tenders/{expediente}", tags=["analysis"])
+# `{expediente:path}`, like the tender detail route and for the same reason: real PLACSP
+# expedientes carry slashes (`2026/SSV/000804`, `2026/S-ABT/0000025771 - Gestión de
+# expedientes`), and the default converter stops at the first one. Declared as a single
+# segment -- the shape this had until 5.2 -- neither route matched those expedientes at
+# all: the request fell through to `GET /tenders/{expediente:path}`, which answered
+# "Tender not found" for an analysis read and 405 for the POST, on 2.282 of the 3.583
+# expedientes in the corpus. The `path` converter is greedy but still anchored by the
+# literal suffix below, so it can't swallow `/analysis` itself.
+router = APIRouter(prefix="/tenders/{expediente:path}", tags=["analysis"])
 
 
 @router.post("/analyze", status_code=202)
