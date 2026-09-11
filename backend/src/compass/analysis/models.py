@@ -71,9 +71,10 @@ class TenderAnalysis(Base):
     # empty until the status reaches COMPLETED.
     extraction: Mapped[dict[str, object] | None] = mapped_column(JSONB)
     # The fraction of extraction's citations that verify against the parsed
-    # pliego text (3.5's `citation_faithfulness`) -- the number Fase 4's
-    # RAGAS faithfulness evals track over time. Nullable for the same reason
-    # as `extraction`: only set once the graph reaches `verify`.
+    # pliego text (3.5's `citation_faithfulness`), computed in Python and
+    # tracked by `regression_eval` (4.4) -- not by RAGAS, which 5.6 aimed at
+    # the free-text descriptions instead. Nullable for the same reason as
+    # `extraction`: only set once the graph reaches `verify`.
     citation_faithfulness: Mapped[float | None] = mapped_column(Float)
     error_message: Mapped[str | None] = mapped_column(Text)
 

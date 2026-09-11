@@ -1,10 +1,11 @@
 """Golden set: real PCAPs, hand-annotated field by field.
 
 Started in 3.4 with 4 pliegos to pick the extraction model; extended in 4.3 to 25-30
-for RAGAS (Fase 4) -- a golden set of that size measures faithfulness and extraction
-correctness as a real regression gate, per the design doc. Same "small-to-medium,
-real, no blind pick" method the 2.4 embedding decision and the 3.4 model decision both
-used, just at a larger scale for the statistical purpose RAGAS needs.
+so the regression gate (`regression_eval`) measures citation faithfulness and extraction
+correctness on enough documents to mean something. Same "small-to-medium, real, no blind
+pick" method the 2.4 embedding decision and the 3.4 model decision both used, just at a
+larger scale for that statistical purpose. RAGAS was expected here when 4.3 was planned;
+it ended up in 5.6, scoring the descriptions this set deliberately doesn't annotate.
 
 Each entry is a real `expediente` from the seeded provider's live matches (`GET
 /matches`), picked for structural diversity, not for being easy: narrative

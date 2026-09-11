@@ -42,8 +42,13 @@ def verify_citation(citation: Citation, pages: list[str]) -> bool:
 
 
 def citation_faithfulness(extraction: PliegoExtraction, pages: list[str]) -> float:
-    """The fraction of `extraction`'s present citations that verify -- the number
-    Fase 4's RAGAS faithfulness evals are meant to track over time.
+    """The fraction of `extraction`'s present citations that verify -- tracked over time
+    by `regression_eval` (4.4), in Python.
+
+    Not what RAGAS measures here: 5.6 pointed it at the *descriptions*, whose prose no
+    string comparison can check, and left citation faithfulness where it already was --
+    a judge model deciding whether a quote appears on a page would be slower, costlier
+    and less certain than this substring test.
 
     Fields with no citation (the pliego genuinely doesn't address that point) aren't
     counted at all: there's nothing to verify, so they neither help nor hurt the score.
