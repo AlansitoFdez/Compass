@@ -77,7 +77,7 @@ Desde la 4.1, cada análisis queda trazado en [Langfuse](https://langfuse.com) c
 
 ## Stack
 
-Python 3.13 (tipado estricto, `mypy --strict`) · FastAPI async sobre Uvicorn · PostgreSQL 17 + pgvector, vía SQLAlchemy async y Alembic · Celery sobre Redis para la ingesta diaria, el backfill de embeddings y el análisis de pliegos bajo demanda · `ibm-granite/granite-embedding-278m-multilingual` para los embeddings semánticos, corrido en local · LangGraph para el agente analista de pliegos, con `nvidia/nemotron-3-super-120b-a12b:free` (vía OpenRouter) como modelo de extracción · pytest, ruff.
+Python 3.13 (tipado estricto, `mypy --strict`) · FastAPI async sobre Uvicorn · PostgreSQL 17 + pgvector, vía SQLAlchemy async y Alembic · Celery sobre Redis para la ingesta diaria, el backfill de embeddings y el análisis de pliegos bajo demanda · `ibm-granite/granite-embedding-278m-multilingual` para los embeddings semánticos, corrido en local · LangGraph para el agente analista de pliegos, con `nvidia/nemotron-3-super-120b-a12b:free` (vía OpenRouter) como modelo de extracción · Next.js 16 con React 19 y Tailwind v4 para el dashboard · pytest, ruff.
 
 ## Arrancar en local
 
@@ -98,6 +98,14 @@ uv run celery -A compass.core.celery_app beat --loglevel=info
 
 # Carga inicial de datos (últimos 3 meses del vertical)
 uv run python -m compass.ingestion.historical_loader
+```
+
+Y el dashboard, desde `frontend/` (necesita la API levantada, y el worker para analizar pliegos):
+
+```bash
+npm install
+cp .env.example .env.local
+npm run dev   # http://localhost:3000
 ```
 
 `uv run pytest` corre la suite completa contra Postgres y Redis reales (necesita la infraestructura de arriba levantada).
