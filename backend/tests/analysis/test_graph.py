@@ -386,3 +386,37 @@ async def test_analyze_pliego_reuses_content_the_caller_already_downloaded() -> 
     )
 
     assert result["status"] == AnalysisStatus.COMPLETED
+
+
+def _status_error(url: str, status_code: int) -> httpx2.HTTPStatusError:
+    """A real `HTTPStatusError` for `url`, as httpx2 would raise it."""
+    request = httpx2.Request("POST", url)
+    return httpx2.HTTPStatusError(
+        "boom", request=request, response=httpx2.Response(status_code, request=request)
+    )
+
+
+def test_a_rate_limited_model_is_not_reported_as_a_dead_pliego_link() -> None:
+    """Protects the distinction between the two HTTP calls one analysis makes.
+
+    Both the PCAP download and the OpenRouter completion raise `HTTPStatusError`, so
+    matching on the type alone told the user their pliego link was dead when what had
+    actually happened was the free tier's 50-requests-a-day cap -- the likeliest failure
+    of the whole pipeline, and found on a real stored row.
+    """
+    message = graph._user_facing_error(_status_error(CHAT_COMPLETIONS_URL, 429))
+
+    assert "cuota" in message
+    assert "PLACSP" not in message
+
+
+def test_a_dead_pcap_url_still_points_at_placsp() -> None:
+    """The other half: a status error from the document host is a download problem, and
+    has to keep saying so.
+    """
+    message = graph._user_facing_error(
+        _status_error("https://contrataciondelestado.es/pliego.pdf", 404)
+    )
+
+    assert "PLACSP" in message
+    assert "cuota" not in message
