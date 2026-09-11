@@ -111,6 +111,35 @@ async def load_month(year: int, month: int, client: httpx2.Client, session: Asyn
     return persisted
 
 
+DEFAULT_MONTHS = 3
+
+
+async def load_recent_months(
+    client: httpx2.Client, session: AsyncSession, months: int = DEFAULT_MONTHS
+) -> int:
+    """Loads the last `months` monthly archives, committing once per month.
+
+    Committing per month rather than once at the end bounds what a mid-run failure
+    loses to the month in flight -- each archive is ~200 MB and takes minutes, so a
+    single transaction around all three would throw away a lot of finished work.
+
+    Args:
+        client: The HTTP client to download the archives with.
+        session: The active database session; this function commits.
+        months: How many months back to go, including the current one.
+
+    Returns:
+        How many tenders matched the IT vertical and were persisted, across all months.
+    """
+    total = 0
+    for year, month in recent_months(months):
+        count = await load_month(year, month, client, session)
+        await session.commit()
+        total += count
+        logger.info("%04d-%02d: %d IT-vertical tenders saved", year, month, count)
+    return total
+
+
 async def _main() -> None:
     """CLI entry point: loads the last three months, committing once per month."""
     from compass.core.db import async_session_factory
@@ -119,10 +148,7 @@ async def _main() -> None:
     # it doesn't support "async with", only the plain "with".
     with httpx2.Client(timeout=60) as client:
         async with async_session_factory() as session:
-            for year, month in recent_months(3):
-                count = await load_month(year, month, client, session)
-                await session.commit()
-                logger.info("%04d-%02d: %d IT-vertical tenders saved", year, month, count)
+            await load_recent_months(client, session)
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ from compass.core.celery_app import celery_app
 from compass.core.db import create_task_engine
 from compass.core.redis_client import get_redis_client
 from compass.ingestion.daily_ingestion import run_daily_ingestion
+from compass.ingestion.historical_loader import load_recent_months
 
 logger = logging.getLogger(__name__)
 
@@ -85,3 +86,68 @@ def daily_ingestion_task() -> int:
             # LOCK_TIMEOUT_SECONDS) or already released by something else --
             # there is nothing to undo here.
             logger.warning("daily_ingestion: lock already expired or released")
+
+
+BACKFILL_LOCK_KEY = "ingestion:backfill:lock"
+# Three ~200 MB archives, downloaded and parsed entry by entry. Minutes in practice, but
+# generous for the same reason as the daily lock: a worker that dies mid-run must not
+# block every future attempt, and the lock expiring on its own is what prevents that.
+BACKFILL_LOCK_TIMEOUT_SECONDS = 7200
+
+
+async def _run_backfill(months: int) -> int:
+    """Runs one historical backfill inside its own event loop and engine."""
+    engine = create_task_engine()
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        with httpx2.Client(timeout=60) as client:
+            async with session_factory() as session:
+                return await load_recent_months(client, session, months)
+    finally:
+        await engine.dispose()
+
+
+@celery_app.task(name="backfill_historical")
+def backfill_historical_task(months: int = 3) -> int:
+    """Celery entry point for the initial corpus load, guarded by a Redis lock.
+
+    Not scheduled by beat: this fills an empty database once, when someone first sets up
+    their profile. The daily ingestion keeps it current from then on.
+
+    There is no progress reporting and none is needed -- the dashboard watches the corpus
+    grow through `funnel.total` on `GET /matches`, which counts rows as they land.
+
+    Args:
+        months: How many monthly archives back to load, including the current one.
+
+    Returns:
+        How many tenders were persisted; `0` if a backfill was already running.
+    """
+    lock = get_redis_client().lock(BACKFILL_LOCK_KEY, timeout=BACKFILL_LOCK_TIMEOUT_SECONDS)
+    if not lock.acquire(blocking=False):
+        # Two concurrent backfills would download the same ~600 MB twice and upsert the
+        # same rows over each other -- harmless but pointless, and slow enough to matter.
+        logger.warning("backfill_historical: already running, skipping")
+        return 0
+
+    try:
+        logger.info("backfill_historical: starting (%d months)", months)
+        start = time.monotonic()
+
+        try:
+            if sys.platform == "win32":
+                count = asyncio.run(_run_backfill(months), loop_factory=asyncio.SelectorEventLoop)
+            else:
+                count = asyncio.run(_run_backfill(months))
+        except Exception:
+            logger.exception("backfill_historical: failed")
+            raise
+
+        elapsed = time.monotonic() - start
+        logger.info("backfill_historical: finished, %d tenders in %.1fs", count, elapsed)
+        return count
+    finally:
+        try:
+            lock.release()
+        except LockError:
+            logger.warning("backfill_historical: lock already expired or released")
