@@ -5,6 +5,8 @@ storage) and `matching.vector` (embeds a provider description at query time)
 -- one place owns the model name and how it's invoked, so both stay in sync.
 """
 
+import asyncio
+
 from sentence_transformers import SentenceTransformer
 
 from compass.tenders.models import EMBEDDING_DIMENSIONS
@@ -18,6 +20,12 @@ EMBEDDING_MODEL_NAME = "ibm-granite/granite-embedding-278m-multilingual"
 # something to reload on every call. A Celery worker (--pool=solo) and a
 # FastAPI process each get their own instance, lazily, on first use.
 _model: SentenceTransformer | None = None
+
+# Query embeddings, keyed by the exact text. Not `functools.lru_cache`: the value is a
+# `list[float]` built inside a coroutine, and lru_cache would cache the coroutine object
+# rather than its result. See `embed_query` for why caching this is worth it at all.
+_query_cache: dict[str, list[float]] = {}
+_QUERY_CACHE_MAX_ENTRIES = 32
 
 
 def _get_model() -> SentenceTransformer:
@@ -44,7 +52,47 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     model = _get_model()
     embeddings = model.encode(texts, normalize_embeddings=True)
     result: list[list[float]] = embeddings.tolist()
-    assert all(len(vector) == EMBEDDING_DIMENSIONS for vector in result), (
-        f"expected {EMBEDDING_DIMENSIONS}-dim vectors from {EMBEDDING_MODEL_NAME}"
-    )
+    # A `raise`, not an `assert`: asserts vanish under `python -O`, and a wrong dimension
+    # is exactly the failure this has to catch at its source -- otherwise it surfaces much
+    # later as a Postgres error on the Vector(768) column, far from the cause.
+    wrong = next((len(vector) for vector in result if len(vector) != EMBEDDING_DIMENSIONS), None)
+    if wrong is not None:
+        raise ValueError(
+            f"expected {EMBEDDING_DIMENSIONS}-dim vectors from {EMBEDDING_MODEL_NAME}, got {wrong}"
+        )
     return result
+
+
+async def embed_query(text: str) -> list[float]:
+    """The embedding of a single query string, cached and off the event loop.
+
+    Both of those matter for `matching.vector`, which runs inside a request handler:
+
+    - **Cached.** The only query this project ever embeds is the provider's own
+      description, and there is exactly one provider profile (a singleton row, see
+      `providers.models.Provider`). Re-encoding the same paragraph on every call to
+      `GET /matches` was measured at ~0.3s of pure CPU per request, for a result that is
+      byte-for-byte identical until the profile is edited.
+    - **Off the event loop.** `SentenceTransformer.encode` is synchronous CPU work, so
+      calling it directly from a coroutine blocks the whole process -- not just the
+      caller. Measured before this change: `/health` degraded from 0.21s to 0.33s while
+      four `/matches` requests were in flight. `asyncio.to_thread` hands it to the
+      default executor, where it blocks a worker thread instead of the loop.
+
+    Args:
+        text: The query to embed -- in practice, `Provider.description`.
+
+    Returns:
+        Its `EMBEDDING_DIMENSIONS`-length normalized vector.
+    """
+    cached = _query_cache.get(text)
+    if cached is not None:
+        return cached
+
+    (embedding,) = await asyncio.to_thread(embed_texts, [text])
+    # Bounded so an unexpected caller (an eval script sweeping many texts) can't grow this
+    # without limit; with a single provider profile the real occupancy is one entry.
+    if len(_query_cache) >= _QUERY_CACHE_MAX_ENTRIES:
+        _query_cache.clear()
+    _query_cache[text] = embedding
+    return embedding

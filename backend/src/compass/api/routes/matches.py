@@ -5,7 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from compass.core.db import get_db
 from compass.matching.fusion import fused_matches
-from compass.matching.schemas import MatchListResponse, MatchSchema
+from compass.matching.repository import funnel_stage_counts
+from compass.matching.schemas import FunnelCountsSchema, MatchListResponse, MatchSchema
 from compass.providers.repository import get_provider
 from compass.tenders.schemas import TenderSchema
 
@@ -30,13 +31,15 @@ async def get_matches(
 
     Returns:
         The top `limit` matches, highest `rrf_score` first, each carrying
-        the signal from whichever recoverer(s) surfaced it.
+        the signal from whichever recoverer(s) surfaced it, plus the funnel's
+        own stage counts -- how the corpus narrowed down to them.
     """
     provider = await get_provider(session)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider profile not seeded yet")
 
     results = await fused_matches(session, provider, limit=limit)
+    counts = await funnel_stage_counts(session, provider)
 
     items = [
         MatchSchema(
@@ -49,4 +52,13 @@ async def get_matches(
         )
         for result in results
     ]
-    return MatchListResponse(items=items, total=len(items), limit=limit)
+    # `total` is the funnel's own output, not `len(items)`: the caller asked for the best
+    # `limit` of them, and reporting the page size as the total made the dashboard's
+    # headline number always equal whatever it had just requested.
+    return MatchListResponse(
+        items=items,
+        total=counts.after_location,
+        returned=len(items),
+        limit=limit,
+        funnel=FunnelCountsSchema.model_validate(counts),
+    )
