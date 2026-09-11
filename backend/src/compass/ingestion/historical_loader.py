@@ -43,13 +43,32 @@ def recent_months(count: int, today: date | None = None) -> list[tuple[int, int]
 
 
 def download_archive(url: str, client: httpx2.Client) -> Path:
-    """Streams the ZIP to a temp file (never holds the whole ~200MB in memory)."""
+    """Streams the ZIP to a temp file (never holds the whole ~200MB in memory).
+
+    Cleans up after itself if the download dies partway: the file is created with
+    `delete=False` so the caller can read it after the handle closes, and the only code
+    that deletes it is `iter_entries_from_url`'s `finally` -- which never runs if this
+    raises. Each failed attempt otherwise left ~200 MB behind in the temp directory.
+
+    Raises:
+        httpx2.HTTPStatusError: The archive isn't available (a month PLACSP hasn't
+            published yet, typically).
+
+    Returns:
+        Path to the downloaded ZIP. The caller owns it, and must delete it.
+    """
     with client.stream("GET", url) as response:
         response.raise_for_status()
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
-            for chunk in response.iter_bytes():
-                tmp.write(chunk)
-            return Path(tmp.name)
+            path = Path(tmp.name)
+            try:
+                for chunk in response.iter_bytes():
+                    tmp.write(chunk)
+            except BaseException:
+                tmp.close()
+                path.unlink(missing_ok=True)
+                raise
+            return path
 
 
 def iter_entries_from_zip(zip_path: Path) -> Iterator[Element]:

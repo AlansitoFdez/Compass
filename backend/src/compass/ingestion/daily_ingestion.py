@@ -34,6 +34,13 @@ async def run_daily_ingestion(
     committed would lose them for good, not just cost some re-walked pages
     like the resume checkpoint does.
 
+    `client` is a *synchronous* httpx2.Client used inside a coroutine, which is
+    deliberate and bounded: this runs in a Celery task that owns its event loop for the
+    whole call (`ingestion.tasks._run`), so the only thing each blocking page fetch
+    delays is this ingestion itself. The same shape inside a request handler is what
+    made GET /matches freeze the entire API in 5.2 -- the difference is who else is
+    sharing the loop, so it's written down here rather than left to be re-derived.
+
     Returns how many tenders matched the IT vertical and were persisted.
     """
     persisted = 0

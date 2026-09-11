@@ -6,7 +6,18 @@ services:
       POSTGRES_PASSWORD: compass
       POSTGRES_DB: compass
     ports:
-      - "5433:5432"
+      # Bound to the loopback interface, not 0.0.0.0. Docker writes its own firewall
+      # rules, so a plainly published port stays reachable from the whole local network
+      # even when the host firewall looks closed -- and these are development
+      # credentials on a database anyone could then read. Compass runs on the machine of
+      # whoever uses it; nothing off that machine needs to reach Postgres.
+      #
+      # Both loopback addresses, not just IPv4: `localhost` resolves to ::1 first on
+      # Windows, and with only 127.0.0.1 published every connection paid a ~2s IPv6
+      # timeout before falling back -- measured, after this line first went in with the
+      # IPv4 mapping alone.
+      - "127.0.0.1:5433:5432"
+      - "[::1]:5433:5432"
     volumes:
       - compass_db_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,7 +29,14 @@ services:
   redis:
     image: redis:8-alpine
     ports:
-      - "6379:6379"
+      # Same reasoning as Postgres above, and it matters more here: Redis has no
+      # authentication configured, and it holds the ingestion checkpoints as well as the
+      # queue -- a stranger on the same wifi could corrupt the high-water mark and make
+      # tenders silently disappear from future runs. A password would add nothing once
+      # nothing outside this machine can open a connection at all. Both loopback
+      # addresses for the same reason as Postgres above.
+      - "127.0.0.1:6379:6379"
+      - "[::1]:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

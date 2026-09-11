@@ -41,7 +41,9 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = str(engine.url)
+    # render_as_string(hide_password=False), not str(): str() masks the password as
+    # "***", so the SQL this mode emits would carry a URL that cannot connect.
+    url = engine.url.render_as_string(hide_password=False)
     context.configure(
         url=url,
         target_metadata=target_metadata,
