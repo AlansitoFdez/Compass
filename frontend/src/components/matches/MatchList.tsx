@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { MatchCard } from "@/components/matches/MatchCard";
+import { MatchOriginLegend } from "@/components/matches/MatchOrigin";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { Match } from "@/lib/api";
 import { daysUntil } from "@/lib/format";
@@ -96,6 +97,10 @@ export function MatchList({ matches }: { matches: Match[] }) {
             ))}
           </div>
         </div>
+      </div>
+
+      <div className="mb-4">
+        <MatchOriginLegend />
       </div>
 
       <ul className="space-y-3">

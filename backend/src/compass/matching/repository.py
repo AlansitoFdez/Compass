@@ -1,8 +1,9 @@
 """Etapa 1 of the matching funnel: deterministic hard filters in SQL, no ranking involved.
 
 Every filter here is AND'd and derived straight from the provider's own
-profile -- CPV, budget range, and geographic scope -- plus a fixed status
-filter ("en plazo": still open for submission). Nothing here ranks or scores
+profile -- CPV, budget range, and geographic scope -- plus a fixed "still
+biddable" filter (open status *and* a deadline that hasn't passed; see
+`_status_filter`). Nothing here ranks or scores
 a tender; a tender either survives every filter or it doesn't. Semantic
 ranking is Etapa 2, a later subphase.
 """
@@ -30,7 +31,8 @@ class FunnelStageCounts:
 
     Attributes:
         total: Every tender in the table, before any filter.
-        after_status: Surviving `status == open_for_submission`.
+        after_status: Surviving the "still biddable" filter -- open status *and* a
+            submission deadline that hasn't passed (see `_status_filter`).
         after_cpv: Also surviving the CPV overlap with the provider.
         after_budget: Also surviving the provider's budget range, if any.
         after_location: Also surviving the provider's geographic scope, if any.
@@ -44,8 +46,24 @@ class FunnelStageCounts:
 
 
 def _status_filter() -> ColumnElement[bool]:
-    """Only tenders still open for submission ("en plazo") ever reach a provider."""
-    return Tender.status == TenderStatus.OPEN_FOR_SUBMISSION
+    """Only tenders a provider could actually still bid on ever reach them.
+
+    Two conditions, not one, and the second is what makes this stage mean what it says.
+    Until 5.4 this checked only PLACSP's own `status` code -- but PLACSP does not reliably
+    move a tender out of `PUB` when its deadline passes, so the code is stale far more
+    often than not: of the 508 tenders in the real corpus whose status said "open",
+    **429 (84%) had a submission deadline already in the past**. The funnel was calling
+    them "en plazo" and the dashboard was showing them as such, right next to a deadline
+    that said "cerrado".
+
+    A tender with no published deadline at all is excluded too, for the same reason
+    `_budget_filter` excludes a tender with no budget: the filter exists to answer "can
+    this still be bid on", and a tender that can't answer doesn't get in for free.
+    """
+    return and_(
+        Tender.status == TenderStatus.OPEN_FOR_SUBMISSION,
+        Tender.submission_deadline >= func.now(),
+    )
 
 
 def _cpv_filter(provider: Provider) -> ColumnElement[bool]:
