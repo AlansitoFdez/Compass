@@ -60,16 +60,45 @@ dashboard**. Las otras dos se deciden después, con el dashboard delante.
 6. **5.6 — Evals del texto libre con RAGAS**
    `analysis/scoring.py` puntúa los nueve campos objetivamente comprobables y deja fuera,
    a propósito, las descripciones en texto libre: no se pueden comparar mecánicamente. Son
-   la mitad de lo que el modelo escribe y hoy no las mide nadie. Ahí es donde RAGAS aporta
-   algo que este proyecto no tiene, en lugar de duplicar la verificación de citas, que ya
-   se hace en Python y de forma más fuerte que con un juez LLM.
+   la mitad de lo que el modelo escribe y hoy no las mide nadie.
+
+   **Dónde encaja, y dónde no.** Usar RAGAS para medir fidelidad de citas sería duplicar
+   —peor— algo que ya existe: `verification.verify_citation` comprueba en Python que la
+   cita aparece literalmente en la página que dice, y un juez LLM opinando sobre eso es más
+   caro, más lento y menos fiable que una comparación de cadenas. El hueco real son las
+   descripciones: comprobar que están fundamentadas en el texto del pliego y no inventadas.
+
+   **Restricciones ya comprobadas al planificarlo:**
+   - `ragas 0.4.3` resuelve con Python 3.13 y encaja con el `langchain==1.4.0` que el
+     proyecto ya usa; arrastra `langchain-openai`, que se apunta a OpenRouter por su API
+     compatible. La compatibilidad no es el problema.
+   - **La cuota sí.** RAGAS necesita llamadas a un modelo juez, el nivel gratuito son 50 al
+     día y `regression_eval` ya gasta 25. Así que corre sobre **un puñado de pliegos y a
+     mano**, nunca sobre los 25 del golden set ni en CI — mismo criterio que ya se aplicó a
+     `regression_eval`, y por el mismo motivo.
+   - Es una **dependencia nueva**, avisada y aceptada.
 
 7. **5.7 — README**
    El actual está organizado por cómo se construyó el proyecto —fases, tablas de estado—
-   y no por lo que necesita quien llega: qué es, verlo, arrancarlo, cómo funciona, y por
-   qué se decidió así. Va después de la 5.5 a propósito: las capturas y el "arrancar en
-   dos comandos" tienen que reflejar lo que el lector hará de verdad. El relato por
-   subfases no se borra, se queda en `docs/phases/` y se enlaza.
+   y no por lo que necesita quien llega. Va después de la 5.5 a propósito: las capturas y
+   el "arrancar en dos comandos" tienen que reflejar lo que el lector hará de verdad.
+
+   **Estructura acordada**, en el orden en que alguien la necesita:
+
+   1. Qué es, en tres líneas, y **una captura del dashboard** — hoy no hay ni una imagen,
+      y es lo que más cambia la primera impresión. Se generan con Edge en modo *headless*,
+      sin añadir ninguna dependencia (ver la 5.3 y la 5.5, que ya lo hicieron).
+   2. **Arrancar**, arriba del todo: dos comandos.
+   3. **Cómo funciona**: el recorrido ingesta → embudo → agente → veredicto.
+   4. **Las decisiones que importan**, con los números reales: por qué el LLM no emite el
+      veredicto, por qué las citas se verifican en Python, por qué híbrido y no sólo
+      vectorial, y cuánto cuesta un análisis.
+   5. **Stack** y **qué queda fuera a propósito**: subvenciones, OCR, digest por email,
+      multi-inquilino.
+
+   El relato por subfases no se borra: se queda en `docs/phases/` y se enlaza como "el
+   razonamiento completo". Un README limpio con cuarenta documentos de decisiones detrás
+   dice más que un README que intenta ser las dos cosas.
 
 8. **5.8 — Revisión completa de la fase**
    Mismo patrón que 1.11, 2.7, 3.9 y 4.7.
