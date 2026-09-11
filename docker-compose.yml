@@ -134,6 +134,12 @@ services:
         # URL is resolved by the browser, which cannot see Docker's internal network. The
         # api service publishes its port on the host for exactly this reason.
         NEXT_PUBLIC_API_URL: http://localhost:8000
+    environment:
+      # Where the dashboard's own server reaches the API while rendering. Not the same as
+      # the browser's URL above: Server Components run inside this container, where
+      # `localhost:8000` is this container and not the API. Deliberately without the
+      # NEXT_PUBLIC_ prefix, so it never leaves the server.
+      COMPASS_INTERNAL_API_URL: http://api:8000
     ports:
       - "127.0.0.1:3000:3000"
       - "[::1]:3000:3000"

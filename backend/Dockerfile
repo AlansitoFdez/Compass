@@ -25,22 +25,27 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project --no-dev
 
+# The model, fetched once at build time into the image's own Hugging Face cache.
+#
+# Before the source, and copying only the one file it needs, so that ~570 MB of weights
+# are not re-downloaded every time a line of application code changes. With `COPY src`
+# above this step -- where it sat until 5.5 -- a one-line edit meant a five-minute rebuild.
+#
+# `runpy.run_path` runs that file on its own instead of importing the package, which isn't
+# installed at this point. It works because `embedding_model.py` imports nothing,
+# deliberately: reading the name from `matching/embeddings.py` instead failed this build
+# with a pydantic validation error, since that module reaches the ORM, which reaches
+# `core.db`, which builds an engine from `Settings` at import time.
+ENV HF_HOME=/opt/huggingface
+COPY src/compass/matching/embedding_model.py /tmp/embedding_model.py
+RUN /app/.venv/bin/python -c "\
+import runpy; \
+from sentence_transformers import SentenceTransformer; \
+SentenceTransformer(runpy.run_path('/tmp/embedding_model.py')['EMBEDDING_MODEL_NAME'])"
+
 COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
-
-# The model, fetched once at build time into the image's own Hugging Face cache. The name
-# comes from `matching/embedding_model.py` rather than being repeated here, so changing the
-# model changes what gets baked with nothing to keep in sync -- and that module imports
-# nothing on purpose, which is what lets this run before any configuration exists. Reading
-# it from `matching/embeddings.py` instead failed this build with a pydantic validation
-# error: that module reaches the ORM, which reaches `core.db`, which builds an engine from
-# `Settings` at import time.
-ENV HF_HOME=/opt/huggingface
-RUN /app/.venv/bin/python -c "\
-from sentence_transformers import SentenceTransformer; \
-from compass.matching.embedding_model import EMBEDDING_MODEL_NAME; \
-SentenceTransformer(EMBEDDING_MODEL_NAME)"
 
 
 FROM python:3.13-slim AS runtime
