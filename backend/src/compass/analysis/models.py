@@ -10,15 +10,36 @@ from sqlalchemy.orm import Mapped, mapped_column
 from compass.analysis.enums import AnalysisStatus
 from compass.core.db import Base
 
+# How long an analysis may sit in `IN_PROGRESS` before it is treated as dead. Matches the
+# Redis lock the Celery task holds (`analysis.tasks.LOCK_TIMEOUT_SECONDS`, which imports
+# this): once that lock has expired, no run is protecting this row any more, so a row still
+# claiming to be in progress is a worker that died mid-analysis -- not work still happening.
+STALE_AFTER_SECONDS = 900
+
 
 class TenderAnalysis(Base):
-    """One pliego analysis, keyed by the PDF's own content hash -- not by `expediente`.
+    """One pliego analysis per tender, keyed by `expediente`.
 
-    Caching by `pdf_hash` (not by tender) is deliberate: it's the extraction
-    -- the expensive, provider-agnostic half of an analysis -- that gets
-    cached this way (see docs/phases/phase3/phase3.md). Two different
-    expedientes whose PCAP happens to be byte-identical share one row. No
-    verdict lives here: it's computed from `extraction` against whichever
+    Keyed by the tender, not by the document: until 5.2 the primary key was
+    `pdf_hash`, which read well as a cache but broke both directions of the
+    real access pattern. Two tenders whose PCAP happened to be byte-identical
+    collided on one row -- the second one's `GET /analysis`, which looks up by
+    expediente, then found nothing and reported "never analyzed" forever while
+    the task kept hitting the cache and writing nothing. And two such analyses
+    running at once both inserted the same key, so the second transaction died
+    with an `IntegrityError`.
+
+    The cache didn't need that key. What's worth reusing is the *extraction* --
+    the expensive, provider-agnostic half (see docs/phases/phase3/phase3.md) --
+    and `repository.find_cached_extraction` finds it by `pdf_hash` on any
+    tender's row, then copies it onto this one. Same LLM call saved, without
+    two tenders sharing an identity.
+
+    `pdf_hash` is nullable because a row can exist before (or without) a
+    readable document: a PCAP that exceeds the download cap is recorded as
+    `NOT_ANALYZABLE` with nothing to hash.
+
+    No verdict lives here: it's computed from `extraction` against whichever
     `Provider` is current at read time, not stored -- storing it would mean
     invalidating it on every profile edit, for a comparison cheap enough
     (pure Python, no LLM) that there's nothing worth caching yet.
@@ -26,13 +47,16 @@ class TenderAnalysis(Base):
 
     __tablename__ = "tender_analyses"
     __table_args__ = (
-        # Every lookup so far is "has this tender's current PCAP already been
-        # analyzed" -- by expediente, not by hash.
-        Index("ix_tender_analyses_expediente", "expediente"),
+        # The extraction cache's only lookup: "has this exact document already
+        # been analyzed, for any tender". No longer a primary key, so it needs
+        # an index of its own.
+        Index("ix_tender_analyses_pdf_hash", "pdf_hash"),
     )
 
-    pdf_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
-    expediente: Mapped[str] = mapped_column(String, ForeignKey("tenders.expediente"))
+    expediente: Mapped[str] = mapped_column(
+        String, ForeignKey("tenders.expediente"), primary_key=True
+    )
+    pdf_hash: Mapped[str | None] = mapped_column(String(64))
 
     status: Mapped[AnalysisStatus] = mapped_column(
         SqlEnum(

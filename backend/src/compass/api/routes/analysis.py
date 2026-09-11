@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from compass.analysis.enums import AnalysisStatus
 from compass.analysis.extraction_schema import PliegoExtraction
-from compass.analysis.repository import get_latest_analysis_for_tender
+from compass.analysis.repository import get_analysis_for_tender, is_stale
 from compass.analysis.schemas import TenderAnalysisResultSchema
 from compass.analysis.tasks import analyze_tender_task
 from compass.analysis.verdict import compute_verdict
@@ -27,6 +27,15 @@ from compass.tenders.models import Tender
 # expedientes in the corpus. The `path` converter is greedy but still anchored by the
 # literal suffix below, so it can't swallow `/analysis` itself.
 router = APIRouter(prefix="/tenders/{expediente:path}", tags=["analysis"])
+
+# Written to `error_message` when a run is found abandoned. Phrased for the person reading
+# the dashboard, not for a log: it says what happened and what to do, which is the same
+# standard every other message this endpoint can return now holds to (see
+# `analysis.graph.analyze_pliego`, which no longer passes raw exception text through).
+STALE_ANALYSIS_MESSAGE = (
+    "El análisis se interrumpió antes de terminar (el proceso que lo ejecutaba dejó de "
+    "responder). Puedes volver a lanzarlo."
+)
 
 
 @router.post("/analyze", status_code=202)
@@ -80,9 +89,18 @@ async def get_analysis_result(
         The analysis's status, extraction, citation faithfulness, and (once
         `COMPLETED`) its verdict.
     """
-    analysis = await get_latest_analysis_for_tender(session, expediente)
+    analysis = await get_analysis_for_tender(session, expediente)
     if analysis is None:
         raise HTTPException(status_code=404, detail="This tender has not been analyzed yet")
+
+    # A run whose worker died leaves a row claiming to be in progress that nothing will
+    # ever finish -- the Redis lock expires on its own, the row doesn't. Settled here, on
+    # read, rather than by a sweeper: this endpoint is the only thing that ever looks at
+    # the row, and the dashboard polls it, so it's where the dead state actually hurts.
+    if is_stale(analysis):
+        analysis.status = AnalysisStatus.FAILED
+        analysis.error_message = STALE_ANALYSIS_MESSAGE
+        await session.commit()
 
     extraction = (
         PliegoExtraction.model_validate(analysis.extraction)

@@ -1,77 +1,119 @@
-"""Persistence for pliego analyses -- create and read by `pdf_hash`.
+"""Persistence for pliego analyses -- one row per tender, plus the extraction cache.
 
-No upsert here, unlike `tenders.repository.upsert_tender`: a `pdf_hash` is a
-content hash, not a republishable identifier -- the same hash means the same
-document, so there is nothing to update in place. The "does this hash already
-have a cached analysis, or do we need to start one" decision belongs to
-whoever has a real hash to check (Phase 3.2 onward), not to this module.
+Two lookups, and the difference between them is the whole point of the 5.2 rekeying:
+
+- `get_analysis_for_tender` answers "what is the state of *this tender's* analysis",
+  which is what `GET /tenders/{expediente}/analysis` and the dashboard need.
+- `find_cached_extraction` answers "has this exact *document* already been read by the
+  model, for any tender at all", which is what saves the expensive LLM call.
+
+Before 5.2 both were the same lookup, keyed by `pdf_hash`, and the first one silently
+failed whenever two tenders shared a PCAP. See `models.TenderAnalysis`.
 """
+
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from compass.analysis.enums import AnalysisStatus
-from compass.analysis.models import TenderAnalysis
+from compass.analysis.models import STALE_AFTER_SECONDS, TenderAnalysis
+
+# What a cached row must have reached for its extraction to be worth copying instead of
+# calling the model again. `NOT_ANALYZABLE` counts: a scanned PCAP with no text layer is a
+# settled answer, not a failure to retry (v1 does no OCR).
+_REUSABLE_STATUSES = (AnalysisStatus.COMPLETED, AnalysisStatus.NOT_ANALYZABLE)
 
 
-async def create_analysis(
-    session: AsyncSession, *, expediente: str, pdf_hash: str
-) -> TenderAnalysis:
-    """Starts a new analysis row for `pdf_hash`, in `PENDING` status.
+async def get_or_create_analysis(session: AsyncSession, *, expediente: str) -> TenderAnalysis:
+    """This tender's analysis row, creating it in `PENDING` if it has none yet.
+
+    Get-or-create rather than a plain insert: there is exactly one row per tender, and it
+    is rewritten in place every time that tender is re-analyzed (a republished PCAP, a
+    retry after a failure).
 
     Args:
         session: The active database session; the caller commits.
-        expediente: Which tender this PCAP came from.
-        pdf_hash: The document's own content hash -- the primary key, and
-            what makes a duplicate call fail loudly (a real `pdf_hash`
-            should only ever be created once) rather than silently
-            overwriting an existing analysis.
+        expediente: Which tender the analysis belongs to.
 
     Returns:
-        The newly created row, not yet flushed.
+        The existing row, or a new `PENDING` one already added to the session.
     """
-    analysis = TenderAnalysis(
-        pdf_hash=pdf_hash, expediente=expediente, status=AnalysisStatus.PENDING
-    )
+    existing = await session.get(TenderAnalysis, expediente)
+    if existing is not None:
+        return existing
+
+    analysis = TenderAnalysis(expediente=expediente, status=AnalysisStatus.PENDING)
     session.add(analysis)
     return analysis
 
 
-async def get_analysis(session: AsyncSession, pdf_hash: str) -> TenderAnalysis | None:
-    """The analysis for `pdf_hash`, or `None` if this document has never been seen.
+async def get_analysis_for_tender(session: AsyncSession, expediente: str) -> TenderAnalysis | None:
+    """This tender's analysis, or `None` if it has never been analyzed.
 
-    Args:
-        session: The active database session.
-        pdf_hash: The document's own content hash.
-
-    Returns:
-        The cached row, whatever its `status`, or `None`.
-    """
-    return await session.get(TenderAnalysis, pdf_hash)
-
-
-async def get_latest_analysis_for_tender(
-    session: AsyncSession, expediente: str
-) -> TenderAnalysis | None:
-    """The most recent analysis for `expediente`, for `GET /tenders/{expediente}/analysis`.
-
-    By `expediente` via `ix_tender_analyses_expediente`, not by `pdf_hash`: a caller here
-    only ever knows the tender, never the PCAP's own content hash -- that's the whole
-    reason this lookup exists alongside `get_analysis`, which the analysis task itself
-    uses once it has actually downloaded and hashed the document.
+    A primary-key read since 5.2, which also removes the tie it used to have: the previous
+    implementation ordered several rows by `created_at`, a column whose `server_default` is
+    `now()` -- frozen for a whole transaction, so two rows written together compared equal
+    and "the most recent" was whichever the planner happened to return.
 
     Args:
         session: The active database session.
         expediente: Which tender to look up.
 
     Returns:
-        The row from the most recent analysis run for this tender, or `None` if it has
-        never been analyzed.
+        The row, or `None`.
+    """
+    return await session.get(TenderAnalysis, expediente)
+
+
+async def find_cached_extraction(
+    session: AsyncSession, pdf_hash: str, *, exclude_expediente: str
+) -> TenderAnalysis | None:
+    """A settled analysis of this exact document, from some *other* tender.
+
+    The extraction is provider-agnostic and derived only from the PDF's bytes, so an
+    identical document never needs a second LLM call -- the expensive half of an analysis
+    (see docs/phases/phase3/phase3.md).
+
+    Args:
+        session: The active database session.
+        pdf_hash: The document's content hash.
+        exclude_expediente: The tender being analyzed, skipped so a caller can't "reuse"
+            its own row and mistake it for a cache hit.
+
+    Returns:
+        A row whose status is `COMPLETED` or `NOT_ANALYZABLE`, or `None`.
     """
     stmt = (
         select(TenderAnalysis)
-        .where(TenderAnalysis.expediente == expediente)
-        .order_by(TenderAnalysis.created_at.desc())
+        .where(
+            TenderAnalysis.pdf_hash == pdf_hash,
+            TenderAnalysis.expediente != exclude_expediente,
+            TenderAnalysis.status.in_(_REUSABLE_STATUSES),
+        )
         .limit(1)
     )
     return (await session.scalars(stmt)).first()
+
+
+def is_stale(analysis: TenderAnalysis, *, now: datetime | None = None) -> bool:
+    """Whether an `IN_PROGRESS` row has outlived the run that was supposed to finish it.
+
+    A worker killed between the commit that sets `IN_PROGRESS` and the one that writes the
+    result leaves a row nothing will ever touch again: the Redis lock expires on its own,
+    the row does not. The dashboard then polls that status forever and never shows the
+    button again, because the button only appears for "never analyzed" or "failed".
+
+    Args:
+        analysis: The row to judge.
+        now: Current time, injectable for tests.
+
+    Returns:
+        `True` only for an `IN_PROGRESS` row last touched more than
+        `STALE_AFTER_SECONDS` ago -- the window in which a real run is still protected by
+        its lock.
+    """
+    if analysis.status != AnalysisStatus.IN_PROGRESS:
+        return False
+    reference = now or datetime.now(UTC)
+    return (reference - analysis.updated_at).total_seconds() > STALE_AFTER_SECONDS

@@ -1,4 +1,4 @@
-"""Fetches a pliego (PCAP) PDF, hashes it, and detects whether it has a real text layer.
+"""Downloads a pliego (PCAP) PDF, hashes it, and detects whether it has a real text layer.
 
 Pure, testable steps -- no orchestration here. Wiring these into an actual
 analysis (deciding what to do with a `NOT_ANALYZABLE` document, persisting
@@ -18,20 +18,51 @@ import pdfplumber
 # and isn't trying to -- it only needs to tell "readable" from "not".
 MIN_CHARS_PER_PAGE = 20
 
+# Hard ceiling on a PCAP download. A pliego with a real text layer -- the only kind this
+# analyzes -- runs a few megabytes; PLACSP also publishes attachments with scanned plans
+# that run into the hundreds. Both the task and the graph used to read `response.content`
+# with no bound at all, and the worker runs with `--pool=solo`, so one oversized document
+# taking the process down takes the daily ingestion with it, not just this analysis.
+MAX_PCAP_BYTES = 50 * 1024 * 1024
 
-def fetch_pcap(url: str, client: httpx2.Client) -> bytes:
-    """Downloads the pliego PDF from `url`.
+
+class PcapTooLargeError(Exception):
+    """The document exceeded `MAX_PCAP_BYTES` and was abandoned mid-download."""
+
+
+async def download_pcap(
+    url: str, client: httpx2.AsyncClient, *, max_bytes: int = MAX_PCAP_BYTES
+) -> bytes:
+    """Downloads a pliego, refusing to buffer more than `max_bytes` of it.
+
+    Streamed and checked as it arrives rather than after the fact: a `Content-Length`
+    header is advisory (PLACSP doesn't always send one, and a chunked response has none),
+    so the only bound that actually holds is counting the bytes while reading them.
 
     Args:
         url: A tender's `pcap_url`.
-        client: The HTTP client to fetch with.
+        client: The async HTTP client to fetch with.
+        max_bytes: Ceiling on the buffered document.
+
+    Raises:
+        PcapTooLargeError: The response exceeded `max_bytes`.
+        httpx2.HTTPStatusError: The server answered with an error status.
 
     Returns:
         The raw PDF bytes.
     """
-    response = client.get(url)
-    response.raise_for_status()
-    return response.content
+    chunks: list[bytes] = []
+    size = 0
+    async with client.stream("GET", url) as response:
+        response.raise_for_status()
+        async for chunk in response.aiter_bytes():
+            size += len(chunk)
+            if size > max_bytes:
+                raise PcapTooLargeError(
+                    f"el pliego supera el límite de {max_bytes // (1024 * 1024)} MB"
+                )
+            chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def hash_document(content: bytes) -> str:

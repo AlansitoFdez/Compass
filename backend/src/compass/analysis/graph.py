@@ -21,6 +21,7 @@ its own catch-all around this.
 
 import asyncio
 import json
+import logging
 from dataclasses import dataclass
 from typing import TypedDict, cast
 
@@ -32,12 +33,20 @@ from langgraph.runtime import Runtime
 from langgraph.types import RetryPolicy
 from pydantic import ValidationError
 
-from compass.analysis.document import extract_pages, has_text_layer, hash_document
+from compass.analysis.document import (
+    PcapTooLargeError,
+    download_pcap,
+    extract_pages,
+    has_text_layer,
+    hash_document,
+)
 from compass.analysis.enums import AnalysisStatus
 from compass.analysis.extraction_schema import PliegoExtraction
 from compass.analysis.openrouter import OpenRouterError, extract_structured
 from compass.analysis.tracing import get_langfuse_client
 from compass.analysis.verification import citation_faithfulness
+
+logger = logging.getLogger(__name__)
 
 # Decided in 3.4 against a real golden set: 100% of the 36 checks, faster than the
 # other free-tier candidate on the same document (phase3.4.md).
@@ -138,20 +147,30 @@ class AnalysisContext:
     client: httpx2.AsyncClient
     api_key: str
     model: str = EXTRACTION_MODEL
+    # The already-downloaded PCAP, when the caller has one. `analysis.tasks` downloads the
+    # document anyway to compute the cache key, and before 5.2 the `fetch` node downloaded
+    # the very same file a second time -- twice the traffic, twice the memory, and a window
+    # in which the two downloads could disagree about what "this document" even is.
+    #
+    # Carried on the context rather than in the graph state on purpose: LangGraph's
+    # callback handler traces state, and raw PDF bytes are neither maskable by
+    # `tracing._mask_long_text` (it only truncates `str`) nor any use in a trace.
+    content: bytes | None = None
 
 
 async def _fetch(
     state: PliegoAnalysisState, runtime: Runtime[AnalysisContext]
 ) -> PliegoAnalysisState:
-    """Downloads the pliego and extracts its per-page text.
+    """Extracts the pliego's per-page text, downloading it first unless the caller already did.
 
     A dead/erroring `pcap_url` raises `httpx2.HTTPStatusError` here, uncaught -- it
     isn't retried (a 404 pcap_url won't start working on a second try), so it reaches
-    `analyze_pliego`'s boundary and becomes `status=FAILED` directly.
+    `analyze_pliego`'s boundary and becomes `status=FAILED` directly. Same for a document
+    over the download cap (`document.PcapTooLargeError`).
     """
-    response = await runtime.context.client.get(state["pcap_url"])
-    response.raise_for_status()
-    content = response.content
+    content = runtime.context.content
+    if content is None:
+        content = await download_pcap(state["pcap_url"], runtime.context.client)
     return {"pdf_hash": hash_document(content), "pages": extract_pages(content)}
 
 
@@ -257,6 +276,60 @@ _EXTRACT_RETRY_POLICY = RetryPolicy(
 _EXTRACT_TOTAL_TIMEOUT_SECONDS = 300.0
 
 
+# What the dashboard shows for each way an analysis can fail. Every entry names the cause
+# and says whether retrying is worth it; nothing here leaks a URL, a stack frame or a
+# provider's raw payload.
+_ERROR_MESSAGES: tuple[tuple[type[BaseException] | tuple[type[BaseException], ...], str], ...] = (
+    (
+        PcapTooLargeError,
+        "El pliego es demasiado grande para analizarlo en esta versión.",
+    ),
+    (
+        TimeoutError,
+        "El modelo tardó demasiado en responder y se canceló la lectura del pliego. "
+        "Suele funcionar al reintentarlo.",
+    ),
+    (
+        httpx2.HTTPStatusError,
+        "No se pudo descargar el pliego: el servidor de PLACSP devolvió un error. "
+        "Puede que el enlace haya caducado.",
+    ),
+    (
+        httpx2.HTTPError,
+        "No se pudo conectar para descargar el pliego o consultar al modelo. "
+        "Comprueba la conexión y reinténtalo.",
+    ),
+    (
+        OpenRouterError,
+        "El modelo no devolvió una respuesta utilizable. Suele funcionar al reintentarlo.",
+    ),
+    (
+        (ValidationError, json.JSONDecodeError),
+        "El modelo devolvió una respuesta que no encaja con el esquema esperado. "
+        "Suele funcionar al reintentarlo.",
+    ),
+)
+
+_FALLBACK_ERROR_MESSAGE = (
+    "El análisis falló por un error inesperado. El detalle está en el log del worker."
+)
+
+
+def _user_facing_error(exc: BaseException) -> str:
+    """A message for the person reading the dashboard, never the raw exception text.
+
+    Args:
+        exc: Whatever reached the graph's error boundary.
+
+    Returns:
+        The mapped message for that failure, or a generic one that points at the log.
+    """
+    for exception_types, message in _ERROR_MESSAGES:
+        if isinstance(exc, exception_types):
+            return message
+    return _FALLBACK_ERROR_MESSAGE
+
+
 def _build_graph() -> CompiledStateGraph[
     PliegoAnalysisState, AnalysisContext, PliegoAnalysisState, PliegoAnalysisState
 ]:
@@ -279,22 +352,30 @@ _GRAPH = _build_graph()
 
 
 async def analyze_pliego(
-    pcap_url: str, *, api_key: str, client: httpx2.AsyncClient, model: str = EXTRACTION_MODEL
+    pcap_url: str,
+    *,
+    api_key: str,
+    client: httpx2.AsyncClient,
+    model: str = EXTRACTION_MODEL,
+    content: bytes | None = None,
 ) -> PliegoAnalysisState:
     """Runs the full pliego analysis graph. Never raises -- see module docstring.
 
     Args:
-        pcap_url: The tender's `pcap_url` to download and analyze.
+        pcap_url: The tender's `pcap_url`, downloaded unless `content` is given.
         api_key: OpenRouter API key.
         client: The async HTTP client to fetch the PDF and call OpenRouter with.
         model: OpenRouter model slug to extract with.
+        content: The PCAP's bytes, when the caller has already downloaded them -- which
+            `analysis.tasks` always has, since it needs the document to compute the cache
+            key before deciding whether to run this at all.
 
     Returns:
         The graph's final state: `status` is always set, to `COMPLETED` (with
         `extraction`/`citation_faithfulness` populated), `NOT_ANALYZABLE`, or `FAILED`
         (with `error_message`).
     """
-    context = AnalysisContext(client=client, api_key=api_key, model=model)
+    context = AnalysisContext(client=client, api_key=api_key, model=model, content=content)
     langfuse = get_langfuse_client()
     # CallbackHandler routes LangGraph's own per-node run events to Langfuse --
     # `fetch`/`check_text_layer`/`extract`/`verify` each land as a child span under the
@@ -310,7 +391,16 @@ async def analyze_pliego(
             )
             trace.update(output={"status": result.get("status")})
     except Exception as exc:  # deliberately broad: this call site *is* the graph's error boundary
-        return {"pcap_url": pcap_url, "status": AnalysisStatus.FAILED, "error_message": str(exc)}
+        # `_user_facing_error`, not `str(exc)`: this string is rendered in the dashboard,
+        # and raw exception text puts httpx tracebacks and internal URLs in front of the
+        # user while telling them nothing they can act on. The detail still reaches the
+        # log and the Langfuse trace, which is where it's actually read.
+        logger.exception("analyze_pliego failed for %s", pcap_url)
+        return {
+            "pcap_url": pcap_url,
+            "status": AnalysisStatus.FAILED,
+            "error_message": _user_facing_error(exc),
+        }
     finally:
         # A Celery task's process can recycle between runs -- flush synchronously
         # here rather than trusting the client's background flush interval to fire

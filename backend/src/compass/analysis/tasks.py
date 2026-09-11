@@ -16,10 +16,14 @@ import httpx2
 from redis.exceptions import LockError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from compass.analysis.document import hash_document
+from compass.analysis.document import PcapTooLargeError, download_pcap, hash_document
 from compass.analysis.enums import AnalysisStatus
 from compass.analysis.graph import EXTRACTION_MODEL, analyze_pliego
-from compass.analysis.repository import create_analysis, get_analysis
+from compass.analysis.models import STALE_AFTER_SECONDS
+from compass.analysis.repository import (
+    find_cached_extraction,
+    get_or_create_analysis,
+)
 from compass.core.celery_app import celery_app
 from compass.core.config import get_settings
 from compass.core.db import create_task_engine
@@ -34,16 +38,19 @@ LOCK_KEY_TEMPLATE = "analysis:{expediente}:lock"
 # generous anyway for the same reason as daily_ingestion_task's own timeout:
 # a run that outlives this expires the lock on its own rather than blocking
 # every future retry forever if a worker process dies mid-run.
-LOCK_TIMEOUT_SECONDS = 900
+#
+# Shared with `repository.is_stale` through one constant: how long the lock
+# protects a run is exactly how long a row may sit in IN_PROGRESS before a
+# reader is entitled to call it dead.
+LOCK_TIMEOUT_SECONDS = STALE_AFTER_SECONDS
 
-# Statuses that mean "don't bother calling the LLM again for this exact
-# document" -- NOT_ANALYZABLE is terminal by design (v1 does no OCR, see
-# AnalysisStatus's own docstring); COMPLETED is the real cache hit this
-# whole subphase exists to serve. FAILED and IN_PROGRESS are deliberately
-# absent: a FAILED run is retried, not treated as a permanent answer, and
-# IN_PROGRESS on a *different* expediente sharing this exact hash still
-# needs its own row's outcome, not a second one racing it.
-_SKIP_STATUSES = frozenset({AnalysisStatus.COMPLETED, AnalysisStatus.NOT_ANALYZABLE})
+# Statuses that mean "this tender's own row already holds a settled answer for
+# this exact document" -- NOT_ANALYZABLE is terminal by design (v1 does no OCR,
+# see AnalysisStatus's own docstring); COMPLETED is the real cache hit. FAILED
+# and IN_PROGRESS are deliberately absent: a FAILED run is retried, not treated
+# as a permanent answer, and an IN_PROGRESS row is either a live run this one
+# just lost a race to, or a dead one a retry should overwrite.
+_SETTLED_STATUSES = frozenset({AnalysisStatus.COMPLETED, AnalysisStatus.NOT_ANALYZABLE})
 
 
 async def _run(expediente: str) -> AnalysisStatus | None:
@@ -89,34 +96,66 @@ async def analyze_tender(
         logger.warning("analyze_tender: %s has no pcap_url to analyze, skipping", expediente)
         return None
 
-    # Downloaded once here just to compute the cache key. On a genuine cache
-    # miss, analyze_pliego (3.6) downloads the same PCAP a second time inside
-    # its own `fetch` node -- accepted duplication: the alternative is
-    # threading a pre-fetched payload through the already-closed, tested
-    # graph from 3.6, for a download that's cheap next to the LLM call it
-    # gates.
-    response = await client.get(tender.pcap_url)
-    response.raise_for_status()
-    pdf_hash = hash_document(response.content)
+    analysis = await get_or_create_analysis(session, expediente=expediente)
 
-    existing = await get_analysis(session, pdf_hash)
-    if existing is not None and existing.status in _SKIP_STATUSES:
+    # Downloaded once, here, and handed to the graph below. It has to happen before
+    # anything else because the content hash is what decides whether this is a cache hit
+    # at all -- but until 5.2 the graph then downloaded the same file again, unbounded.
+    try:
+        content = await download_pcap(tender.pcap_url, client)
+    except PcapTooLargeError as exc:
+        # Terminal, like a scanned document: v1 has no answer for it, and retrying would
+        # just re-download it. Recorded rather than raised so the dashboard can say why
+        # instead of leaving the user on a button that appears to do nothing.
+        analysis.status = AnalysisStatus.NOT_ANALYZABLE
+        analysis.error_message = str(exc)
+        await session.commit()
+        logger.warning("analyze_tender: %s pcap too large, skipping", expediente)
+        return analysis.status
+
+    pdf_hash = hash_document(content)
+
+    if analysis.pdf_hash == pdf_hash and analysis.status in _SETTLED_STATUSES:
         logger.info(
             "analyze_tender: %s already %s for pdf_hash %s, skipping",
             expediente,
-            existing.status,
+            analysis.status,
             pdf_hash,
         )
-        return existing.status
+        return analysis.status
 
-    analysis = existing or await create_analysis(session, expediente=expediente, pdf_hash=pdf_hash)
+    # The extraction is derived only from the document's bytes, so an identical PCAP
+    # already read for another tender needs no second LLM call -- only a copy onto this
+    # tender's own row. Before 5.2 the row *was* the cache, keyed by hash, so this case
+    # left the second tender with no row of its own and a permanent 404.
+    cached = await find_cached_extraction(session, pdf_hash, exclude_expediente=expediente)
+    if cached is not None:
+        analysis.pdf_hash = pdf_hash
+        analysis.status = cached.status
+        analysis.extraction = cached.extraction
+        analysis.citation_faithfulness = cached.citation_faithfulness
+        analysis.error_message = cached.error_message
+        await session.commit()
+        logger.info(
+            "analyze_tender: %s reused the extraction cached for %s (pdf_hash %s)",
+            expediente,
+            cached.expediente,
+            pdf_hash,
+        )
+        return analysis.status
+
+    analysis.pdf_hash = pdf_hash
     analysis.status = AnalysisStatus.IN_PROGRESS
     analysis.error_message = None
     await session.commit()
 
     settings = get_settings()
     result = await analyze_pliego(
-        tender.pcap_url, api_key=settings.openrouter_api_key, client=client, model=EXTRACTION_MODEL
+        tender.pcap_url,
+        api_key=settings.openrouter_api_key,
+        client=client,
+        model=EXTRACTION_MODEL,
+        content=content,
     )
 
     analysis.status = result["status"]
