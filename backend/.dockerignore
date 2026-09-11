@@ -1,0 +1,14 @@
+# Everything the image builds from is listed explicitly in the Dockerfile, but the build
+# context is still sent to the daemon in full -- and .venv alone is gigabytes.
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+tests/
+# Never: it carries the real OpenRouter key, and a secret baked into an image layer stays
+# there even if a later layer deletes it.
+.env
+celerybeat-schedule
+README.md

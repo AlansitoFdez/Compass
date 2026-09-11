@@ -43,5 +43,86 @@ services:
       timeout: 5s
       retries: 5
 
+  # One-shot: applies migrations and exits. The three services below wait for it to
+  # succeed, which is what keeps them from each running `alembic upgrade head` in parallel
+  # on startup -- Alembic takes no lock of its own, so three concurrent upgrades against
+  # one database is a race, not a no-op.
+  migrate:
+    build: ./backend
+    command: ["alembic", "upgrade", "head"]
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://compass:compass@db:5432/compass
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: ./backend
+    ports:
+      # Loopback only, like the database ports: the API has no authentication, and Compass
+      # runs on the machine of whoever uses it.
+      - "127.0.0.1:8000:8000"
+      - "[::1]:8000:8000"
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://compass:compass@db:5432/compass
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build: ./backend
+    # prefork, not the --pool=solo needed on Windows: this container is Linux, where
+    # fork() works and the default pool is the right one.
+    command:
+      ["celery", "-A", "compass.core.celery_app", "worker", "--loglevel=info"]
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://compass:compass@db:5432/compass
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  beat:
+    build: ./backend
+    # --schedule on the mounted volume, and this is load-bearing. Beat stores each task's
+    # last_run_at there; without it, every restart initialises them to "now" and a run
+    # missed while the machine was off is never recovered -- it would simply wait for the
+    # next 03:00. With it, beat fires the missed daily ingestion seconds after startup,
+    # which is the whole reason a tool that runs on a laptop stays up to date.
+    command:
+      [
+        "celery",
+        "-A",
+        "compass.core.celery_app",
+        "beat",
+        "--loglevel=info",
+        "--schedule=/app/state/celerybeat-schedule",
+      ]
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://compass:compass@db:5432/compass
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - compass_beat_state:/app/state
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   compass_db_data:
+  compass_beat_state:
