@@ -11,9 +11,10 @@ import pytest
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from compass.matching.embedding_model import EMBEDDING_DIMENSIONS
 from compass.matching.tasks import BATCH_SIZE, generate_embeddings, generate_embeddings_task
 from compass.tenders.enums import ContractType, TenderStatus
-from compass.tenders.models import EMBEDDING_DIMENSIONS, Tender
+from compass.tenders.models import Tender
 
 # A prefix outside PLACSP's real expediente format: isolates these tests'
 # synthetic rows for the explicit cleanup below, same reasoning as

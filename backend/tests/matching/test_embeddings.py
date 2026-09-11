@@ -11,8 +11,8 @@ from unittest.mock import patch
 import pytest
 
 from compass.matching import embeddings as embeddings_module
+from compass.matching.embedding_model import EMBEDDING_DIMENSIONS
 from compass.matching.embeddings import embed_query, embed_texts
-from compass.tenders.models import EMBEDDING_DIMENSIONS
 
 
 def test_embed_texts_returns_unit_normalized_vectors_of_the_right_dimension() -> None:

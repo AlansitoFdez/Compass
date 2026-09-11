@@ -6,8 +6,9 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from compass.matching.embedding_model import EMBEDDING_DIMENSIONS
 from compass.tenders.enums import ContractType, TenderStatus
-from compass.tenders.models import EMBEDDING_DIMENSIONS, Tender
+from compass.tenders.models import Tender
 from compass.tenders.schemas import TenderSchema
 
 
