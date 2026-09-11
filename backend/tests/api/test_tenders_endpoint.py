@@ -174,8 +174,13 @@ def test_the_tender_detail_route_does_not_swallow_the_analysis_route(client: Tes
     A 404 is expected here either way -- that tender doesn't exist -- so the tell is
     *which* endpoint produced it: the analysis route says "has not been analyzed yet",
     the detail route says "Tender not found".
-    """
-    response = client.get("/tenders/TEST-EP-DOES-NOT-EXIST/analysis")
 
-    assert response.status_code == 404
-    assert response.json()["detail"] == "This tender has not been analyzed yet"
+    Checked with a slash-carrying expediente too, and that half is the one that matters:
+    the slash-free case passed even while the analysis routes were declared as a single
+    path segment (5.2), which is exactly why the bug survived a test that only covered it.
+    """
+    for expediente in ("TEST-EP-DOES-NOT-EXIST", "TEST/EP/DOES/NOT/EXIST - con barras"):
+        response = client.get(f"/tenders/{expediente}/analysis")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "This tender has not been analyzed yet"

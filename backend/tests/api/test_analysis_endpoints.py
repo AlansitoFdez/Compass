@@ -24,6 +24,14 @@ from compass.tenders.models import Tender
 
 TEST_HASH = "e" * 64
 
+# The shape a real PLACSP expediente actually has -- slashes, a space and an accent all
+# at once (`2026/S-ABT/0000025771 - Gestión de expedientes` is a live one). The tests
+# below run every route against this, not only against a slash-free identifier: until
+# 5.2 the analysis routes matched a single path segment, so none of them reached this
+# endpoint at all for the 2.282 of 3.583 corpus expedientes that carry a slash, and a
+# suite written only around `TEST-EP-...` names had no way to notice.
+REAL_SHAPED_EXPEDIENTE = "TEST/EP/2026/0001 - Análisis con barras"
+
 # A minimal, syntactically valid extraction requiring the one certification the
 # real seeded provider actually declares (see `mcp__postgres__execute_sql`
 # check during planning: `certifications: ['ENS', 'ISO 27001']`) and no
@@ -124,6 +132,55 @@ async def test_post_analyze_enqueues_the_task_and_returns_202(
         mocked_task.delay.assert_called_once_with(expediente)
     finally:
         await _cleanup(db_session, expediente)
+
+
+async def test_post_analyze_reaches_the_analysis_route_for_a_real_shaped_expediente(
+    db_session: AsyncSession, client: TestClient
+) -> None:
+    """Protects the routing itself, not the handler: with the expediente declared as a
+    single path segment this POST never reached `trigger_analysis` at all and came back
+    405, because `GET /tenders/{expediente:path}` was the only route that matched.
+    """
+    try:
+        db_session.add(_tender(REAL_SHAPED_EXPEDIENTE, pcap_url="https://fake/pliego.pdf"))
+        await db_session.commit()
+
+        with patch("compass.api.routes.analysis.analyze_tender_task") as mocked_task:
+            response = client.post(f"/tenders/{REAL_SHAPED_EXPEDIENTE}/analyze")
+
+        assert response.status_code == 202
+        # The expediente survives the round trip through the URL intact -- the slashes
+        # stay separators, the space and the accent come back decoded.
+        mocked_task.delay.assert_called_once_with(REAL_SHAPED_EXPEDIENTE)
+    finally:
+        await _cleanup(db_session, REAL_SHAPED_EXPEDIENTE)
+
+
+async def test_get_analysis_reaches_the_analysis_route_for_a_real_shaped_expediente(
+    db_session: AsyncSession, client: TestClient
+) -> None:
+    """The read half of the same protection: this used to be answered by the tender detail
+    route with "Tender not found", which the dashboard renders as "never analyzed" -- an
+    existing analysis was invisible on two thirds of the corpus.
+    """
+    try:
+        db_session.add(_tender(REAL_SHAPED_EXPEDIENTE, pcap_url="https://fake/pliego.pdf"))
+        await db_session.flush()
+        db_session.add(
+            TenderAnalysis(
+                pdf_hash=TEST_HASH,
+                expediente=REAL_SHAPED_EXPEDIENTE,
+                status=AnalysisStatus.PENDING,
+            )
+        )
+        await db_session.commit()
+
+        response = client.get(f"/tenders/{REAL_SHAPED_EXPEDIENTE}/analysis")
+
+        assert response.status_code == 200
+        assert response.json()["expediente"] == REAL_SHAPED_EXPEDIENTE
+    finally:
+        await _cleanup(db_session, REAL_SHAPED_EXPEDIENTE)
 
 
 async def test_get_analysis_returns_404_when_never_analyzed(client: TestClient) -> None:
