@@ -81,7 +81,7 @@ jobs:
         with:
           # test_vector.py and test_fusion.py run the real embedding model on purpose
           # (2.5): cosine distance over fake vectors would prove nothing. Without this
-          # cache every run would pull ~1 GB from Hugging Face. Keyed on the file that
+          # cache every run would pull ~570 MB from Hugging Face. Keyed on the file that
           # names the model, so switching models invalidates it by itself.
           path: ~/.cache/huggingface
           key: huggingface-${{ runner.os }}-${{ hashFiles('backend/src/compass/matching/embeddings.py') }}

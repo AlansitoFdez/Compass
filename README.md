@@ -1,5 +1,7 @@
 # Compass
 
+[![CI](https://github.com/AlansitoFdez/Compass/actions/workflows/ci.yml/badge.svg)](https://github.com/AlansitoFdez/Compass/actions/workflows/ci.yml)
+
 Radar de **licitaciones públicas** españolas para proveedores que compiten por contratos y no dan abasto revisando los cientos de anuncios que [PLACSP](https://contrataciondelestado.es) publica cada día.
 
 Compass ingiere el feed ATOM/CODICE de PLACSP, filtra ese volumen hasta el puñado de licitaciones relevantes para un proveedor concreto, y usa un agente LLM para leer el pliego de las que sobreviven y emitir un veredicto citado — APTO / APTO CON RESERVAS / NO APTO — contra el perfil de ese proveedor.
@@ -11,7 +13,7 @@ No es un buscador de subvenciones ni de ayudas: es un radar de contratos que la 
 - ✅ **Fase 1 — Ingesta y normalización.** El feed de PLACSP se ingiere de forma incremental (marca de agua sobre `atom:updated`, sin re-recorrer el feed en cada corrida), se parsea el CODICE, se filtra por el vertical de servicios informáticos (CPV división 72) y se persiste con upsert idempotente por `expediente` — una licitación republicada actualiza la misma fila, nunca crea una nueva ni se borra físicamente.
 - ✅ **Fase 2 — Matching híbrido y perfil de proveedor.** Un embudo de tres etapas reduce el corpus completo al puñado que de verdad encaja con un proveedor: filtros duros en SQL, recuperación híbrida (léxica + vectorial) y fusión por Reciprocal Rank Fusion. Nada de esto pasa por un LLM todavía — es determinista y auditable.
 - ✅ **Fase 3 — Agente analista de pliegos.** Un grafo LangGraph descarga el PCAP de una licitación bajo demanda, detecta si tiene capa de texto, extrae los campos que deciden el encaje (solvencia, certificaciones, criterios, garantías, plazos, lotes) contra un esquema Pydantic cerrado, verifica en Python que cada cita existe de verdad en el texto parseado, y calcula el veredicto — nunca el LLM — comparando la extracción contra el perfil del proveedor. Resultado cacheado por hash de documento; el segundo usuario que mire la misma licitación no vuelve a pagar el análisis.
-- 🚧 **Fase 4 — Trazas, coste y evals.** En curso: cada análisis ya queda trazado en Langfuse con tokens y coste reales (4.1-4.2), el golden set alcanzó las 25 entradas hand-anotadas (4.3) y el prompt está endurecido contra inyección (4.5). Pendiente: RAGAS como gate de regresión y CI.
+- 🚧 **Fase 4 — Trazas, coste y evals.** En curso: cada análisis ya queda trazado en Langfuse con tokens y coste reales (4.1-4.2), el golden set alcanzó las 25 entradas hand-anotadas (4.3) y se corre contra el grafo de producción como gate de regresión (4.4), el prompt está endurecido contra inyección (4.5) y cada push pasa por CI — lint, tipos y la suite contra Postgres y Redis reales (4.6). Pendiente: la revisión completa de la fase.
 
 El detalle completo de cada subfase, con la evidencia y el razonamiento detrás de cada decisión, vive en `docs/phases/`.
 
@@ -96,3 +98,9 @@ uv run python -m compass.ingestion.historical_loader
 ```
 
 `uv run pytest` corre la suite completa contra Postgres y Redis reales (necesita la infraestructura de arriba levantada).
+
+## CI
+
+Cada push a `main` y cada pull request pasan por [GitHub Actions](.github/workflows/ci.yml): `ruff check`, `ruff format --check`, `mypy --strict` y la suite de tests contra un Postgres con pgvector y un Redis reales, levantados como *service containers* con las mismas imágenes que `docker-compose.yml`.
+
+**Tres tests no corren ahí**, marcados con `@pytest.mark.real_corpus` y deseleccionados con `-m "not real_corpus"`: comparan el golden set y el embudo contra el corpus real de PLACSP persistido en local, y contra un corpus sintético no probarían nada. El eval de regresión del golden set (`uv run python -m compass.analysis.regression_eval`) queda fuera de CI por el mismo motivo — lee de esa misma base — y porque una corrida consume 25 de las 50 peticiones diarias del nivel gratuito de OpenRouter.
