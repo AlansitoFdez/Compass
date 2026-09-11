@@ -35,18 +35,20 @@ Medido contra el corpus real (persistido desde PLACSP) y el perfil de proveedor 
 | Etapa | Sobreviven |
 |---|---|
 | Corpus completo (Fase 1) | 3.583 |
-| Etapa 1 — en plazo de presentación | 508 |
-| Etapa 1 — + CPV del proveedor | 131 |
-| Etapa 1 — + rango de presupuesto | 61 |
-| Etapa 1 — + ámbito geográfico | 61 |
-| Etapa 2 — recuperación léxica (`tsvector`, al menos un término compartido) | 28 |
-| Etapa 2 — recuperación vectorial (embebidas, listas para rankear) | 61 |
-| Fusión RRF — únicas tras combinar ambos rankings | **52** |
-| — de las cuales, encontradas por ambos recuperadores | 26 |
-| — solo por el léxico | 2 |
-| — solo por el vectorial | 24 |
+| Etapa 1 — se pueden presentar todavía | 76 |
+| Etapa 1 — + CPV del proveedor | 27 |
+| Etapa 1 — + rango de presupuesto | 6 |
+| Etapa 1 — + ámbito geográfico | 6 |
+| Etapa 2 — recuperación léxica (`tsvector`, al menos un término compartido) | 3 |
+| Etapa 2 — recuperación vectorial (embebidas, listas para rankear) | 6 |
+| Fusión RRF — únicas tras combinar ambos rankings | **6** |
+| — de las cuales, encontradas por ambos recuperadores | 3 |
+| — solo por el léxico | 0 |
+| — solo por el vectorial | 3 |
 
-**La premisa del diseño híbrido, confirmada con números reales**: 24 de las 52 licitaciones finales (46%) las trajo *solo* el recuperador vectorial — se habrían perdido con una búsqueda puramente léxica. Y el léxico sigue aportando 2 que el vectorial no vio. Ninguno de los dos por sí solo cubre lo que cubren juntos.
+**La premisa del diseño híbrido, confirmada con números reales**: 3 de las 6 licitaciones finales las trajo *solo* el recuperador vectorial — se habrían perdido con una búsqueda puramente léxica.
+
+**Sobre la primera etapa**: hasta la 5.4 filtraba solo por el código de estado que publica PLACSP, y esa cifra era 508. Pero PLACSP no mueve ese código de forma fiable cuando vence el plazo: **429 de esas 508 (el 84%) tenían la fecha límite ya pasada**. El embudo las llamaba "en plazo" y el dashboard las enseñaba como tales, junto a un plazo que decía "cerrado". Ahora la etapa exige las dos cosas — estado abierto *y* fecha por vencer — y por eso el número cae de 508 a 76. Es una cifra mucho más pequeña y bastante más cierta: son las que de verdad se pueden presentar hoy.
 
 ### Fase 3 — Análisis de pliegos, coste y tiempo reales
 

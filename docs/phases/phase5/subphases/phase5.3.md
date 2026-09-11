@@ -165,3 +165,39 @@ que construirlo desde `NEXT_PUBLIC_API_URL`, y eso es una decisión de la 5.4.
 `npm run lint` y `npm run build` limpios. Verificado contra la API real: la portada pinta
 3.583 → 508 → 131 → 61 con los números del corpus, los enlaces a expedientes con barras
 funcionan, y el título de pestaña de una ficha nombra la licitación en vez del producto.
+
+### Repaso final, mirando la aplicación en marcha
+
+Levantada la aplicación entera y capturada la pantalla —no sólo comprobado el HTML—
+aparecieron tres cosas que ninguna comprobación automática iba a dar:
+
+**El embudo llamaba "en plazo" a licitaciones cerradas, y eran la mayoría.** En la portada
+se veía la contradicción dentro de la misma tarjeta: "En plazo de presentación" arriba y
+"Plazo cerrado" justo debajo. La Etapa 1 filtraba sólo por el código de estado de PLACSP,
+que no se actualiza de forma fiable al vencer el plazo: **429 de las 508 que el estado
+daba por abiertas (el 84%) tenían la fecha ya pasada**. La etapa exige ahora las dos
+condiciones, y el embudo pasa de `3.583 → 508 → 131 → 61` a `3.583 → 76 → 27 → 6`.
+
+Seis resultados hacen la pantalla más vacía, pero son los que de verdad se pueden
+presentar, y la premisa del diseño híbrido aguanta igual de bien: **3 de los 6 los trajo
+sólo el recuperador vectorial**. Los números del README se han rehecho con esta corrida.
+
+Un efecto colateral que merece quedar escrito: el golden set de la 2.3 se anotó a mano
+contra los supervivientes de Etapa 1 de entonces, y su test comprobaba igualdad exacta con
+los de hoy. Esa igualdad no podía sostenerse — una licitación abandona esa población sola,
+en cuanto vence su plazo. El test pasa a comprobar la contención en la dirección que
+importa para medir recall@k: que no se rankee nada sin etiquetar. Perseguir la igualdad en
+el otro sentido habría significado reanotar en silencio las etiquetas hechas a mano.
+
+**Un fallo propio de la 5.2.** Un análisis hace dos llamadas HTTP —el PCAP a PLACSP y la
+extracción a OpenRouter— y ambas lanzan `HTTPStatusError`, así que el mapeo por tipo
+traducía un 429 del modelo como "el servidor de PLACSP devolvió un error". Encontrado
+mirando una fila real. Ahora se distingue por el host, y el 429 tiene su propio mensaje:
+es el fallo más probable de toda la cadena, porque el nivel gratuito son 50 peticiones al
+día.
+
+**Dos detalles de pantalla.** El embudo escribía `3583` porque `es-ES` no agrupa cuatro
+dígitos por defecto, mientras toda la documentación del proyecto escribe `3.583`. Y la
+explicación del motivo de encaje se repetía idéntica en las veinte tarjetas —casi todas
+son léxico+vectorial—, así que pasa a ser una leyenda única encima del listado, donde el
+caso "solo vectorial" puede llevarse la frase que de verdad merece.

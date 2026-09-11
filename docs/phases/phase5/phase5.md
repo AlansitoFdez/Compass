@@ -43,12 +43,18 @@ dashboard**. Las otras dos se deciden después, con el dashboard delante.
    backend, límites de error y estados de carga, y el rediseño que pone el veredicto y el
    plazo donde deciden. Separado de la 5.2 porque tiene su propio criterio de "hecho".
 
-4. **5.4 — Despliegue** *(alcance por decidir)*
-   Sacar la aplicación de la máquina de desarrollo. Aquí es donde aterriza la implicación
-   real del diseño: la ingesta diaria y el backfill de embeddings son tareas programadas,
-   así que necesitan un proceso vivo a esa hora -- no el portátil de Alan. Decisión
-   pendiente entre un VPS con el `docker compose` entero (beat incluido) y desacoplar el
-   reloj a un cron externo que encole la tarea, dejando vivos solo API y worker.
+4. **5.4 — Empaquetado para ejecutar en local** *(alcance por decidir)*
+   Compass no es un servicio alojado: es una herramienta que el proveedor se descarga y
+   levanta en su propia máquina. Lo que falta, entonces, no es un servidor sino que ese
+   arranque sea de una pieza — hoy son cuatro procesos en cuatro terminales, más un `.env`
+   que hay que rellenar a mano y un modelo de embeddings de ~570 MB que se descarga en la
+   primera petición.
+
+   Lo que hay que decidir aquí: si el backend entero (API, worker y beat) entra en el
+   `docker compose` que ya existe para Postgres y Redis, con el modelo horneado en la
+   imagen en vez de descargado al arrancar; y qué pasa con la ingesta diaria de las 03:00
+   en una máquina que se apaga por las noches — que es el problema que un VPS resolvía
+   solo y aquí no.
 
 5. **5.5 — Digest diario por email** *(candidato a quedar fuera de la v1)*
    Está en el alcance del MVP del documento de diseño y no existe nada de él: ni
