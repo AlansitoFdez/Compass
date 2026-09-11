@@ -1,10 +1,13 @@
 """The process-wide Langfuse client for the pliego analysis graph (Fase 4)."""
 
+import logging
 from functools import lru_cache
 
 from langfuse import Langfuse
 
 from compass.core.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 # Not a confidentiality control -- a PCAP is a public PLACSP document, nothing this
 # graph handles is secret. It exists because LangGraph's CallbackHandler (4.1) traces
@@ -50,13 +53,27 @@ def get_langfuse_client() -> Langfuse:
     one `langfuse.langchain.CallbackHandler()` makes internally) returns this same
     instance instead of building a second one.
 
+    Tracing is optional (5.4). Compass is downloaded and run on the user's own machine,
+    and asking someone who just wants to see it work for a second account somewhere else
+    is a tax on curiosity -- so with no `LANGFUSE_*` keys the client is built with tracing
+    disabled instead of the process refusing to start. Every observation then becomes a
+    no-op, which is why `analysis.graph` can go on calling this unconditionally and knows
+    nothing about whether tracing is configured.
+
     Returns:
-        The shared Langfuse client for this process.
+        The shared Langfuse client for this process, tracing disabled if unconfigured.
     """
     settings = get_settings()
+    configured = bool(settings.langfuse_public_key and settings.langfuse_secret_key)
+    if not configured:
+        logger.info(
+            "Langfuse no está configurado: el análisis funciona igual, sin trazas. "
+            "Añade LANGFUSE_PUBLIC_KEY y LANGFUSE_SECRET_KEY al .env para activarlas."
+        )
     return Langfuse(
         public_key=settings.langfuse_public_key,
         secret_key=settings.langfuse_secret_key,
         base_url=settings.langfuse_base_url,
         mask=_mask_long_text,
+        tracing_enabled=configured,
     )

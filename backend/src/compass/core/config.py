@@ -22,10 +22,14 @@ class Settings(BaseSettings):
             checkpoint store.
         openrouter_api_key: OpenRouter API key used by the pliego analyst
             agent (Fase 3) to call its extraction models.
-        langfuse_public_key: Langfuse Cloud public key (Fase 4) -- identifies
-            the project, safe to appear in client-side code, but still kept
-            here so a missing one fails at startup rather than silently.
-        langfuse_secret_key: Langfuse Cloud secret key (Fase 4).
+        langfuse_public_key: Langfuse Cloud public key (Fase 4), or `None`.
+            Optional on purpose: tracing is how *this* project watches what
+            its model calls cost, not something the tool needs to work, and
+            requiring a second account from someone who just wants to try
+            Compass would be a tax on curiosity. Without both keys the
+            client is built disabled and every observation becomes a no-op
+            (see `analysis.tracing`).
+        langfuse_secret_key: Langfuse Cloud secret key (Fase 4), or `None`.
         langfuse_base_url: Langfuse API host. Defaults to the EU Cloud
             region; override in `.env` if the account lives in another
             region (e.g. `https://us.cloud.langfuse.com`).
@@ -40,9 +44,12 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     database_url: str
     redis_url: str
+    # Required: without it the analyst agent has nothing to call, which is
+    # the one thing Compass cannot do without.
     openrouter_api_key: str
-    langfuse_public_key: str
-    langfuse_secret_key: str
+    # Optional: see the class docstring.
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
     langfuse_base_url: str = "https://cloud.langfuse.com"
     cors_origins: list[str] = ["http://localhost:3000"]
 

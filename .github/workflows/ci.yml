@@ -29,13 +29,15 @@ jobs:
       # doesn't have.
       DATABASE_URL: postgresql://compass:compass@localhost:5432/compass
       REDIS_URL: redis://localhost:6379/0
-      # Required by `Settings`, never used for real: every OpenRouter call is mocked in
-      # the suite and conftest.py disables Langfuse tracing. Placeholders, not secrets --
-      # this job needs no GitHub secret at all, which is itself the proof that the tests
-      # never reach a paid service.
+      # The one key `Settings` requires, never used for real: every OpenRouter call is
+      # mocked in the suite. A placeholder, not a secret -- this job needs no GitHub
+      # secret at all, which is itself the proof that the tests never reach a paid
+      # service.
       OPENROUTER_API_KEY: ci-placeholder
-      LANGFUSE_PUBLIC_KEY: ci-placeholder
-      LANGFUSE_SECRET_KEY: ci-placeholder
+      # No LANGFUSE_* on purpose. They became optional in 5.4, and leaving them unset is
+      # what makes this job exercise the path a downloaded copy actually takes: the client
+      # builds with tracing disabled and every observation is a no-op. Setting
+      # placeholders here would mean that path was never run anywhere.
 
     services:
       db:
