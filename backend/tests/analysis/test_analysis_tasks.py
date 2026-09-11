@@ -14,11 +14,11 @@ import pytest
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from compass.analysis.document import hash_document
+from compass.analysis.document import PcapTooLargeError, hash_document
 from compass.analysis.enums import AnalysisStatus
 from compass.analysis.models import TenderAnalysis
 from compass.analysis.openrouter import CHAT_COMPLETIONS_URL
-from compass.analysis.repository import create_analysis, get_analysis
+from compass.analysis.repository import get_analysis_for_tender, get_or_create_analysis
 from compass.analysis.tasks import LOCK_KEY_TEMPLATE, analyze_tender, analyze_tender_task
 from compass.core.redis_client import get_redis_client
 from compass.tenders.enums import ContractType, TenderStatus
@@ -172,8 +172,9 @@ async def test_analyze_tender_persists_a_completed_analysis_on_a_cache_miss(
         result = await analyze_tender(db_session, client, "TEST-TASK-MISS")
 
         assert result == AnalysisStatus.COMPLETED
-        stored = await get_analysis(db_session, SAMPLE_PLIEGO_HASH)
+        stored = await get_analysis_for_tender(db_session, "TEST-TASK-MISS")
         assert stored is not None
+        assert stored.pdf_hash == SAMPLE_PLIEGO_HASH
         assert stored.status == AnalysisStatus.COMPLETED
         assert stored.extraction is not None
         assert stored.citation_faithfulness == 1.0
@@ -184,14 +185,13 @@ async def test_analyze_tender_persists_a_completed_analysis_on_a_cache_miss(
 async def test_analyze_tender_skips_the_llm_call_on_a_completed_cache_hit(
     db_session: AsyncSession,
 ) -> None:
-    """Protects the whole point of caching by hash: the second lookup at the same
-    document costs one download and zero LLM calls.
+    """Protects the whole point of caching by hash: a second run over the same document,
+    for the same tender, costs one download and zero LLM calls.
     """
     db_session.add(_tender("TEST-TASK-HIT"))
     await db_session.flush()
-    analysis = await create_analysis(
-        db_session, expediente="TEST-TASK-HIT", pdf_hash=SAMPLE_PLIEGO_HASH
-    )
+    analysis = await get_or_create_analysis(db_session, expediente="TEST-TASK-HIT")
+    analysis.pdf_hash = SAMPLE_PLIEGO_HASH
     analysis.status = AnalysisStatus.COMPLETED
     await db_session.flush()
     client = _client(pcap_content=SAMPLE_PLIEGO, extract_handler=None)
@@ -210,9 +210,8 @@ async def test_analyze_tender_skips_the_llm_call_for_a_cached_not_analyzable_doc
     scanned_hash = hash_document(SCANNED_DOCUMENT)
     db_session.add(_tender("TEST-TASK-SCANNED"))
     await db_session.flush()
-    analysis = await create_analysis(
-        db_session, expediente="TEST-TASK-SCANNED", pdf_hash=scanned_hash
-    )
+    analysis = await get_or_create_analysis(db_session, expediente="TEST-TASK-SCANNED")
+    analysis.pdf_hash = scanned_hash
     analysis.status = AnalysisStatus.NOT_ANALYZABLE
     await db_session.flush()
     client = _client(pcap_content=SCANNED_DOCUMENT, extract_handler=None)
@@ -231,9 +230,8 @@ async def test_analyze_tender_retries_a_previously_failed_analysis(
     try:
         db_session.add(_tender("TEST-TASK-RETRY"))
         await db_session.flush()
-        analysis = await create_analysis(
-            db_session, expediente="TEST-TASK-RETRY", pdf_hash=SAMPLE_PLIEGO_HASH
-        )
+        analysis = await get_or_create_analysis(db_session, expediente="TEST-TASK-RETRY")
+        analysis.pdf_hash = SAMPLE_PLIEGO_HASH
         analysis.status = AnalysisStatus.FAILED
         analysis.error_message = "boom"
         await db_session.flush()
@@ -245,11 +243,101 @@ async def test_analyze_tender_retries_a_previously_failed_analysis(
         result = await analyze_tender(db_session, client, "TEST-TASK-RETRY")
 
         assert result == AnalysisStatus.COMPLETED
-        stored = await get_analysis(db_session, SAMPLE_PLIEGO_HASH)
+        stored = await get_analysis_for_tender(db_session, "TEST-TASK-RETRY")
         assert stored is not None
         assert stored.error_message is None
     finally:
         await _cleanup(db_session, "TEST-TASK-RETRY")
+
+
+async def test_analyze_tender_copies_a_cached_extraction_onto_the_second_tenders_row(
+    db_session: AsyncSession,
+) -> None:
+    """Protects the fix for the dead end two tenders sharing a PCAP used to hit.
+
+    The cache still saves the LLM call -- `extract_handler=None` makes any attempt at one
+    blow up -- but the result now lands on *this* tender's own row, so reading its analysis
+    by expediente finds it. Before 5.2 the task returned the other tender's status and
+    wrote nothing, leaving the dashboard on a permanent 404 and a button that did nothing.
+    """
+    try:
+        db_session.add_all([_tender("TEST-TASK-SHARED-A"), _tender("TEST-TASK-SHARED-B")])
+        await db_session.flush()
+        done = await get_or_create_analysis(db_session, expediente="TEST-TASK-SHARED-A")
+        done.pdf_hash = SAMPLE_PLIEGO_HASH
+        done.status = AnalysisStatus.COMPLETED
+        done.extraction = _VALID_EXTRACTION
+        done.citation_faithfulness = 1.0
+        await db_session.commit()
+        client = _client(pcap_content=SAMPLE_PLIEGO, extract_handler=None)
+
+        result = await analyze_tender(db_session, client, "TEST-TASK-SHARED-B")
+
+        assert result == AnalysisStatus.COMPLETED
+        stored = await get_analysis_for_tender(db_session, "TEST-TASK-SHARED-B")
+        assert stored is not None
+        assert stored.extraction == _VALID_EXTRACTION
+        assert stored.citation_faithfulness == 1.0
+    finally:
+        await _cleanup(db_session, "TEST-TASK-SHARED-A")
+        await _cleanup(db_session, "TEST-TASK-SHARED-B")
+
+
+async def test_analyze_tender_records_a_pcap_over_the_download_cap(
+    db_session: AsyncSession,
+) -> None:
+    """Protects the worker against an oversized document, and the user against silence.
+
+    The download is abandoned instead of buffering the whole thing -- with `--pool=solo`
+    an out-of-memory worker takes the daily ingestion down too -- and the reason is
+    recorded as `NOT_ANALYZABLE` so the dashboard can say why rather than leaving the
+    button looking broken.
+    """
+    try:
+        db_session.add(_tender("TEST-TASK-HUGE"))
+        await db_session.flush()
+        client = _client(pcap_content=b"%PDF-" + b"x" * 4096, extract_handler=None)
+
+        with patch("compass.analysis.tasks.download_pcap", side_effect=PcapTooLargeError("50 MB")):
+            result = await analyze_tender(db_session, client, "TEST-TASK-HUGE")
+
+        assert result == AnalysisStatus.NOT_ANALYZABLE
+        stored = await get_analysis_for_tender(db_session, "TEST-TASK-HUGE")
+        assert stored is not None
+        assert stored.pdf_hash is None
+        assert "50 MB" in (stored.error_message or "")
+    finally:
+        await _cleanup(db_session, "TEST-TASK-HUGE")
+
+
+async def test_analyze_tender_downloads_the_pliego_only_once(
+    db_session: AsyncSession,
+) -> None:
+    """Protects against the duplicate download: the task needs the bytes to compute the
+    cache key, and the graph used to fetch the very same file again for itself -- twice the
+    traffic and twice the memory, with a window where the two could disagree.
+    """
+    try:
+        db_session.add(_tender("TEST-TASK-ONEFETCH"))
+        await db_session.flush()
+        downloads = 0
+
+        def handler(request: httpx2.Request) -> httpx2.Response:
+            """Counts PCAP fetches; serves the extraction for the OpenRouter call."""
+            nonlocal downloads
+            if request.url.host != "openrouter.ai":
+                downloads += 1
+                return httpx2.Response(200, content=SAMPLE_PLIEGO)
+            return httpx2.Response(200, content=_sse_body(_VALID_EXTRACTION))
+
+        client = httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+
+        result = await analyze_tender(db_session, client, "TEST-TASK-ONEFETCH")
+
+        assert result == AnalysisStatus.COMPLETED
+        assert downloads == 1
+    finally:
+        await _cleanup(db_session, "TEST-TASK-ONEFETCH")
 
 
 def _lock_key(expediente: str) -> str:

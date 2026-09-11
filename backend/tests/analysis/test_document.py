@@ -1,13 +1,21 @@
-"""Tests for fetch_pcap/hash_document/extract_pages/has_text_layer -- real fixture PDFs,
+"""Tests for download_pcap/hash_document/extract_pages/has_text_layer -- real fixture PDFs,
 no OCR/mocking of the PDF parsing itself; only the HTTP fetch is mocked (no real network calls).
 """
 
+import asyncio
 from pathlib import Path
 
 import httpx2
 import pytest
 
-from compass.analysis.document import extract_pages, fetch_pcap, has_text_layer, hash_document
+from compass.analysis.document import (
+    MAX_PCAP_BYTES,
+    PcapTooLargeError,
+    download_pcap,
+    extract_pages,
+    has_text_layer,
+    hash_document,
+)
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 SAMPLE_PLIEGO = (FIXTURES_DIR / "sample_pliego.pdf").read_bytes()
@@ -54,21 +62,45 @@ def test_has_text_layer_is_false_for_an_empty_page_list() -> None:
     assert has_text_layer([]) is False
 
 
-def test_fetch_pcap_uses_mocked_transport() -> None:
-    """Protects that `fetch_pcap` requests the given URL and returns the raw bytes."""
+def test_download_pcap_returns_the_whole_document() -> None:
+    """Protects the happy path of the streamed download: the bytes come back identical to
+    what the server sent, chunking included.
+    """
 
     def handler(request: httpx2.Request) -> httpx2.Response:
-        """Confirms the requested URL, then serves the real sample fixture's bytes."""
-        assert str(request.url) == "https://fake/pliego.pdf"
+        """Serves the fixture pliego for any request."""
         return httpx2.Response(200, content=SAMPLE_PLIEGO)
 
-    client = httpx2.Client(transport=httpx2.MockTransport(handler))
-    content = fetch_pcap("https://fake/pliego.pdf", client)
+    client = httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
 
-    assert content == SAMPLE_PLIEGO
+    async def run() -> bytes:
+        async with client:
+            return await download_pcap("https://fake/pliego.pdf", client)
+
+    assert asyncio.run(run()) == SAMPLE_PLIEGO
 
 
-def test_fetch_pcap_raises_on_http_error() -> None:
+def test_download_pcap_refuses_a_document_over_the_cap() -> None:
+    """Protects the worker's memory: both callers used to read the whole response with no
+    bound, and `--pool=solo` means one oversized PCAP takes down the daily ingestion too,
+    not just this analysis.
+    """
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        """Serves more bytes than the caller allows."""
+        return httpx2.Response(200, content=b"x" * 2048)
+
+    client = httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+
+    async def run() -> bytes:
+        async with client:
+            return await download_pcap("https://fake/huge.pdf", client, max_bytes=1024)
+
+    with pytest.raises(PcapTooLargeError):
+        asyncio.run(run())
+
+
+def test_download_pcap_raises_on_http_error() -> None:
     """Protects against a 404/5xx (a stale or dead pcap_url) being silently treated as an
     empty document instead of raising.
     """
@@ -77,7 +109,18 @@ def test_fetch_pcap_raises_on_http_error() -> None:
         """Serves a 404 for any request, standing in for a dead pcap_url."""
         return httpx2.Response(404)
 
-    client = httpx2.Client(transport=httpx2.MockTransport(handler))
+    client = httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+
+    async def run() -> bytes:
+        async with client:
+            return await download_pcap("https://fake/missing.pdf", client)
 
     with pytest.raises(httpx2.HTTPStatusError):
-        fetch_pcap("https://fake/missing.pdf", client)
+        asyncio.run(run())
+
+
+def test_the_cap_is_generous_for_a_real_text_pliego() -> None:
+    """Protects against the ceiling being tightened to where it would reject the documents
+    this is supposed to analyze -- a PCAP with a text layer is megabytes, not tens of them.
+    """
+    assert MAX_PCAP_BYTES >= 20 * 1024 * 1024

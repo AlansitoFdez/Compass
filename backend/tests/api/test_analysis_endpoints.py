@@ -10,15 +10,15 @@ dependency runs on a different event loop than pytest-asyncio's, so only a real 
 is guaranteed visible to it.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
-from sqlalchemy import delete
+from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from compass.analysis.enums import AnalysisStatus
-from compass.analysis.models import TenderAnalysis
+from compass.analysis.models import STALE_AFTER_SECONDS, TenderAnalysis
 from compass.tenders.enums import ContractType, TenderStatus
 from compass.tenders.models import Tender
 
@@ -247,6 +247,70 @@ async def test_get_analysis_computes_the_live_verdict_for_a_completed_analysis(
         assert body["extraction"]["certifications"] == ["ISO 27001"]
         assert body["verdict"]["verdict"] == "apto"
         assert body["verdict"]["reasons"] == []
+    finally:
+        await _cleanup(db_session, expediente)
+
+
+async def test_get_analysis_reports_an_abandoned_run_as_failed(
+    db_session: AsyncSession, client: TestClient
+) -> None:
+    """Protects against the dashboard chasing a run nobody is running.
+
+    A worker killed between the commit that sets `IN_PROGRESS` and the one that writes the
+    result leaves a row nothing will ever finish -- the Redis lock expires on its own, the
+    row doesn't. The panel then polls that status every five seconds forever and never
+    shows the button again, because the button only appears for "never analyzed" or
+    "failed". Past the lock's own window, the read settles it.
+    """
+    expediente = "TEST-EP-ANALYSIS-STALE"
+    try:
+        db_session.add(_tender(expediente, pcap_url="https://fake/pliego.pdf"))
+        await db_session.flush()
+        analysis = TenderAnalysis(
+            expediente=expediente,
+            pdf_hash=TEST_HASH,
+            status=AnalysisStatus.IN_PROGRESS,
+        )
+        db_session.add(analysis)
+        await db_session.commit()
+        await db_session.execute(
+            update(TenderAnalysis)
+            .where(TenderAnalysis.expediente == expediente)
+            .values(updated_at=datetime.now(UTC) - timedelta(seconds=STALE_AFTER_SECONDS + 60))
+        )
+        await db_session.commit()
+
+        response = client.get(f"/tenders/{expediente}/analysis")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "failed"
+        assert "interrumpió" in body["error_message"]
+    finally:
+        await _cleanup(db_session, expediente)
+
+
+async def test_get_analysis_leaves_a_recent_in_progress_run_alone(
+    db_session: AsyncSession, client: TestClient
+) -> None:
+    """Protects the other side of the same rule: a run that started seconds ago is work in
+    progress, not a corpse, and must keep reading as `in_progress`.
+    """
+    expediente = "TEST-EP-ANALYSIS-RUNNING"
+    try:
+        db_session.add(_tender(expediente, pcap_url="https://fake/pliego.pdf"))
+        await db_session.flush()
+        db_session.add(
+            TenderAnalysis(
+                expediente=expediente, pdf_hash=TEST_HASH, status=AnalysisStatus.IN_PROGRESS
+            )
+        )
+        await db_session.commit()
+
+        response = client.get(f"/tenders/{expediente}/analysis")
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "in_progress"
     finally:
         await _cleanup(db_session, expediente)
 

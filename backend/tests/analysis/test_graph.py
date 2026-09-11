@@ -15,11 +15,11 @@ import httpx2
 import pytest
 
 from compass.analysis import graph
-from compass.analysis.document import hash_document
+from compass.analysis.document import PcapTooLargeError, hash_document
 from compass.analysis.enums import AnalysisStatus
 from compass.analysis.extraction_schema import PliegoExtraction
 from compass.analysis.graph import analyze_pliego, build_prompt
-from compass.analysis.openrouter import CHAT_COMPLETIONS_URL
+from compass.analysis.openrouter import CHAT_COMPLETIONS_URL, OpenRouterError
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 SAMPLE_PLIEGO = (FIXTURES_DIR / "sample_pliego.pdf").read_bytes()
@@ -248,7 +248,11 @@ async def test_analyze_pliego_fails_when_the_extraction_call_stalls_past_the_wal
     assert result["status"] == AnalysisStatus.FAILED
     error_message = result.get("error_message")
     assert error_message is not None
-    assert "wall-clock cap" in error_message
+    # The message the dashboard renders, not the exception's own text: since 5.2 the graph
+    # maps each failure to something a user can act on, and keeps the raw detail in the log
+    # and the Langfuse trace instead of putting it on screen.
+    assert "tardó demasiado" in error_message
+    assert "wall-clock" not in error_message
     assert call_count == 1
 
 
@@ -329,3 +333,56 @@ async def test_extract_reports_no_cost_details_when_openrouter_reports_no_cost(
     (generation,) = [o for o in spy.observations if o.name == "extract"]
     (update,) = generation.updates
     assert update["cost_details"] is None
+
+
+def test_every_failure_gets_a_message_written_for_a_person() -> None:
+    """Protects the boundary that used to put `str(exc)` on screen.
+
+    Each mapped failure has to name its cause in Spanish and say whether retrying helps,
+    and nothing here may carry the shape of a traceback, a URL or a library name -- the
+    dashboard renders this string verbatim.
+    """
+    failures = [
+        PcapTooLargeError("50 MB"),
+        TimeoutError("extraction call exceeded 300s wall-clock cap"),
+        httpx2.ConnectError("[Errno 111] Connection refused"),
+        OpenRouterError({"message": "rate limited", "code": 429}),
+        RuntimeError("algo inesperado en https://interno/ruta"),
+    ]
+
+    for exc in failures:
+        message = graph._user_facing_error(exc)
+        assert message.endswith(".")
+        assert "http" not in message.lower()
+        assert "Error" not in message
+        assert "Traceback" not in message
+
+
+def test_an_unmapped_failure_points_at_the_log_instead_of_leaking() -> None:
+    """Protects the fallback: an exception nobody anticipated must still not put its own
+    text in front of the user, and must tell them where the detail actually lives.
+    """
+    message = graph._user_facing_error(RuntimeError("psycopg://compass:compass@localhost"))
+
+    assert "compass:compass" not in message
+    assert "log" in message
+
+
+async def test_analyze_pliego_reuses_content_the_caller_already_downloaded() -> None:
+    """Protects the single-download path: given the bytes, the graph must not reach for the
+    network at all -- the task already paid for that download to compute the cache key.
+    """
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        """Fails any PCAP fetch; serves the extraction for the OpenRouter call."""
+        if request.url.host != "openrouter.ai":
+            raise AssertionError(f"unexpected download of {request.url}")
+        return httpx2.Response(200, content=_sse_body(FIXTURE_EXTRACTION))
+
+    client = httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+
+    result = await analyze_pliego(
+        PCAP_URL, api_key="fake-key", client=client, content=SAMPLE_PLIEGO
+    )
+
+    assert result["status"] == AnalysisStatus.COMPLETED
