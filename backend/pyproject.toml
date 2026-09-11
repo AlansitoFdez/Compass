@@ -12,6 +12,13 @@ dependencies = [
     "fastapi>=0.141.1",
     "httpx2>=2.10.0",
     "langchain>=1.4.0",
+    # Nothing in Compass imports langchain-community: it's here only to pin the version
+    # ragas can live with. `ragas/llms/base.py` imports
+    # `langchain_community.chat_models.vertexai` at module scope, and 0.4 removed that
+    # module -- so a plain `uv add ragas` resolves cleanly and then every `import ragas`
+    # dies with ModuleNotFoundError. 0.3.31 still ships it and, despite predating the
+    # langchain 1.x split, imposes no upper bound that clashes with langchain-core 1.6.
+    "langchain-community<0.4",
     "langfuse>=4.15.2",
     "langgraph>=1.2.11",
     "pdfplumber>=0.11.10",

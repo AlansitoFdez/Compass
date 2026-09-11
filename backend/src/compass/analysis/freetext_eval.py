@@ -299,6 +299,10 @@ async def _main() -> None:
     openai_client = AsyncOpenAI(
         base_url=OPENROUTER_BASE_URL,
         api_key=require_openrouter_key(),
+        # One retry, not the SDK's default two: the 429 this run actually meets is the
+        # daily cap, which no amount of retrying resolves, and each attempt is a real
+        # request -- the first dry run spent three of them on a single doomed call.
+        max_retries=1,
         http_client=httpx2.AsyncClient(
             timeout=JUDGE_TIMEOUT_SECONDS, event_hooks={"request": [counter]}
         ),
