@@ -156,3 +156,155 @@ espacio y acento a la vez, como `2026/S-ABT/0000025771 - Gestión de expedientes
 recorren con ella las dos rutas de análisis. El test de orden de routers pasa a comprobar
 también el caso con barras. Los tres fallan contra el código anterior y pasan contra el
 actual, comprobado revirtiendo el cambio.
+
+### C2 — La API sólo arrancaba bien por un efecto colateral
+
+La causa no era la que parecía. `uvicorn.Server.run()` no usa la *policy* global de
+asyncio: pasa `config.get_loop_factory()` explícitamente a `asyncio.run`, y esa fábrica
+(`uvicorn/loops/asyncio.py`) devuelve `ProactorEventLoop` en Windows **salvo cuando
+uvicorn va a lanzar un subproceso**. Una fábrica explícita gana a cualquier *policy*, así
+que fijar la policy —el arreglo que usan los otros cinco puntos de entrada— aquí no habría
+servido de nada.
+
+Esa excepción del subproceso es exactamente por qué `--reload` funcionaba: el recargador
+lanza un subproceso, y esa rama sí devuelve `SelectorEventLoop`. La API servía tráfico
+correctamente sólo por estar en modo desarrollo.
+
+El arreglo es un punto de entrada propio, `python -m compass`, que construye el servidor y
+elige el loop él mismo: `SelectorEventLoop` en Windows, y lo que uvicorn habría elegido en
+cualquier otro sitio, para que una instalación Linux siga usando uvloop igual que antes.
+`--reload` se delega a uvicorn sin tocar nada, porque esa rama ya era correcta. El comando
+documentado en CLAUDE.md cambia en consecuencia.
+
+Los tests fijan la elección con `sys.platform` parcheado en vez de saltarse fuera de
+Windows: CI corre en Linux, que es justo donde una regresión aquí no se notaría.
+
+### C3 — El modelo de embeddings, fuera del event loop
+
+`vector_matches` llamaba a `embed_texts` de forma síncrona en cada petición: cargaba ~570
+MB de pesos en la primera (6,21 s medidos) y gastaba ~0,3 s de CPU en cada una después,
+todo dentro del hilo del event loop, que mientras tanto no atendía a nadie más — `/health`
+pasaba de 0,21 s a 0,33 s con cuatro `/matches` en vuelo.
+
+Dos cambios, y los dos importan por separado. El resultado se **cachea**: sólo existe un
+perfil de proveedor (una fila *singleton*), así que la descripción embebida era
+byte-idéntica en cada llamada. Y el encode se manda a un hilo con `asyncio.to_thread`, para
+que cuando sí haya que calcularlo no congele el proceso entero. El test lo comprueba por
+dónde corre: el hilo del encode no puede ser el del loop.
+
+No se ha llegado a persistir el embedding del proveedor en una columna —la opción de fondo
+del informe—, porque con la caché el modelo ya sólo se carga una vez por proceso y el coste
+por petición desaparece. Queda anotado para la 5.4, donde la memoria del despliegue sí
+decide.
+
+### G3 — El número de la portada
+
+`MatchListResponse(total=len(items))`: el total era el tamaño de página. Con `limit=20`
+decía 20 y con `limit=5` decía 5, y la portada lo imprimía como "N resultados del embudo".
+
+Ahora `total` es la salida real del embudo y `returned` el tamaño de la página, y la
+respuesta lleva además las cuentas por etapa que `funnel_stage_counts` ya calculaba: corpus
+entero → en plazo → CPV → importe → ámbito. Eso no es sólo corregir un número: es lo que
+permite que la portada **cuente** la reducción en vez de afirmarla, y que un resultado
+vacío diga en qué etapa se quedó en lugar de un "no hay nada".
+
+El test que lo protege pide dos veces con límites distintos: el corpus no cambia entre las
+dos llamadas, así que `total` tampoco puede. Es lo que distingue un recuento real del
+tamaño de página, que a simple vista se parecen.
+
+### G1, G2, G4, G6 y M5 — Todos salían de la misma clave
+
+`TenderAnalysis` se escribía con clave primaria `pdf_hash` y se leía siempre por
+`expediente`. De ahí salían cuatro problemas distintos:
+
+- Dos licitaciones con el PCAP byte-idéntico compartían una sola fila. La segunda leía su
+  análisis por expediente, no encontraba nada y respondía "nunca analizado" para siempre,
+  mientras la tarea acertaba en la caché y no escribía nada. Bucle cerrado, sin error
+  visible por ninguna parte (**G2**).
+- Esas mismas dos, analizadas a la vez, insertaban la misma clave primaria y la segunda
+  transacción moría con `IntegrityError`. Hoy lo tapa `--pool=solo`; con `prefork` en
+  Linux, no (**G6**).
+- "El análisis más reciente" ordenaba por `created_at`, cuyo `server_default` es `now()` —
+  congelado durante toda una transacción, así que dos filas escritas juntas empataban
+  (**M5**).
+
+La clave pasa a ser `expediente`: una fila por licitación, reescrita en sitio. Lo que la
+clave por hash servía —no repetir la llamada cara al LLM— no necesitaba ser la identidad de
+la fila: `find_cached_extraction` busca el documento por un índice sobre `pdf_hash` y copia
+la extracción ya validada sobre la fila de *esta* licitación. Mismo ahorro, sin dos
+licitaciones compartiendo identidad. Y la lectura vuelve a ser un acceso por clave primaria,
+con lo que el empate desaparece solo.
+
+La migración va escrita a mano: `--autogenerate` ve una clave primaria cambiando de columna
+como "tira la identidad de la tabla y construye otra", sin saber que antes hay que
+deduplicar las filas. Comprobada de ida y vuelta, y `alembic check` no detecta diferencias
+con los modelos.
+
+Encima de eso, dos límites que faltaban:
+
+- **G1**: una corrida cuyo worker muere entre el `commit` que marca `IN_PROGRESS` y el que
+  escribe el resultado dejaba una fila que nadie iba a terminar nunca — el lock de Redis
+  caduca solo, la fila no. La lectura la resuelve como fallida una vez pasado el plazo que
+  ese lock protegía, y la constante es literalmente la misma para los dos, para que no
+  puedan separarse.
+- **G4**: el PCAP se descargaba dos veces por análisis, las dos bufereando la respuesta
+  entera sin tope. Ahora se descarga una sola vez, en *streaming*, con un techo de 50 MB, y
+  los bytes se le pasan al grafo por su contexto —no por el estado, que Langfuse traza y
+  donde unos bytes de PDF no se pueden enmascarar ni sirven de nada. Un documento por
+  encima del tope se registra como no analizable en vez de tumbar al worker, que con
+  `--pool=solo` se llevaría por delante también la ingesta diaria.
+
+### G7 — Lo que lee el usuario cuando algo falla
+
+El límite de error del grafo guardaba `str(exc)` y el panel lo pintaba tal cual. Ahora cada
+fallo se mapea a un mensaje que nombra la causa y dice si reintentar sirve de algo, y el
+detalle técnico se queda en el log y en la traza de Langfuse, que es donde se lee de verdad.
+El test recorre todos los fallos mapeados y comprueba que ninguno lleva una URL, un
+*traceback* ni el nombre de una librería.
+
+### C5, M7, M8, M9, M11 — Los bordes
+
+**C5** baja de crítico a medio por ser una herramienta local, pero se arregla igual: los
+puertos de Postgres y Redis se publican sólo en los interfaces de loopback. Docker escribe
+sus propias reglas de cortafuegos, así que un puerto publicado a secas sigue siendo
+alcanzable desde toda la red local aunque el cortafuegos del sistema parezca cerrado — con
+credenciales de desarrollo en la base de datos y ninguna autenticación en Redis, que además
+guarda los *checkpoints* de ingesta. Se mapean **los dos** loopback, no sólo el IPv4:
+publicando únicamente `127.0.0.1`, `localhost` resuelve primero a `::1` en Windows y cada
+conexión pagaba ~2 s de *timeout* antes de caer al IPv4 — medido en el momento, porque la
+suite pasó de 12 s a más de dos minutos.
+
+**M7**: una descripción sin lexemas significativos construía un `tsquery` vacío, y
+`to_tsquery('')` es un error de sintaxis que se llevaba `GET /matches` entero. Los lexemas
+se resuelven ahora en su propia consulta, y si no hay ninguno se salta la mitad léxica. La
+primera versión metía un `nullif` dentro de la expresión anidada, y eso resultó convertir la
+consulta de ranking de milisegundos en **130 segundos**: el planificador dejaba de tratar el
+`tsquery` como una constante. Queda escrito en el propio módulo, porque es exactamente el
+tipo de cambio que parece inocuo.
+
+**M8**: el cargador histórico dejaba su ZIP temporal de ~200 MB si la descarga se cortaba a
+mitad, porque el único código que lo borraba vivía en una función a la que nunca llegaba la
+ruta. **M9**: el cliente HTTP síncrono dentro de una corrutina se queda —es correcto ahí,
+porque esa tarea es dueña de su loop—, pero con un comentario que lo marca como deliberado
+y lo contrasta con C3, que es el mismo patrón donde sí hace daño. **M11**: el modo *offline*
+de Alembic construía su URL con `str(engine.url)`, que enmascara la contraseña, así que el
+SQL que emitía llevaba una URL incapaz de conectar.
+
+**M10**: CLAUDE.md decía "Fase 1 cerrada, siguiente Fase 2" con el repositorio en la 5.2, y
+presentaba como decisión abierta el modelo de embeddings, cerrado desde la 2.4. Actualizado,
+junto con el comando de arranque de la API que cambia por C2.
+
+### Lo que queda para la 5.3
+
+Los trece hallazgos de frontend (E1–E13) y los cuatro medios que viven en el dashboard: el
+`setInterval` con *callback* asíncrono (M1), el error que no se limpia tras un reintento con
+éxito (M2), los enlaces sin codificar frente a un cliente de API que sí codifica (M3), las
+cabeceras de seguridad ausentes en `next.config.ts` (M6) y la falta de `generateMetadata` en
+la ficha (M12). **G5** —que el dashboard no tiene ningún límite de error— entra ahí también,
+por tocar los mismos ficheros.
+
+### Estado al cerrar
+
+236 tests en verde, `ruff check`, `ruff format --check` y `mypy --strict` limpios. Los tres
+criterios de aceptación se cumplen, y el primero está verificado contra la API levantada y
+el corpus real, no simulado.
