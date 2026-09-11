@@ -1,12 +1,13 @@
-"""GET /tenders — list tenders with basic filters and pagination."""
+"""GET /tenders — list tenders with basic filters and pagination, and read one by expediente."""
 
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from compass.core.db import get_db
 from compass.tenders.enums import TenderStatus
+from compass.tenders.models import Tender
 from compass.tenders.repository import list_tenders
 from compass.tenders.schemas import TenderListResponse, TenderSchema
 
@@ -52,3 +53,29 @@ async def get_tenders(
         limit=limit,
         offset=offset,
     )
+
+
+# Declared after the list route, and with a literal prefix that can't swallow it: FastAPI
+# matches in declaration order, so a path param this broad registered first would capture
+# every later `/tenders/...` path too.
+@router.get("/{expediente:path}")
+async def get_tender(expediente: str, session: AsyncSession = Depends(get_db)) -> TenderSchema:
+    """One tender by its expediente.
+
+    Exists for the dashboard's tender page (5.1), which has to work on a reload or a
+    shared link -- not only when arrived at from the list, carrying the data along.
+
+    `:path` in the route, unlike every other param in this API: real PLACSP expedientes
+    carry slashes (`SER/2026/0000006435`, `300/2026/01246`), and the default converter
+    stops at the first one, so those tenders would 404 on their own detail page.
+
+    Raises:
+        HTTPException: 404 if no tender has this expediente.
+
+    Returns:
+        The tender, in the same shape the list endpoint serializes.
+    """
+    tender = await session.get(Tender, expediente)
+    if tender is None:
+        raise HTTPException(status_code=404, detail="Tender not found")
+    return TenderSchema.model_validate(tender)

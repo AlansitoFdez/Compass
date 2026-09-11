@@ -29,6 +29,9 @@ class Settings(BaseSettings):
         langfuse_base_url: Langfuse API host. Defaults to the EU Cloud
             region; override in `.env` if the account lives in another
             region (e.g. `https://us.cloud.langfuse.com`).
+        cors_origins: Origins the browser is allowed to call this API from
+            (Fase 5) -- the dashboard's dev server by default. A list, not
+            a wildcard: see `compass.main.create_app`.
     """
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -41,6 +44,7 @@ class Settings(BaseSettings):
     langfuse_public_key: str
     langfuse_secret_key: str
     langfuse_base_url: str = "https://cloud.langfuse.com"
+    cors_origins: list[str] = ["http://localhost:3000"]
 
 
 @lru_cache

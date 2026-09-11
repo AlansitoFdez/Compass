@@ -119,3 +119,63 @@ def test_get_tenders_rejects_negative_offset(client: TestClient) -> None:
     response = client.get("/tenders", params={"offset": -1})
 
     assert response.status_code == 422
+
+
+async def test_get_tender_returns_one_tender_by_expediente(
+    db_session: AsyncSession, client: TestClient
+) -> None:
+    """Protects the dashboard's tender page (5.1): a tender is readable on its own,
+    not only as part of a list response.
+    """
+    expediente = "TEST-EP-DETAIL"
+    try:
+        await _seed(db_session, _tender(expediente, title="Portal web municipal"))
+
+        response = client.get(f"/tenders/{expediente}")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["expediente"] == expediente
+        assert body["title"] == "Portal web municipal"
+    finally:
+        await _cleanup(db_session)
+
+
+async def test_get_tender_finds_an_expediente_containing_slashes(
+    db_session: AsyncSession, client: TestClient
+) -> None:
+    """Protects the `:path` converter against the shape of real PLACSP expedientes.
+
+    `SER/2026/0000006435` and `300/2026/01246` are real entries in the golden set --
+    with the default converter, which stops at the first slash, their own detail page
+    would 404.
+    """
+    expediente = "TEST/EP/2026/0001"
+    try:
+        await _seed(db_session, _tender(expediente))
+
+        response = client.get(f"/tenders/{expediente}")
+
+        assert response.status_code == 200
+        assert response.json()["expediente"] == expediente
+    finally:
+        await _cleanup(db_session)
+
+
+def test_get_tender_returns_404_for_an_unknown_expediente(client: TestClient) -> None:
+    """Protects the missing case: a 404, not a 500 or an empty object."""
+    assert client.get("/tenders/TEST-EP-DOES-NOT-EXIST").status_code == 404
+
+
+def test_the_tender_detail_route_does_not_swallow_the_analysis_route(client: TestClient) -> None:
+    """Protects the router order (5.1): `/tenders/{expediente:path}` matches slashes, so
+    registered before the analysis router it would answer `/tenders/X/analysis` itself.
+
+    A 404 is expected here either way -- that tender doesn't exist -- so the tell is
+    *which* endpoint produced it: the analysis route says "has not been analyzed yet",
+    the detail route says "Tender not found".
+    """
+    response = client.get("/tenders/TEST-EP-DOES-NOT-EXIST/analysis")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "This tender has not been analyzed yet"
