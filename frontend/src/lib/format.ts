@@ -1,0 +1,73 @@
+/**
+ * Display helpers: Spanish labels for the API's closed vocabularies, and number/date
+ * formatting in the locale a Spanish procurement officer expects.
+ *
+ * The backend speaks English identifiers on purpose (see CLAUDE.md); the translation
+ * to what a user reads lives here, in one place, instead of being spelled out inline
+ * in every component.
+ */
+
+import type { AnalysisStatus, TenderStatus, Verdict } from "@/lib/api";
+
+const TENDER_STATUS_LABELS: Record<TenderStatus, string> = {
+  prior_notice: "Anuncio previo",
+  open_for_submission: "En plazo de presentación",
+  pending_award: "Pendiente de adjudicación",
+  awarded: "Adjudicada",
+  resolved: "Resuelta",
+  cancelled: "Anulada",
+};
+
+const VERDICT_LABELS: Record<Verdict, string> = {
+  apto: "APTO",
+  apto_con_reservas: "APTO CON RESERVAS",
+  no_apto: "NO APTO",
+};
+
+const ANALYSIS_STATUS_LABELS: Record<AnalysisStatus, string> = {
+  pending: "En cola",
+  in_progress: "Analizando el pliego…",
+  completed: "Análisis completado",
+  failed: "El análisis falló",
+  not_analyzable: "Pliego no analizable",
+};
+
+export function tenderStatusLabel(status: TenderStatus): string {
+  return TENDER_STATUS_LABELS[status] ?? status;
+}
+
+export function verdictLabel(verdict: Verdict): string {
+  return VERDICT_LABELS[verdict] ?? verdict;
+}
+
+export function analysisStatusLabel(status: AnalysisStatus): string {
+  return ANALYSIS_STATUS_LABELS[status] ?? status;
+}
+
+/** Budgets arrive as strings: they are `Decimal` server-side, and JSON has no decimals. */
+export function formatEur(amount: string | number | null): string {
+  if (amount === null) return "Sin importe publicado";
+  const value = typeof amount === "string" ? Number(amount) : amount;
+  if (Number.isNaN(value)) return "Sin importe publicado";
+  return new Intl.NumberFormat("es-ES", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+export function formatDate(iso: string | null): string {
+  if (iso === null) return "Sin fecha";
+  return new Intl.DateTimeFormat("es-ES", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(iso));
+}
+
+/** Days left until `iso`, or `null` when there is no date to count down to. */
+export function daysUntil(iso: string | null): number | null {
+  if (iso === null) return null;
+  const millisecondsPerDay = 1000 * 60 * 60 * 24;
+  return Math.ceil((new Date(iso).getTime() - Date.now()) / millisecondsPerDay);
+}

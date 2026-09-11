@@ -117,3 +117,38 @@ jobs:
         # docs/phases/phase4/subphases/phase4.6.md for the exact list and why faking
         # that corpus would make them prove nothing.
         run: uv run pytest -m "not real_corpus"
+
+  frontend:
+    name: Dashboard lint and build
+    runs-on: ubuntu-latest
+
+    # No services and no dependency on the backend job: the dashboard reads the API at
+    # request time, never at build time (every route is `force-dynamic`), so building it
+    # needs no database and no running API.
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        # `npm ci` over `npm install`: it installs exactly package-lock.json and fails if
+        # the lock and package.json disagree -- the same guarantee `uv sync --locked`
+        # gives the backend job.
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        # Type-checks as part of the build (see next.config.ts: nothing disables it), so
+        # this is the types gate for the frontend too -- the route types Next generates
+        # only exist once a build has run, which is why there is no separate `tsc` step.
+        run: npm run build
