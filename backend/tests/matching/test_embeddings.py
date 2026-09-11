@@ -3,11 +3,15 @@ a fake embedding would validate nothing about whether the vectors it produces ar
 useful for ranking.
 """
 
+import asyncio
 import math
+import threading
+from unittest.mock import patch
 
 import pytest
 
-from compass.matching.embeddings import embed_texts
+from compass.matching import embeddings as embeddings_module
+from compass.matching.embeddings import embed_query, embed_texts
 from compass.tenders.models import EMBEDDING_DIMENSIONS
 
 
@@ -41,3 +45,81 @@ def test_embed_texts_places_similar_titles_closer_than_unrelated_ones() -> None:
         return sum(x * y for x, y in zip(a, b, strict=True))
 
     assert cosine(query, similar) > cosine(query, unrelated)
+
+
+@pytest.fixture(autouse=True)
+def _clear_query_cache() -> None:
+    """Keeps `embed_query`'s cache from leaking a hit between tests -- it's module state,
+    deliberately shared by the whole process, so a test that asserts on a miss has to
+    start from empty.
+    """
+    embeddings_module._query_cache.clear()
+
+
+async def test_embed_query_matches_embed_texts_for_the_same_string() -> None:
+    """Protects that the cached/threaded path returns the same vector as the direct one --
+    it exists to move the work, not to change the answer.
+    """
+    (expected,) = embed_texts(["Mantenimiento de portal web institucional"])
+
+    assert await embed_query("Mantenimiento de portal web institucional") == expected
+
+
+async def test_embed_query_encodes_once_per_distinct_text() -> None:
+    """Protects the cache: there is exactly one provider profile, so `GET /matches` embeds
+    the same paragraph on every request -- ~0.3s of CPU each time, for a byte-for-byte
+    identical result.
+    """
+    with patch.object(embeddings_module, "embed_texts", wraps=embeddings_module.embed_texts) as spy:
+        first = await embed_query("Portal web municipal")
+        second = await embed_query("Portal web municipal")
+        await embed_query("Suministro de mobiliario")
+
+    assert first == second
+    assert spy.call_count == 2
+
+
+async def test_embed_query_runs_the_model_off_the_event_loop() -> None:
+    """Protects the other half of the fix: `SentenceTransformer.encode` is synchronous CPU
+    work, and calling it straight from a coroutine froze the whole API process, not just
+    the request that asked for it.
+
+    The tell is the thread it runs on -- `asyncio.to_thread` hands it to the executor, so
+    it must not be the thread the event loop is running on.
+    """
+    loop_thread = threading.current_thread().ident
+    seen: list[int | None] = []
+
+    def recording_embed_texts(texts: list[str]) -> list[list[float]]:
+        seen.append(threading.current_thread().ident)
+        return [[0.0] * EMBEDDING_DIMENSIONS for _ in texts]
+
+    with patch.object(embeddings_module, "embed_texts", recording_embed_texts):
+        await embed_query("Un texto cualquiera")
+
+    assert seen == [seen[0]]
+    assert seen[0] != loop_thread
+    assert loop_thread == threading.current_thread().ident
+    assert asyncio.get_running_loop().is_running()
+
+
+def test_embed_texts_raises_instead_of_asserting_on_a_wrong_dimension() -> None:
+    """Protects the dimension check surviving `python -O`, which strips `assert` outright.
+
+    A vector of the wrong length written to the `Vector(768)` column fails in Postgres,
+    far from whatever actually produced it, so this has to fail at the source.
+    """
+
+    class _WrongSizeModel:
+        def encode(self, texts: list[str], normalize_embeddings: bool) -> object:
+            class _Array:
+                def tolist(self) -> list[list[float]]:
+                    return [[0.0] * (EMBEDDING_DIMENSIONS - 1) for _ in texts]
+
+            return _Array()
+
+    with (
+        patch.object(embeddings_module, "_get_model", _WrongSizeModel),
+        pytest.raises(ValueError, match=str(EMBEDDING_DIMENSIONS)),
+    ):
+        embed_texts(["lo que sea"])
