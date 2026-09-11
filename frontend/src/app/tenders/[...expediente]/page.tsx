@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { AnalysisPanel } from "@/components/analysis/AnalysisPanel";
 import { TenderDocuments } from "@/components/tenders/TenderDocuments";
 import { TenderFacts } from "@/components/tenders/TenderFacts";
-import { ApiError, getAnalysis, getTender } from "@/lib/api";
+import { ApiError, getAnalysis, getCapabilities, getTender } from "@/lib/api";
 
 // Same reasoning as the list: always live. The analysis status in particular changes while
 // the page is being looked at.
@@ -56,9 +56,13 @@ export default async function TenderPage({
     throw error;
   }
 
-  // Read on the server so the panel arrives already knowing the state: no flash of "sin
-  // analizar" on a tender that was analyzed days ago.
-  const analysis = await getAnalysis(expediente);
+  // Both read on the server so the panel arrives already knowing the state: no flash of
+  // "sin analizar" on a tender that was analyzed days ago, and no button offered on an
+  // installation that has no key to honour it with.
+  const [analysis, capabilities] = await Promise.all([
+    getAnalysis(expediente),
+    getCapabilities(),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -79,6 +83,7 @@ export default async function TenderPage({
         expediente={expediente}
         hasPcap={tender.pcap_url !== null}
         initialAnalysis={analysis}
+        canAnalyze={capabilities.analysis}
       />
 
       <TenderFacts tender={tender} />

@@ -5,6 +5,7 @@
 import { ApiError, request } from "@/lib/api/client";
 import type {
   AnalysisResult,
+  Capabilities,
   MatchList,
   Provider,
   Tender,
@@ -79,4 +80,9 @@ export function saveProvider(profile: Provider): Promise<Provider> {
 /** Enqueues the initial corpus load. Answers 202; progress is watched via `getMatches`. */
 export function triggerBackfill(): Promise<{ detail: string }> {
   return request("/ingestion/backfill", { method: "POST" });
+}
+
+/** What this installation can do, given its configuration. */
+export function getCapabilities(): Promise<Capabilities> {
+  return request("/capabilities");
 }

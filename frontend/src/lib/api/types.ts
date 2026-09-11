@@ -156,3 +156,17 @@ export type Provider = {
   certifications: string[] | null;
   locations: string[] | null;
 };
+
+/**
+ * What this installation is configured to do.
+ *
+ * Both keys are optional (5.4, 5.5), so a freshly downloaded Compass runs with neither.
+ * The dashboard reads this to say what is missing *before* someone clicks something that
+ * would then fail -- never to decide whether a request is allowed, which is the API's job.
+ */
+export type Capabilities = {
+  /** Whether a pliego can be analyzed at all. `false` means no OpenRouter key. */
+  analysis: boolean;
+  /** Whether runs are traced to Langfuse. Changes nothing a user can see. */
+  tracing: boolean;
+};

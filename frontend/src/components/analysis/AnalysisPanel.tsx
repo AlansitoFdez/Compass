@@ -25,10 +25,13 @@ export function AnalysisPanel({
   expediente,
   hasPcap,
   initialAnalysis,
+  canAnalyze,
 }: {
   expediente: string;
   hasPcap: boolean;
   initialAnalysis: AnalysisResult | null;
+  /** Whether this installation has an OpenRouter key. See `GET /capabilities`. */
+  canAnalyze: boolean;
 }) {
   const {
     analysis,
@@ -39,6 +42,24 @@ export function AnalysisPanel({
     error,
     start,
   } = useAnalysisPolling(expediente, initialAnalysis);
+
+  // Said before anyone clicks, not after a 503 comes back. The key is optional on
+  // purpose (5.5) so Compass runs with nothing configured; this is the one screen where
+  // that choice is visible, so it has to explain itself rather than look broken.
+  if (!canAnalyze) {
+    return (
+      <Card as="section" className="p-5">
+        <h2 className="text-sm font-semibold">Análisis del pliego</h2>
+        <p className="mt-2 max-w-prose text-sm text-muted">
+          Para leer el pliego y calcular el veredicto hace falta una clave de OpenRouter,
+          que es gratuita. Añade{" "}
+          <code className="font-mono text-xs text-foreground">OPENROUTER_API_KEY</code> a{" "}
+          <code className="font-mono text-xs text-foreground">backend/.env</code> y reinicia
+          Compass. Todo lo demás —la ingesta, el embudo y este listado— funciona sin ella.
+        </p>
+      </Card>
+    );
+  }
 
   if (!hasPcap) {
     return (
