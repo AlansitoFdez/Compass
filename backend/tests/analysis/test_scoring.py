@@ -1,14 +1,7 @@
-"""Tests for the pure scoring logic behind the 3.4 model comparison -- not the live
-OpenRouter calls, which `uv run python -m compass.analysis.extraction_eval` makes on
-demand as this subphase's decision tool (see phase3.4.md for the real run's numbers).
+"""Tests for the golden-set field-scoring logic -- built in 3.4 for the model
+comparison, reused as-is in 4.4's regression gate over the full golden set.
 """
 
-from compass.analysis.extraction_eval import (
-    _cert_tokens,
-    _nums_match,
-    _price_points,
-    score_extraction,
-)
 from compass.analysis.extraction_schema import (
     AwardCriteria,
     AwardCriterion,
@@ -22,6 +15,7 @@ from compass.analysis.extraction_schema import (
     SubmissionDeadline,
     TechnicalSolvency,
 )
+from compass.analysis.scoring import _cert_tokens, _nums_match, _price_points, score_extraction
 
 
 def _minimal_extraction(**overrides: object) -> PliegoExtraction:
