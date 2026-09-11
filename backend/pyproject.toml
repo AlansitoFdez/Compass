@@ -22,6 +22,11 @@ dependencies = [
     "redis>=8.1.0",
     "sentence-transformers>=6.0.1",
     "sqlalchemy>=2.0.51",
+    # Dependencia de sentence-transformers, declarada aquí a propósito: solo una
+    # dependencia directa admite `[tool.uv.sources]`, y ese es el único punto donde
+    # se puede elegir la variante CPU del wheel en Linux (ver más abajo). No añade
+    # nada al entorno -- ya estaba instalada como transitiva.
+    "torch>=2.14.0",
     "uvicorn[standard]>=0.52.1",
 ]
 
@@ -37,6 +42,19 @@ dev = [
     "pytest-asyncio>=1.4.0",
     "ruff>=0.16.2",
 ]
+
+# CI (4.6) corre en Linux, donde el `torch` de PyPI que arrastra sentence-transformers
+# viene con toda la pila CUDA detrás: ~3,3 GB de instalación, de los cuales ~2,6 GB son
+# wheels de NVIDIA que un runner sin GPU no llega a usar nunca. El índice CPU de PyTorch
+# deja esa instalación en ~320 MB (196 MB de ellos, el propio wheel de torch). Solo para Linux: en Windows el wheel de PyPI ya es
+# CPU-only, así que el entorno local de desarrollo no cambia.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 
 [tool.ruff]
 line-length = 100
