@@ -3,16 +3,43 @@
 /*
  * One palette, defined light-first and re-declared for dark, so every component can
  * speak in roles (surface, border, muted) instead of hardcoding a color per element.
+ *
+ * Extended in 5.3 with the parts that were missing and were being improvised per
+ * component: a type scale, radii, elevation, and semantic colors for the three verdicts.
+ * The amber and red of APTO CON RESERVAS / NO APTO used to be written inline as Tailwind
+ * utility classes, which is how they ended up outside the system that every other color
+ * belongs to -- and how they ended up with no dark-mode consideration at all.
  */
 :root {
   --background: #f7f7f5;
   --surface: #ffffff;
   --surface-muted: #f1f1ee;
   --foreground: #1a1a18;
-  --muted: #6b6b63;
+  /* Darkened from #6b6b63 in 5.3: over --surface-muted it measured ~4.3:1, under the
+     4.5:1 AA needs for small text -- and that is exactly the pair used by every grid
+     label and the match-origin chip. */
+  --muted: #5d5d55;
   --border: #e2e2dc;
   --accent: #1f6f5c;
+  --accent-strong: #17574a;
   --accent-soft: #e6f0ec;
+
+  /* Verdict, and only verdict. Kept apart from --accent on purpose: the accent is the
+     product's own color and says "interactive", while these three say "this is the
+     answer". Reusing the accent for APTO would make the two meanings indistinguishable. */
+  --verdict-pass: #1f6f5c;
+  --verdict-pass-soft: #e6f0ec;
+  --verdict-warn: #8a5a08;
+  --verdict-warn-soft: #fbf1de;
+  --verdict-fail: #a4261c;
+  --verdict-fail-soft: #fbeae8;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  --shadow-raised: 0 1px 2px rgb(26 26 24 / 0.05), 0 1px 3px rgb(26 26 24 / 0.04);
+  --shadow-lifted: 0 2px 4px rgb(26 26 24 / 0.05), 0 12px 28px -20px rgb(26 26 24 / 0.5);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -21,10 +48,21 @@
     --surface: #1a1a17;
     --surface-muted: #211f1c;
     --foreground: #ededea;
-    --muted: #9a9a90;
+    --muted: #a3a399;
     --border: #2e2c28;
     --accent: #57c3a3;
+    --accent-strong: #7ad6bb;
     --accent-soft: #16302a;
+
+    --verdict-pass: #57c3a3;
+    --verdict-pass-soft: #14302a;
+    --verdict-warn: #e0ac52;
+    --verdict-warn-soft: #332813;
+    --verdict-fail: #ef8378;
+    --verdict-fail-soft: #37201d;
+
+    --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.5);
+    --shadow-lifted: 0 2px 4px rgb(0 0 0 / 0.5), 0 12px 32px -22px rgb(0 0 0 / 0.9);
   }
 }
 
@@ -36,7 +74,23 @@
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
   --color-accent-soft: var(--accent-soft);
+
+  --color-verdict-pass: var(--verdict-pass);
+  --color-verdict-pass-soft: var(--verdict-pass-soft);
+  --color-verdict-warn: var(--verdict-warn);
+  --color-verdict-warn-soft: var(--verdict-warn-soft);
+  --color-verdict-fail: var(--verdict-fail);
+  --color-verdict-fail-soft: var(--verdict-fail-soft);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --shadow-raised: var(--shadow-raised);
+  --shadow-lifted: var(--shadow-lifted);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -45,4 +99,44 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/*
+ * One focus style for the whole app. Browsers give keyboard focus a default ring, but it
+ * inherits the element's own color and disappears against the accent buttons -- so it is
+ * declared once here rather than remembered per component.
+ */
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/*
+ * The uppercase labels that name every field in a definition grid. A class rather than
+ * four repeated utilities, because they have to stay identical across three components
+ * for the grids to read as one object.
+ */
+.field-label {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Digits that sit in columns -- amounts, days, scores -- line up instead of shimmying. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

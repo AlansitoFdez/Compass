@@ -2,9 +2,9 @@
  * Display helpers: Spanish labels for the API's closed vocabularies, and number/date
  * formatting in the locale a Spanish procurement officer expects.
  *
- * The backend speaks English identifiers on purpose (see CLAUDE.md); the translation
- * to what a user reads lives here, in one place, instead of being spelled out inline
- * in every component.
+ * The backend speaks English identifiers on purpose (see CLAUDE.md); the translation to
+ * what a user reads lives here, in one place, instead of being spelled out inline in
+ * every component.
  */
 
 import type { AnalysisStatus, TenderStatus, Verdict } from "@/lib/api";
@@ -24,9 +24,17 @@ const VERDICT_LABELS: Record<Verdict, string> = {
   no_apto: "NO APTO",
 };
 
+/** What each verdict actually means for the reader, under the label itself. */
+const VERDICT_SUMMARIES: Record<Verdict, string> = {
+  apto: "Nada en el pliego bloquea ni condiciona tu candidatura.",
+  apto_con_reservas:
+    "Puedes presentarte, pero hay requisitos que tu perfil no permite verificar.",
+  no_apto: "Hay requisitos que tu perfil no cumple.",
+};
+
 const ANALYSIS_STATUS_LABELS: Record<AnalysisStatus, string> = {
   pending: "En cola",
-  in_progress: "Analizando el pliego…",
+  in_progress: "Analizando el pliego",
   completed: "Análisis completado",
   failed: "El análisis falló",
   not_analyzable: "Pliego no analizable",
@@ -38,6 +46,10 @@ export function tenderStatusLabel(status: TenderStatus): string {
 
 export function verdictLabel(verdict: Verdict): string {
   return VERDICT_LABELS[verdict] ?? verdict;
+}
+
+export function verdictSummary(verdict: Verdict): string {
+  return VERDICT_SUMMARIES[verdict] ?? "";
 }
 
 export function analysisStatusLabel(status: AnalysisStatus): string {
@@ -65,9 +77,41 @@ export function formatDate(iso: string | null): string {
   }).format(new Date(iso));
 }
 
+/** Thousands separators in the Spanish convention, for the funnel's counts. */
+export function formatCount(value: number): string {
+  return new Intl.NumberFormat("es-ES").format(value);
+}
+
 /** Days left until `iso`, or `null` when there is no date to count down to. */
 export function daysUntil(iso: string | null): number | null {
   if (iso === null) return null;
   const millisecondsPerDay = 1000 * 60 * 60 * 24;
   return Math.ceil((new Date(iso).getTime() - Date.now()) / millisecondsPerDay);
+}
+
+/** How urgent a submission deadline is -- what the deadline pill colors itself by. */
+export type DeadlineUrgency = "none" | "closed" | "critical" | "soon" | "comfortable";
+
+export function deadlineUrgency(days: number | null): DeadlineUrgency {
+  if (days === null) return "none";
+  if (days < 0) return "closed";
+  if (days <= 3) return "critical";
+  if (days <= 7) return "soon";
+  return "comfortable";
+}
+
+/** "quedan 4 días" / "vence hoy" / "quedó cerrado", said the way a person would. */
+export function deadlineText(days: number | null): string {
+  if (days === null) return "Sin plazo publicado";
+  if (days < 0) return "Plazo cerrado";
+  if (days === 0) return "Vence hoy";
+  if (days === 1) return "Queda 1 día";
+  return `Quedan ${days} días`;
+}
+
+/** Elapsed seconds as `m:ss`, for the analysis timer. */
+export function formatElapsed(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const rest = Math.floor(seconds % 60);
+  return `${minutes}:${rest.toString().padStart(2, "0")}`;
 }
