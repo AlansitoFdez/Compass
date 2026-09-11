@@ -580,14 +580,12 @@ dependencies = [
     { name = "fastapi" },
     { name = "httpx2" },
     { name = "langchain" },
-    { name = "langchain-community" },
     { name = "langfuse" },
     { name = "langgraph" },
     { name = "pdfplumber" },
     { name = "pgvector" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
-    { name = "ragas" },
     { name = "redis" },
     { name = "sentence-transformers" },
     { name = "sqlalchemy" },
@@ -599,9 +597,11 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "celery-types" },
+    { name = "langchain-community" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "ragas" },
     { name = "ruff" },
 ]
 
@@ -612,14 +612,12 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "httpx2", specifier = ">=2.10.0" },
     { name = "langchain", specifier = ">=1.4.0" },
-    { name = "langchain-community", specifier = "<0.4" },
     { name = "langfuse", specifier = ">=4.15.2" },
     { name = "langgraph", specifier = ">=1.2.11" },
     { name = "pdfplumber", specifier = ">=0.11.10" },
     { name = "pgvector", specifier = ">=0.4.1" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
     { name = "pydantic-settings", specifier = ">=2.15.0" },
-    { name = "ragas", specifier = ">=0.4.3" },
     { name = "redis", specifier = ">=8.1.0" },
     { name = "sentence-transformers", specifier = ">=6.0.1" },
     { name = "sqlalchemy", specifier = ">=2.0.51" },
@@ -631,9 +629,11 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "celery-types", specifier = ">=0.26.0" },
+    { name = "langchain-community", specifier = "<0.4" },
     { name = "mypy", specifier = ">=2.3.1" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
+    { name = "ragas", specifier = ">=0.4.3" },
     { name = "ruff", specifier = ">=0.16.2" },
 ]
 

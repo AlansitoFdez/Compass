@@ -12,20 +12,12 @@ dependencies = [
     "fastapi>=0.141.1",
     "httpx2>=2.10.0",
     "langchain>=1.4.0",
-    # Nothing in Compass imports langchain-community: it's here only to pin the version
-    # ragas can live with. `ragas/llms/base.py` imports
-    # `langchain_community.chat_models.vertexai` at module scope, and 0.4 removed that
-    # module -- so a plain `uv add ragas` resolves cleanly and then every `import ragas`
-    # dies with ModuleNotFoundError. 0.3.31 still ships it and, despite predating the
-    # langchain 1.x split, imposes no upper bound that clashes with langchain-core 1.6.
-    "langchain-community<0.4",
     "langfuse>=4.15.2",
     "langgraph>=1.2.11",
     "pdfplumber>=0.11.10",
     "pgvector>=0.4.1",
     "psycopg[binary]>=3.3.4",
     "pydantic-settings>=2.15.0",
-    "ragas>=0.4.3",
     "redis>=8.1.0",
     "sentence-transformers>=6.0.1",
     "sqlalchemy>=2.0.51",
@@ -48,6 +40,18 @@ dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.16.2",
+    # Only `analysis/freetext_eval.py` imports it, and that script is run by hand (5.6),
+    # never by the API or the worker. Here and not in `dependencies` so the image the
+    # Dockerfile builds with `--no-dev` doesn't carry pandas, pyarrow and datasets: 177 MB
+    # measured in the venv, most of it pyarrow, for a script no container ever runs.
+    "ragas>=0.4.3",
+    # Not a dependency of Compass, a constraint ragas imposes: `ragas/llms/base.py`
+    # imports `langchain_community.chat_models.vertexai` at module scope, and
+    # langchain-community 0.4 removed that module when it aligned with langchain 1.x. So
+    # `uv add ragas` resolves cleanly and then every `import ragas` dies with
+    # ModuleNotFoundError. 0.3.31 still ships it and declares no upper bound that clashes
+    # with the langchain-core 1.6 the project already runs.
+    "langchain-community<0.4",
 ]
 
 # CI (4.6) corre en Linux, donde el `torch` de PyPI que arrastra sentence-transformers
