@@ -15,6 +15,8 @@ No es un buscador de subvenciones ni de ayudas: es un radar de contratos que la 
 - ✅ **Fase 3 — Agente analista de pliegos.** Un grafo LangGraph descarga el PCAP de una licitación bajo demanda, detecta si tiene capa de texto, extrae los campos que deciden el encaje (solvencia, certificaciones, criterios, garantías, plazos, lotes) contra un esquema Pydantic cerrado, verifica en Python que cada cita existe de verdad en el texto parseado, y calcula el veredicto — nunca el LLM — comparando la extracción contra el perfil del proveedor. Resultado cacheado por hash de documento; el segundo usuario que mire la misma licitación no vuelve a pagar el análisis.
 - ✅ **Fase 4 — Trazas, coste y evals.** Cada análisis queda trazado en Langfuse con tokens y coste reales; el golden set llegó a 25 pliegos anotados a mano y se corre contra el grafo de producción como gate de regresión; el prompt está endurecido contra inyección (delimitadores que el propio documento no puede cerrar); y cada push pasa por CI con lint, tipos y la suite contra Postgres y Redis reales.
 
+- ✅ **Fase 5 — Dashboard.** Dos pantallas en Next.js sobre la misma API que consumiría cualquier otro cliente: el listado de matches, que enseña la reducción del embudo con sus cuentas por etapa y el porqué del encaje de cada licitación, y la ficha, con el análisis del pliego bajo demanda y el veredicto citado. Entre medias, una revisión completa de la aplicación contra el corpus real (`docs/phases/phase5/subphases/phase5.2.md`) que encontró 37 fallos — el mayor, que las rutas de análisis no casaban con los 2.282 expedientes cuyo identificador lleva una barra: el agente estaba apagado en dos de cada tres licitaciones que el propio dashboard enseñaba.
+
 El detalle completo de cada subfase, con la evidencia y el razonamiento detrás de cada decisión, vive en `docs/phases/`.
 
 ## El embudo, con números reales
@@ -90,7 +92,7 @@ docker compose up -d
 # Desde backend/, con un .env configurado
 cd backend
 uv run alembic upgrade head
-uv run uvicorn compass.main:app --reload   # API en http://localhost:8000/docs
+uv run python -m compass --reload          # API en http://localhost:8000/docs
 
 # En otras dos terminales, para la ingesta diaria y el backfill de embeddings
 uv run celery -A compass.core.celery_app worker --pool=solo --loglevel=info
@@ -114,4 +116,4 @@ npm run dev   # http://localhost:3000
 
 Cada push a `main` y cada pull request pasan por [GitHub Actions](.github/workflows/ci.yml): `ruff check`, `ruff format --check`, `mypy --strict` y la suite de tests contra un Postgres con pgvector y un Redis reales, levantados como *service containers* con las mismas imágenes que `docker-compose.yml`.
 
-**Tres tests no corren ahí**, marcados con `@pytest.mark.real_corpus` y deseleccionados con `-m "not real_corpus"`: comparan el golden set y el embudo contra el corpus real de PLACSP persistido en local, y contra un corpus sintético no probarían nada. El eval de regresión del golden set (`uv run python -m compass.analysis.regression_eval`) queda fuera de CI por el mismo motivo — lee de esa misma base — y porque una corrida consume 25 de las 50 peticiones diarias del nivel gratuito de OpenRouter.
+**Cinco tests no corren ahí**, marcados con `@pytest.mark.real_corpus` y deseleccionados con `-m "not real_corpus"`: comparan el golden set y el embudo contra el corpus real de PLACSP persistido en local, y contra un corpus sintético no probarían nada. El eval de regresión del golden set (`uv run python -m compass.analysis.regression_eval`) queda fuera de CI por el mismo motivo — lee de esa misma base — y porque una corrida consume 25 de las 50 peticiones diarias del nivel gratuito de OpenRouter.

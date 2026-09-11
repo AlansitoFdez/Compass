@@ -77,9 +77,15 @@ export function formatDate(iso: string | null): string {
   }).format(new Date(iso));
 }
 
-/** Thousands separators in the Spanish convention, for the funnel's counts. */
+/**
+ * Thousands separators in the Spanish convention, for the funnel's counts.
+ *
+ * `useGrouping: "always"` because the default leaves four-digit numbers ungrouped in
+ * `es-ES` -- so the corpus rendered as "3583" on screen while every document about this
+ * project writes it "3.583".
+ */
 export function formatCount(value: number): string {
-  return new Intl.NumberFormat("es-ES").format(value);
+  return new Intl.NumberFormat("es-ES", { useGrouping: "always" }).format(value);
 }
 
 /** Days left until `iso`, or `null` when there is no date to count down to. */

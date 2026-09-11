@@ -290,11 +290,6 @@ _ERROR_MESSAGES: tuple[tuple[type[BaseException] | tuple[type[BaseException], ..
         "Suele funcionar al reintentarlo.",
     ),
     (
-        httpx2.HTTPStatusError,
-        "No se pudo descargar el pliego: el servidor de PLACSP devolvió un error. "
-        "Puede que el enlace haya caducado.",
-    ),
-    (
         httpx2.HTTPError,
         "No se pudo conectar para descargar el pliego o consultar al modelo. "
         "Comprueba la conexión y reinténtalo.",
@@ -315,6 +310,38 @@ _FALLBACK_ERROR_MESSAGE = (
 )
 
 
+def _http_status_message(exc: httpx2.HTTPStatusError) -> str:
+    """Tells apart the two very different HTTP calls one analysis makes.
+
+    Both the PCAP download and the OpenRouter completion raise `HTTPStatusError`, so
+    matching on the type alone reported a rate-limited model as a dead PLACSP link --
+    caught against a real stored row whose message was a 429 from
+    `openrouter.ai/api/v1/chat/completions`. The request's own host separates them.
+
+    Args:
+        exc: The status error that reached the graph's boundary.
+
+    Returns:
+        The message for whichever of the two calls actually failed.
+    """
+    if exc.request.url.host.endswith("openrouter.ai"):
+        if exc.response.status_code == 429:
+            # By far the likeliest failure of the whole pipeline: the free tier allows 50
+            # requests a day, shared with the regression evals.
+            return (
+                "Se ha agotado la cuota de peticiones del modelo (nivel gratuito de "
+                "OpenRouter, 50 al día). Vuelve a intentarlo mañana."
+            )
+        return (
+            "El servicio del modelo devolvió un error. Suele funcionar al reintentarlo "
+            "en unos minutos."
+        )
+    return (
+        "No se pudo descargar el pliego: el servidor de PLACSP devolvió un error. "
+        "Puede que el enlace haya caducado."
+    )
+
+
 def _user_facing_error(exc: BaseException) -> str:
     """A message for the person reading the dashboard, never the raw exception text.
 
@@ -324,6 +351,8 @@ def _user_facing_error(exc: BaseException) -> str:
     Returns:
         The mapped message for that failure, or a generic one that points at the log.
     """
+    if isinstance(exc, httpx2.HTTPStatusError):
+        return _http_status_message(exc)
     for exception_types, message in _ERROR_MESSAGES:
         if isinstance(exc, exception_types):
             return message
