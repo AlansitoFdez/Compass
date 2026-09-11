@@ -10,12 +10,8 @@ from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
 from compass.core.db import Base
+from compass.matching.embedding_model import EMBEDDING_DIMENSIONS
 from compass.tenders.enums import ContractType, TenderStatus
-
-# Fixed by the 2.4 decision (ibm-granite/granite-embedding-278m-multilingual):
-# see docs/phases/phase2/subphases/phase2.4.md. Changing the model later means
-# migrating this column's dimension, not editing a constant.
-EMBEDDING_DIMENSIONS = 768
 
 
 class Tender(Base):

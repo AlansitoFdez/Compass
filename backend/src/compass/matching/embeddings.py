@@ -9,12 +9,7 @@ import asyncio
 
 from sentence_transformers import SentenceTransformer
 
-from compass.tenders.models import EMBEDDING_DIMENSIONS
-
-# Decided in 2.4 by measuring real recall@k against a golden set -- see
-# docs/phases/phase2/subphases/phase2.4.md. Its 768-dimensional output is
-# what fixes tenders.models.EMBEDDING_DIMENSIONS.
-EMBEDDING_MODEL_NAME = "ibm-granite/granite-embedding-278m-multilingual"
+from compass.matching.embedding_model import EMBEDDING_DIMENSIONS, EMBEDDING_MODEL_NAME
 
 # Loaded once per process and reused -- the model's weights are ~500MB, not
 # something to reload on every call. A Celery worker (--pool=solo) and a
