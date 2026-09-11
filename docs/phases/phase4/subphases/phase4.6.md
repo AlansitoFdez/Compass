@@ -154,8 +154,9 @@ Corrida verde (`bb5273d`), **136 s en total**:
 
 El `torch==2.14.0+cpu` del log es la confirmación de que el índice CPU se aplicó de verdad
 en el runner, no solo en el lock. La caché de Hugging Face falló en esta corrida (`Cache not
-found`, era la primera) y se guardó al terminar: a partir de la siguiente, el modelo no se
-vuelve a descargar.
+found`, era la primera) y se guardó al terminar. La corrida siguiente (`1fb6627`) lo
+confirma: `Cache restored from key: huggingface-Linux-...` y los tests bajan de 17,22 s a
+**12,56 s** sin volver a descargar el modelo.
 
 ### Cierre
 
