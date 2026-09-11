@@ -93,3 +93,48 @@ se escribe aquí.
 6. `uv run pytest`, `ruff check`, `ruff format --check` y `mypy` limpios, y CI en verde.
 
 ## Progreso
+
+### RAGAS entra, pero no por donde decía el plan
+
+La compatibilidad estaba comprobada al planificar: `ragas 0.4.3` resuelve con Python 3.13
+y con el `langchain 1.4.0` del proyecto. Resolver e importar, sin embargo, son cosas
+distintas — `uv add ragas` terminó limpio y el primer `import ragas` murió:
+
+```
+ModuleNotFoundError: No module named 'langchain_community.chat_models.vertexai'
+```
+
+`ragas/llms/base.py` importa ese módulo en la cabecera, sin protección, y
+`langchain-community 0.4` lo borró al alinearse con la versión 1.x de langchain. O sea que
+**ragas 0.4.3 —la última— no arranca en ningún entorno con langchain 1.x**, que es
+exactamente el entorno que la planificación dio por bueno. Y no hay versión posterior de
+ragas donde esté arreglado.
+
+Lo que sí funciona es fijar `langchain-community<0.4`: la 0.3.31 todavía trae el módulo y,
+pese a ser anterior al corte de la 1.x, no declara tope que choque con `langchain-core
+1.6.2`. Queda en `pyproject.toml` como dependencia directa con su comentario, porque no es
+una dependencia del producto —Compass no importa nada de `langchain_community`— sino una
+restricción que impone ragas. Verificado que el grafo de análisis y ragas conviven en el
+mismo intérprete, y que la suite entera sigue en verde.
+
+### Las dos llamadas por muestra, confirmadas leyendo el código
+
+`Faithfulness.ascore` hace exactamente dos: una que parte la descripción en afirmaciones
+atómicas y otra que emite un veredicto por afirmación contra el contexto. Nada más. El
+presupuesto, entonces, es de **14 peticiones por pliego** (7 descripciones × 2) menos las
+que se salten por no tener cita — unos tres pliegos por día en el nivel gratuito.
+
+Pero `ascore` devuelve sólo el número agregado, y con el número solo **el criterio 5 es
+imposible**: no hay forma de abrir el pliego y comprobar si el juez acertó si no se sabe
+qué afirmación rechazó ni por qué. Así que el script llama a los dos pasos de RAGAS por
+separado —sus prompts, sus esquemas, su misma fórmula— y se queda con los veredictos por
+afirmación, con su razón. Mismo coste, y la evidencia delante.
+
+### Contando lo que se gasta, no lo que se pide
+
+El contador de peticiones va enganchado al transporte del cliente de OpenAI, no a las
+llamadas del script. La diferencia apareció en la primera corrida en seco: **una sola
+llamada condenada gastó tres peticiones HTTP**, porque el SDK reintenta dos veces por su
+cuenta. Contar las llamadas que hace el script habría dicho «1» mientras la cuota bajaba de
+tres en tres. Los reintentos del SDK quedan en uno: el 429 que este script encuentra de
+verdad es el tope diario, y ése no lo arregla ningún reintento.
