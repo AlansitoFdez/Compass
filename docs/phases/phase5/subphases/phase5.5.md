@@ -173,3 +173,28 @@ Criterios 1, 2, 3 y 5, cumplidos y verificados levantando la pila de verdad. El 
 pendiente** hasta que la cuota diaria de OpenRouter se renueve — el camino está verificado
 de punta a punta salvo el eslabón de una extracción con éxito, que la Fase 3 y los evals de
 la 4.4 ya cubren contra el golden set.
+
+### El criterio 4, cerrado al día siguiente
+
+La cuota se renueva a las **00:00 UTC** —02:00 en Madrid—, y lo dice la propia respuesta de
+OpenRouter: junto al 429 viaja `X-RateLimit-Limit: 50`, `X-RateLimit-Remaining: 0` y un
+`X-RateLimit-Reset` en milisegundos que apuntaba exactamente a esa medianoche. No es «vuelve
+mañana» a ojo: es una hora concreta.
+
+Pasada esa hora, el mismo expediente de la víspera, `INN 26 002` —el primer match del
+proveedor—, analizado desde el dashboard: estado `in_progress` mientras el grafo descarga
+las 98 páginas y llama al modelo, y a los ~100 segundos **veredicto NO APTO con sus dos
+razones citadas**, la extracción completa campo a campo con su cláusula y su página, y la
+fidelidad de citas en 56%. Capturado de la pantalla, no del `curl`.
+
+Con eso, los cinco criterios de la 5.5 están cumplidos.
+
+**Y el análisis trajo un hallazgo que no es de esta subfase.** Una de las dos razones del
+NO APTO es la certificación `ISO/IEC 20000`, que en ese pliego **no es un requisito: es un
+criterio de adjudicación que da 6 puntos** («s'atorgaran 6 punts en el cas de disposar
+qualsevol dels següents certificats»). El modelo la metió en `certifications`, que el
+cálculo del veredicto trata como exigencia, y el resultado es un **falso NO APTO**: se
+descarta una licitación a la que el proveedor sí podía presentarse. El esquema le dice al
+modelo que no incluya papeleo administrativo, pero no le dice que distinga *exigido* de
+*puntuado*. Anotado para la revisión de fase (5.8); es el tipo de error más caro que este
+producto puede cometer, porque se manifiesta como silencio.
