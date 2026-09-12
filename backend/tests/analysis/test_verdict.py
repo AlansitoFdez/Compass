@@ -283,3 +283,51 @@ def test_a_blocking_reason_cites_that_certification_and_not_the_list() -> None:
     result = compute_verdict(extraction, provider)
 
     assert result.reasons[0].citation == own_citation
+
+
+def test_a_required_name_that_is_not_a_certification_reserves_instead_of_blocking() -> None:
+    """The 5.8 finding that the role field alone could not fix. Re-analyzed under the new
+    schema, the model still returned `required_to_bid` for the four team profiles of
+    `INN 26 002`'s clause F.3 -- which is a staffing requirement, not a certification.
+    Blocking on those is a silent false NO APTO, the one failure this product can't
+    afford, so the code checks the claim instead of taking it.
+    """
+    extraction = _extraction(certifications=[_certification("Responsable tècnic del projecte")])
+    provider = _provider(certifications=["ISO 27001"])
+
+    result = compute_verdict(extraction, provider)
+
+    assert result.verdict == Verdict.APTO_CON_RESERVAS
+    assert len(result.reasons) == 1
+    assert "Responsable tècnic del projecte" in result.reasons[0].detail
+
+
+def test_the_reservation_still_carries_the_clause_it_came_from() -> None:
+    """Protects the reader's way out: downgrading a block to a reservation must not cost
+    the citation, because checking it by hand is exactly what the reservation asks for.
+    """
+    extraction = _extraction(certifications=[_certification("Declaración responsable")])
+    provider = _provider()
+
+    result = compute_verdict(extraction, provider)
+
+    assert result.reasons[0].citation == CERTIFICATIONS_CITATION
+
+
+def test_a_real_standard_the_profile_lacks_still_blocks() -> None:
+    """Protects the guard from swallowing true positives. `1583900M` demands ISO 9001,
+    ISO 27001/ENS and ISO 14001 as solvencia técnica under arts. 93-94 LCSP; a profile
+    holding only one of them cannot bid, and must still be told so.
+    """
+    extraction = _extraction(
+        certifications=[
+            _certification("Certificación de Calidad ISO9001 o equivalente, en vigor"),
+            _certification("Certificado de Gestión Ambiental ISO14001 o equivalente, en vigor"),
+        ]
+    )
+    provider = _provider(certifications=["ISO/IEC 27001:2013"])
+
+    result = compute_verdict(extraction, provider)
+
+    assert result.verdict == Verdict.NO_APTO
+    assert len(result.reasons) == 2
