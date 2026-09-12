@@ -5,7 +5,9 @@ profile -- CPV, budget range, and geographic scope -- plus a fixed "still
 biddable" filter (open status *and* a deadline that hasn't passed; see
 `_status_filter`). Nothing here ranks or scores
 a tender; a tender either survives every filter or it doesn't. Semantic
-ranking is Etapa 2, a later subphase.
+ranking is Etapa 2 (`matching.lexical`, `matching.vector` and `matching.fusion`,
+built in 2.3-2.6), which reuses `build_filters` to stay scoped to these same
+survivors.
 """
 
 from dataclasses import dataclass
@@ -49,12 +51,13 @@ def _status_filter() -> ColumnElement[bool]:
     """Only tenders a provider could actually still bid on ever reach them.
 
     Two conditions, not one, and the second is what makes this stage mean what it says.
-    Until 5.4 this checked only PLACSP's own `status` code -- but PLACSP does not reliably
+    Until 5.3 this checked only PLACSP's own `status` code -- but PLACSP does not reliably
     move a tender out of `PUB` when its deadline passes, so the code is stale far more
     often than not: of the 508 tenders in the real corpus whose status said "open",
     **429 (84%) had a submission deadline already in the past**. The funnel was calling
     them "en plazo" and the dashboard was showing them as such, right next to a deadline
-    that said "cerrado".
+    that said "cerrado". Re-measured in 5.8 as the corpus grew, the ratio only got worse:
+    1.636 of 1.740.
 
     A tender with no published deadline at all is excluded too, for the same reason
     `_budget_filter` excludes a tender with no budget: the filter exists to answer "can
