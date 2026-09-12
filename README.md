@@ -108,10 +108,14 @@ uv run celery -A compass.core.celery_app worker --pool=solo --loglevel=info
 uv run celery -A compass.core.celery_app beat --loglevel=info
 ```
 
-`uv run pytest` corre los **288 tests** contra Postgres y Redis reales; `uv run ruff check`, `uv run ruff format --check` y `uv run mypy` cierran el resto. Todo eso pasa también en [CI](.github/workflows/ci.yml) en cada push, contra los mismos contenedores de Postgres con pgvector y Redis.
+`uv run pytest` corre los **296 tests** contra Postgres y Redis reales; `uv run ruff check`, `uv run ruff format --check` y `uv run mypy` cierran el resto. Todo eso pasa también en [CI](.github/workflows/ci.yml) en cada push, contra los mismos contenedores de Postgres con pgvector y Redis.
 
 Cinco tests quedan fuera de CI (`@pytest.mark.real_corpus`): comparan el golden set y el embudo contra el corpus real de PLACSP persistido en local, y contra uno sintético no probarían nada. Los evals que llaman al modelo quedan fuera por lo mismo, y porque una corrida se come la cuota diaria del nivel gratuito.
 
 ## El razonamiento completo
 
 Este README cuenta qué es y cómo funciona. **El porqué de cada decisión —con lo que se midió, lo que se descartó y lo que salió mal por el camino— vive en [`docs/phases/`](docs/phases/)**: un documento por subfase, escrito mientras se construía, con la evidencia delante. Ahí está por qué el veredicto no lo emite el modelo, por qué el embudo es híbrido, por qué el golden set tiene 25 pliegos y no 4, y qué encontró cada revisión.
+
+## Licencia
+
+[MIT](LICENSE). Descárgalo, ejecútalo, cámbialo o reutiliza lo que te sirva; lo único que pide es que el aviso de copyright viaje con el código. Sin garantía de ningún tipo: esto lee pliegos y te da una opinión calculada, no asesoramiento jurídico — la decisión de presentarte a una licitación sigue siendo tuya.
