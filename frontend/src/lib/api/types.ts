@@ -78,6 +78,25 @@ export type MatchList = {
 
 export type Citation = { clause: string; page: number; quote: string };
 
+/**
+ * Why the pliego names a certification -- and so whether it can block the bid.
+ *
+ * Only `required_to_bid` reaches the verdict. The other two exist because a pliego
+ * genuinely names certifications it merely scores, or that every bidder files as
+ * paperwork, and reporting those as requirements is what produced false NO APTO
+ * verdicts before 5.8.
+ */
+export type CertificationRole =
+  | "required_to_bid"
+  | "award_criterion"
+  | "administrative_paperwork";
+
+export type RequiredCertification = {
+  name: string;
+  role: CertificationRole;
+  citation: Citation | null;
+};
+
 export type PliegoExtraction = {
   economic_solvency: {
     minimum_annual_turnover_eur: number | null;
@@ -89,8 +108,7 @@ export type PliegoExtraction = {
     description: string;
     citation: Citation | null;
   };
-  certifications: string[];
-  certifications_citation: Citation | null;
+  certifications: RequiredCertification[];
   award_criteria: {
     total_points: number;
     criteria: { name: string; points: number; is_price: boolean }[];
@@ -102,7 +120,14 @@ export type PliegoExtraction = {
     description: string;
     citation: Citation | null;
   };
-  execution_deadline: { description: string; citation: Citation | null };
+  execution_deadline: {
+    /** The base period, before any extension. */
+    description: string;
+    /** `null` means the PCAP doesn't address prórrogas, not that there are none. */
+    extensions_allowed: boolean | null;
+    extensions_description: string | null;
+    citation: Citation | null;
+  };
   submission_deadline: { description: string; citation: Citation | null };
   subcontracting: {
     allowed: boolean;
