@@ -18,7 +18,7 @@ from compass.main import app
 # var, so this disables real network activity for the whole test session without
 # touching how the client is built. Same reasoning as mocking every OpenRouter call
 # in tests instead of hitting it for real -- a test run shouldn't write synthetic
-# traces into Alan's real Langfuse project.
+# traces into the developer's real Langfuse project.
 os.environ.setdefault("LANGFUSE_TRACING_ENABLED", "false")
 
 if sys.platform == "win32":

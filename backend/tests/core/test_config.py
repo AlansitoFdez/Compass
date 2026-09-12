@@ -24,7 +24,7 @@ def _settings(**environment: str) -> Settings:
     """Builds `Settings` from exactly `environment`, ignoring the developer's own .env."""
     with patch.dict("os.environ", {**_MINIMUM_ENVIRONMENT, **environment}, clear=True):
         # _env_file=None: without it pydantic-settings would read the real .env sitting in
-        # backend/, and the test would pass because of Alan's own keys rather than because
+        # backend/, and the test would pass because of the developer's own keys rather than because
         # of what it asserts.
         return Settings(_env_file=None)
 
