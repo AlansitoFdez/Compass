@@ -2,136 +2,110 @@
 
 [![CI](https://github.com/AlansitoFdez/Compass/actions/workflows/ci.yml/badge.svg)](https://github.com/AlansitoFdez/Compass/actions/workflows/ci.yml)
 
-Radar de **licitaciones públicas** españolas para proveedores que compiten por contratos y no dan abasto revisando los cientos de anuncios que [PLACSP](https://contrataciondelestado.es) publica cada día.
+**Radar de licitaciones públicas españolas.** [PLACSP](https://contrataciondelestado.es) publica del orden de 800 anuncios cada día. Compass los ingiere, deja los pocos que encajan con tu empresa, y lee el pliego de esos pocos para decirte —con la cláusula y la página delante— si puedes presentarte.
 
-Compass ingiere el feed ATOM/CODICE de PLACSP, filtra ese volumen hasta el puñado de licitaciones relevantes para un proveedor concreto, y usa un agente LLM para leer el pliego de las que sobreviven y emitir un veredicto citado — APTO / APTO CON RESERVAS / NO APTO — contra el perfil de ese proveedor.
+No es un buscador de subvenciones: son contratos que la administración compra, no dinero que reparte.
 
-No es un buscador de subvenciones ni de ayudas: es un radar de contratos que la administración compra, no de dinero que reparte.
+![El listado de matches, con el embudo y el porqué de cada encaje](docs/images/dashboard-matches.png)
 
-## Estado del proyecto
+## Arrancar
 
-- ✅ **Fase 1 — Ingesta y normalización.** El feed de PLACSP se ingiere de forma incremental (marca de agua sobre `atom:updated`, sin re-recorrer el feed en cada corrida), se parsea el CODICE, se filtra por el vertical de servicios informáticos (CPV división 72) y se persiste con upsert idempotente por `expediente` — una licitación republicada actualiza la misma fila, nunca crea una nueva ni se borra físicamente.
-- ✅ **Fase 2 — Matching híbrido y perfil de proveedor.** Un embudo de tres etapas reduce el corpus completo al puñado que de verdad encaja con un proveedor: filtros duros en SQL, recuperación híbrida (léxica + vectorial) y fusión por Reciprocal Rank Fusion. Nada de esto pasa por un LLM todavía — es determinista y auditable.
-- ✅ **Fase 3 — Agente analista de pliegos.** Un grafo LangGraph descarga el PCAP de una licitación bajo demanda, detecta si tiene capa de texto, extrae los campos que deciden el encaje (solvencia, certificaciones, criterios, garantías, plazos, lotes) contra un esquema Pydantic cerrado, verifica en Python que cada cita existe de verdad en el texto parseado, y calcula el veredicto — nunca el LLM — comparando la extracción contra el perfil del proveedor. Resultado cacheado por hash de documento; el segundo usuario que mire la misma licitación no vuelve a pagar el análisis.
-- ✅ **Fase 4 — Trazas, coste y evals.** Cada análisis queda trazado en Langfuse con tokens y coste reales; el golden set llegó a 25 pliegos anotados a mano y se corre contra el grafo de producción como gate de regresión; el prompt está endurecido contra inyección (delimitadores que el propio documento no puede cerrar); y cada push pasa por CI con lint, tipos y la suite contra Postgres y Redis reales.
-
-- ✅ **Fase 5 — Dashboard.** Dos pantallas en Next.js sobre la misma API que consumiría cualquier otro cliente: el listado de matches, que enseña la reducción del embudo con sus cuentas por etapa y el porqué del encaje de cada licitación, y la ficha, con el análisis del pliego bajo demanda y el veredicto citado. Entre medias, una revisión completa de la aplicación contra el corpus real (`docs/phases/phase5/subphases/phase5.2.md`) que encontró 37 fallos — el mayor, que las rutas de análisis no casaban con los 2.282 expedientes cuyo identificador lleva una barra: el agente estaba apagado en dos de cada tres licitaciones que el propio dashboard enseñaba.
-
-El detalle completo de cada subfase, con la evidencia y el razonamiento detrás de cada decisión, vive en `docs/phases/`.
-
-## El embudo, con números reales
-
-Medido contra el corpus real (persistido desde PLACSP) y el perfil de proveedor sembrado (desarrollo y mantenimiento de portales web institucionales, con Drupal/WordPress, para el sector público).
-
-### Fase 1 — Ingesta
-
-| Etapa | Resultado |
-|---|---|
-| PLACSP publica, todas las categorías | del orden de 800 anuncios/día (estimación de diseño, no medida aquí) |
-| Filtrado al vertical de servicios informáticos (CPV división 72) | **3.583** licitaciones persistidas |
-
-### Fase 2 — Matching, para el proveedor sembrado
-
-| Etapa | Sobreviven |
-|---|---|
-| Corpus completo (Fase 1) | 3.583 |
-| Etapa 1 — se pueden presentar todavía | 76 |
-| Etapa 1 — + CPV del proveedor | 27 |
-| Etapa 1 — + rango de presupuesto | 6 |
-| Etapa 1 — + ámbito geográfico | 6 |
-| Etapa 2 — recuperación léxica (`tsvector`, al menos un término compartido) | 3 |
-| Etapa 2 — recuperación vectorial (embebidas, listas para rankear) | 6 |
-| Fusión RRF — únicas tras combinar ambos rankings | **6** |
-| — de las cuales, encontradas por ambos recuperadores | 3 |
-| — solo por el léxico | 0 |
-| — solo por el vectorial | 3 |
-
-**La premisa del diseño híbrido, confirmada con números reales**: 3 de las 6 licitaciones finales las trajo *solo* el recuperador vectorial — se habrían perdido con una búsqueda puramente léxica.
-
-**Sobre la primera etapa**: hasta la 5.4 filtraba solo por el código de estado que publica PLACSP, y esa cifra era 508. Pero PLACSP no mueve ese código de forma fiable cuando vence el plazo: **429 de esas 508 (el 84%) tenían la fecha límite ya pasada**. El embudo las llamaba "en plazo" y el dashboard las enseñaba como tales, junto a un plazo que decía "cerrado". Ahora la etapa exige las dos cosas — estado abierto *y* fecha por vencer — y por eso el número cae de 508 a 76. Es una cifra mucho más pequeña y bastante más cierta: son las que de verdad se pueden presentar hoy.
-
-### Fase 3 — Análisis de pliegos, coste y tiempo reales
-
-Medido con tres análisis end-to-end reales (`POST /tenders/{expediente}/analyze` contra un pliego real del golden set de la 3.4, worker Celery real, modelo `nvidia/nemotron-3-super-120b-a12b:free` real) — no simulados.
-
-| Corrida | Tiempo real | Coste |
-|---|---|---|
-| 1ª | 101 s | 0,00 € |
-| 2ª | 75 s | 0,00 € |
-| 3ª | 260 s | 0,00 € |
-
-**Coste real: 0,00 € por análisis**, en las tres corridas — el nivel gratuito de OpenRouter elegido en la 3.4 se sostiene en producción, no solo en la medición inicial contra el golden set.
-
-**El tiempo varía mucho de una corrida a otra** (75-260 s) porque el modelo es de razonamiento: la mayor parte del tiempo se va en una traza interna antes de emitir el resultado, y esa traza no tiene una duración fija. La 3.9 confirmó que el timeout que protege contra un cuelgue real (300 s) da margen de sobra sobre lo observado, sin cortar una corrida legítima.
-
-### Fase 4 — Coste real, medido con Langfuse
-
-Desde la 4.1, cada análisis queda trazado en [Langfuse](https://langfuse.com) con tokens y coste reales por llamada -- ya no una medición manual puntual como en la 3.9, sino observabilidad real que crece sola con cada análisis que se dispara. Números sobre las **64 trazas reales acumuladas** hasta hoy (`uv run python -m compass.analysis.cost_report`):
-
-| Medida | Valor real |
-|---|---|
-| Análisis con extracción completada | **34** de 64 trazas |
-| Tokens por análisis | 29.988 – 118.486 (**media 58.689**: 47.931 entrada / 10.758 salida) |
-| Coste | **0,00 €** en el 100% |
-| Tiempo real de extremo a extremo | 36 – 338 s (media 161 s) |
-
-**El volumen de entrada varía mucho más de lo esperado** (30.000 a 118.000 tokens según el pliego): el prompt manda el texto completo del PCAP, página a página, sin trocear -- un pliego largo o con formato denso puede doblar o triplicar el de otro con el mismo número de páginas. **Coste real: 0,00 €** en el 100% de los análisis trazados, confirmando en producción -- ahora con tokens reales delante, no solo la cifra final -- lo que la 3.4 ya había medido contra el golden set: el nivel gratuito de OpenRouter se sostiene.
-
-**Las otras 30 trazas quedan fuera de esa media, a propósito**: son llamadas que nunca devolvieron -- el tope de 300 s o los `429` del cupo diario gratuito, casi todas de las corridas del golden set de la 4.4. Promediar sus ceros respondería a "cuánto cuesta un intento", no a "cuánto cuesta analizar un pliego". La 4.7 encontró que el informe sí las estaba promediando, y que además contaba cada reintento como un análisis aparte.
-
-## Stack
-
-Python 3.13 (tipado estricto, `mypy --strict`) · FastAPI async sobre Uvicorn · PostgreSQL 17 + pgvector, vía SQLAlchemy async y Alembic · Celery sobre Redis para la ingesta diaria, el backfill de embeddings y el análisis de pliegos bajo demanda · `ibm-granite/granite-embedding-278m-multilingual` para los embeddings semánticos, corrido en local · LangGraph para el agente analista de pliegos, con `nvidia/nemotron-3-super-120b-a12b:free` (vía OpenRouter) como modelo de extracción · Next.js 16 con React 19 y Tailwind v4 para el dashboard · pytest, ruff.
-
-## Arrancar en local
-
-Compass se ejecuta en tu máquina, no como servicio alojado. Requiere Docker y nada más.
+Hace falta Docker. Nada más: ni Python, ni Node, ni una cuenta en ningún sitio.
 
 ```bash
-cp backend/.env.example backend/.env   # y pon tu clave gratuita de openrouter.ai
+cp backend/.env.example backend/.env
 docker compose up -d
 ```
 
-Eso levanta Postgres, Redis, la API, el worker y el planificador, y aplica las migraciones
-por el camino. La API queda en http://localhost:8000/docs.
+Eso levanta Postgres, Redis, la API, el worker, el planificador y el dashboard, y aplica las migraciones por el camino. El dashboard queda en **http://localhost:3000** y la API en **http://localhost:8000/docs**.
 
-Sólo `OPENROUTER_API_KEY` es obligatoria: es la única sin la que el agente no tiene a quién
-preguntar. Las de Langfuse son opcionales — sirven para ver el coste real de cada análisis,
-y sin ellas todo funciona igual, sin trazas.
+**Ninguna clave es obligatoria.** Con el `.env` recién copiado y vacío, todo funciona salvo el agente: la ingesta, el embudo, el ranking híbrido y el dashboard entero. Cuando pulses «analizar el pliego», la pantalla te dirá qué falta en vez de fallar. Para desbloquearlo, una clave gratuita de [openrouter.ai](https://openrouter.ai) en `OPENROUTER_API_KEY` — nivel gratuito, 50 peticiones al día, 0 €. Las de [Langfuse](https://langfuse.com) son opcionales y sólo sirven para ver el coste real de cada análisis.
 
-Y el dashboard, desde `frontend/`:
+La primera vez, el dashboard te pide el perfil de tu empresa: a qué te dedicas, tus CPV, tu rango de importe, tu facturación y tus certificaciones. Al guardarlo se descargan los últimos tres meses de PLACSP —unos minutos, con el avance en pantalla— y a partir de ahí la ingesta diaria corre sola a las 03:00.
 
-```bash
-npm install
-cp .env.example .env.local
-npm run dev   # http://localhost:3000
-```
+## Cómo funciona
 
-La primera vez te pedirá el perfil de tu empresa —a qué te dedicas, tus CPV, tu rango de
-importe, tu facturación y tus certificaciones—, que es con lo que el embudo filtra y con lo
-que se calcula cada veredicto. Al guardarlo se descargan los últimos tres meses de
-licitaciones de PLACSP; tarda unos minutos y el avance se ve en la propia portada.
+**1. Ingesta.** El feed ATOM/CODICE de PLACSP, leído de forma incremental con una marca de agua sobre `atom:updated`, filtrado al vertical de servicios informáticos (CPV 72) y persistido con *upsert* por expediente: una licitación republicada actualiza su fila, nunca crea otra ni se borra. En la instalación de desarrollo eso son **3.583 licitaciones**.
 
-### Desarrollo, sin contenedores
+**2. El embudo.** Tres etapas que reducen ese corpus al puñado que encaja con un proveedor concreto, y **ninguna pasa por un modelo**: filtros duros en SQL (plazo, CPV, importe, ámbito), recuperación híbrida —léxica con `tsvector` y semántica con pgvector— y fusión de los dos rankings por *Reciprocal Rank Fusion*. Es determinista y se puede auditar línea a línea.
 
-Con [uv](https://docs.astral.sh/uv/) instalado, y levantando sólo la infraestructura:
+**3. El agente.** Bajo demanda, un grafo de LangGraph descarga el PCAP, comprueba que tiene capa de texto y se lo pasa entero al modelo contra un esquema Pydantic cerrado: solvencia económica y técnica, certificaciones, criterios de adjudicación, garantías, plazos, subcontratación y lotes. **Cada valor viaja con su cita**: cláusula, página y texto literal.
+
+**4. El veredicto.** APTO / APTO CON RESERVAS / NO APTO, calculado **en Python** comparando esa extracción con tu perfil.
+
+![La ficha de una licitación, con el veredicto citado](docs/images/dashboard-verdict.png)
+
+## Las decisiones que importan
+
+### El modelo extrae; el veredicto lo calcula el código
+
+El LLM no opina nunca sobre si puedes presentarte. Rellena un esquema cerrado, y el veredicto sale de comparar esos datos con tu perfil en Python plano. Eso lo hace determinista —el mismo pliego y el mismo perfil dan siempre lo mismo—, auditable —cada razón enseña la cláusula que la sostiene— y barato de recalcular: el veredicto no se guarda, se recalcula al leerlo, así que editar tu perfil cambia todos los veredictos al instante sin volver a pagar un solo análisis.
+
+### Las citas se verifican en Python, no se creen
+
+Que un modelo escriba una cita no significa que exista. Cada cita se busca literalmente en la página que dice —normalizando sólo los espacios, porque un PDF parte las frases donde se le acaba la línea— y la ficha enseña qué proporción de las citas de ese análisis han pasado la comprobación. No es un modelo evaluando a otro: es una comparación de cadenas contra el texto del propio pliego.
+
+### Híbrido, no sólo vectorial
+
+Con el perfil sembrado, el embudo deja hoy **3.583 → 71 → 25 → 6**, y de esas 6 finales **3 las trajo únicamente el recuperador vectorial**: comparten significado con el perfil sin compartir sus palabras, así que una búsqueda por palabras clave las habría perdido enteras. Eso es exactamente por lo que hay dos recuperadores y no uno.
+
+Un detalle de esos números que merece contarse: la primera etapa filtraba sólo por el código de estado que publica PLACSP, y dejaba pasar 508. Pero PLACSP no mueve ese código de forma fiable al vencer el plazo — **429 de esas 508 (el 84%) tenían la fecha límite ya pasada**. Ahora la etapa exige las dos cosas, y por eso el número es tan pequeño: son las que de verdad se pueden presentar hoy.
+
+### Qué cuesta de verdad analizar un pliego
+
+Medido con [Langfuse](https://langfuse.com) sobre las trazas reales acumuladas (`uv run python -m compass.analysis.cost_report`), no estimado:
+
+| Medida | Valor real |
+|---|---|
+| Análisis con extracción completada | 35 |
+| Tokens por análisis | 31.729 – 118.486 (media **60.399**) |
+| Coste | **0,00 €** en el 100% |
+| Tiempo de extremo a extremo | 36 – 338 s (media 159 s) |
+
+El modelo es de razonamiento y el pliego entra completo, sin trocear: de ahí que el tiempo y el volumen de entrada varíen tanto de un pliego a otro.
+
+### Cómo se sabe que la extracción es correcta
+
+Tres medidas, y dos de las tres no necesitan ningún modelo:
+
+- **25 pliegos anotados a mano**, campo a campo, y un *gate* de regresión que corre el grafo de producción contra ellos y compara los nueve campos objetivamente comprobables (`analysis/regression_eval.py`).
+- **Fidelidad de citas**, comprobada en Python sobre el texto del PDF (`analysis/verification.py`).
+- **Fidelidad de las descripciones en texto libre**, que es la mitad que no se puede comparar cadena a cadena: ahí sí entra un juez LLM, con RAGAS, contra las páginas que cada cita señala (`analysis/freetext_eval.py`). Se ejecuta a mano: cuesta dos llamadas al modelo por descripción.
+
+## Stack
+
+Python 3.13 con `mypy --strict` · FastAPI async sobre Uvicorn · PostgreSQL 17 + pgvector con SQLAlchemy async y Alembic · Celery sobre Redis para la ingesta diaria, los embeddings y los análisis · `ibm-granite/granite-embedding-278m-multilingual` corriendo en local para los embeddings · LangGraph para el agente, con `nvidia/nemotron-3-super-120b-a12b:free` vía OpenRouter · Langfuse para trazas y coste · Next.js 16, React 19 y Tailwind v4 para el dashboard · pytest, ruff, GitHub Actions.
+
+## Qué queda fuera, a propósito
+
+- **Subvenciones y ayudas** (BDNS, TED). Multiplican el modelo de datos y difuminan el producto: esto es un radar de contratos.
+- **OCR.** Un pliego escaneado sin capa de texto se marca como no analizable y se dice en pantalla, en vez de adivinar.
+- **Digest diario por correo.** Compass corre en tu máquina; un correo a las 03:00 sale de un proceso que a esa hora está apagado, y llegaría justo cuando vas a abrir el dashboard de todas formas.
+- **Multi-inquilino y despliegue alojado.** Un perfil, una máquina, tus datos.
+
+### Limitaciones conocidas
+
+El campo de certificaciones es hoy demasiado inclusivo: el modelo mete ahí certificados que el pliego sólo *puntúa* como criterio de adjudicación, y a veces papeleo administrativo que presenta cualquier licitador. Como el veredicto trata esa lista como requisitos, puede salir un **NO APTO falso**. Está identificado, con los casos reales delante, y es lo primero de la revisión de fase.
+
+## Desarrollo
+
+Con [uv](https://docs.astral.sh/uv/), levantando sólo la infraestructura:
 
 ```bash
 docker compose up -d db redis
 cd backend
 uv run alembic upgrade head
-uv run python -m compass --reload          # API en http://localhost:8000/docs
+uv run python -m compass --reload     # API en http://localhost:8000/docs
 
-# En otras dos terminales
+# en otras dos terminales
 uv run celery -A compass.core.celery_app worker --pool=solo --loglevel=info
 uv run celery -A compass.core.celery_app beat --loglevel=info
 ```
 
-`uv run pytest` corre la suite completa contra Postgres y Redis reales (necesita esa
-infraestructura levantada).
+`uv run pytest` corre los **268 tests** contra Postgres y Redis reales; `uv run ruff check`, `uv run ruff format --check` y `uv run mypy` cierran el resto. Todo eso pasa también en [CI](.github/workflows/ci.yml) en cada push, contra los mismos contenedores de Postgres con pgvector y Redis.
 
-## CI
+Cinco tests quedan fuera de CI (`@pytest.mark.real_corpus`): comparan el golden set y el embudo contra el corpus real de PLACSP persistido en local, y contra uno sintético no probarían nada. Los evals que llaman al modelo quedan fuera por lo mismo, y porque una corrida se come la cuota diaria del nivel gratuito.
 
-Cada push a `main` y cada pull request pasan por [GitHub Actions](.github/workflows/ci.yml): `ruff check`, `ruff format --check`, `mypy --strict` y la suite de tests contra un Postgres con pgvector y un Redis reales, levantados como *service containers* con las mismas imágenes que `docker-compose.yml`.
+## El razonamiento completo
 
-**Cinco tests no corren ahí**, marcados con `@pytest.mark.real_corpus` y deseleccionados con `-m "not real_corpus"`: comparan el golden set y el embudo contra el corpus real de PLACSP persistido en local, y contra un corpus sintético no probarían nada. El eval de regresión del golden set (`uv run python -m compass.analysis.regression_eval`) queda fuera de CI por el mismo motivo — lee de esa misma base — y porque una corrida consume 25 de las 50 peticiones diarias del nivel gratuito de OpenRouter.
+Este README cuenta qué es y cómo funciona. **El porqué de cada decisión —con lo que se midió, lo que se descartó y lo que salió mal por el camino— vive en [`docs/phases/`](docs/phases/)**: un documento por subfase, escrito mientras se construía, con la evidencia delante. Ahí está por qué el veredicto no lo emite el modelo, por qué el embudo es híbrido, por qué el golden set tiene 25 pliegos y no 4, y qué encontró cada revisión.
