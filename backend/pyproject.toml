@@ -2,6 +2,7 @@
 name = "compass"
 version = "0.1.0"
 description = "Spanish public tender radar"
+license = "MIT"
 authors = [
     { name = "Alan", email = "alanfdiosdado@gmail.com" }
 ]
