@@ -15,7 +15,7 @@ Del desglose de la Fase 4 (`docs/phases/phase4/phase4.md`): cuenta en Langfuse C
 
 ### Paso 1 — Cuenta y dependencias
 
-Alan creó la cuenta en Langfuse Cloud y añadió `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` reales a su `.env` antes de que existiera siquiera `.env.example` con esos nombres -- documentados ahí después, junto a `LANGFUSE_BASE_URL` (por defecto la región EU).
+La cuenta en Langfuse Cloud se creó y sus `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` reales entraron en el `.env` local antes de que existiera siquiera `.env.example` con esos nombres -- documentados ahí después, junto a `LANGFUSE_BASE_URL` (por defecto la región EU).
 
 `uv add langfuse` resolvió `langfuse==4.15.2` (SDK basado en OpenTelemetry, no el cliente REST simple de versiones anteriores) más sus dependencias de OTEL. **Dependencia adicional no anticipada, añadida también**: `langfuse.langchain.CallbackHandler` hace `import langchain` en tiempo de import (para comprobar su versión) aunque solo use símbolos de `langchain_core` -- sin el paquete `langchain` completo instalado, revienta con `ModuleNotFoundError` al arrancar la API. `uv add langchain` (1.4.0) resuelto sin más dependencias nuevas -- ya comparte `langchain-core` con LangGraph.
 
@@ -39,9 +39,9 @@ Investigado antes de escribir el nodo: la forma "idiomática" del SDK es llamar 
 
 ### Paso 5 — Tests sin red real contra Langfuse
 
-`tests/conftest.py`: `os.environ.setdefault("LANGFUSE_TRACING_ENABLED", "false")` antes de cualquier importación de test -- el propio cliente de Langfuse combina su parámetro `tracing_enabled` con esta variable de entorno, así que desactiva toda actividad de red real para toda la sesión de tests sin tocar cómo se construye el cliente. Mismo criterio que mockear siempre OpenRouter: un test no debería escribir trazas sintéticas en el proyecto real de Langfuse de Alan.
+`tests/conftest.py`: `os.environ.setdefault("LANGFUSE_TRACING_ENABLED", "false")` antes de cualquier importación de test -- el propio cliente de Langfuse combina su parámetro `tracing_enabled` con esta variable de entorno, así que desactiva toda actividad de red real para toda la sesión de tests sin tocar cómo se construye el cliente. Mismo criterio que mockear siempre OpenRouter: un test no debería escribir trazas sintéticas en el proyecto real de Langfuse.
 
-**Hallazgo operativo durante la verificación, no un bug**: la suite completa se quedó colgada al ejecutarla -- Docker Desktop se había cerrado en algún momento entre la planificación y la ejecución de esta subfase, y Redis/Postgres rechazaban la conexión. Nada que ver con Langfuse; confirmado reproduciendo el mismo cuelgue con el código de la 3.9 sin tocar, y resuelto en cuanto Alan reabrió Docker Desktop.
+**Hallazgo operativo durante la verificación, no un bug**: la suite completa se quedó colgada al ejecutarla -- Docker Desktop se había cerrado en algún momento entre la planificación y la ejecución de esta subfase, y Redis/Postgres rechazaban la conexión. Nada que ver con Langfuse; confirmado reproduciendo el mismo cuelgue con el código de la 3.9 sin tocar, y resuelto en cuanto se reabrió Docker Desktop.
 
 Suite completa: **189 passed** (sin tests nuevos -- el criterio de aceptación 3 se protege con la configuración de `conftest.py`, no con una aserción nueva). `ruff check`/`format --check`/`mypy` sin avisos. `alembic check` sin drift (esta subfase no toca el esquema).
 
@@ -51,7 +51,7 @@ Disparado un análisis real (`POST /tenders/0025-26/analyze`, un tender nunca an
 
 - Traza `analyze_pliego` con los cinco *spans* del grafo (`fetch`, `check_text_layer`, `_route_after_text_layer_check`, `extract`, `verify`) más la propia envoltura `LangGraph`, cada uno con su latencia real (`fetch`: 4,27s; el par `extract`: 2m 49s).
 - El nodo `extract` de tipo `generation` con **`Provided Model Name: nvidia/nemotron-3-super-120b-a12b:free`** y **coste real: $0,00** -- el nivel gratuito, coherente con todas las mediciones anteriores (3.4, 3.5, 3.9).
-- **Hallazgo propio durante la verificación**: `client.api.observations.get_many()` (la API REST de lectura) devuelve una vista reducida que no incluye `usage_details`/`cost_details` -- confirmado con dos trazas de depuración construidas a mano (coste ficticio $0,001/$0,0042) que tampoco aparecían por esa vía a pesar de que el log de depuración del SDK mostraba el *span* de OpenTelemetry con los atributos correctos. La confirmación real vino del propio dashboard (captura de Alan), no de la API -- anotado para no repetir el mismo callejón sin salida si una subfase futura necesita leer costes por API en vez de a mano.
+- **Hallazgo propio durante la verificación**: `client.api.observations.get_many()` (la API REST de lectura) devuelve una vista reducida que no incluye `usage_details`/`cost_details` -- confirmado con dos trazas de depuración construidas a mano (coste ficticio $0,001/$0,0042) que tampoco aparecían por esa vía a pesar de que el log de depuración del SDK mostraba el *span* de OpenTelemetry con los atributos correctos. La confirmación real vino del propio dashboard, no de la API -- anotado para no repetir el mismo callejón sin salida si una subfase futura necesita leer costes por API en vez de a mano.
 
 ## Verificación final
 
@@ -59,6 +59,6 @@ Disparado un análisis real (`POST /tenders/0025-26/analyze`, un tender nunca an
 - `uv run ruff check .` / `ruff format --check .`: sin avisos.
 - `uv run mypy` (proyecto completo): sin avisos.
 - `uv run alembic check`: sin drift.
-- Traza real verificada en el dashboard de Langfuse Cloud (captura de pantalla de Alan), con coste y modelo reales en el nodo `extract`.
+- Traza real verificada en el dashboard de Langfuse Cloud (comprobado en pantalla), con coste y modelo reales en el nodo `extract`.
 
 Subfase 4.1 completada. Los cuatro criterios de aceptación se cumplen.

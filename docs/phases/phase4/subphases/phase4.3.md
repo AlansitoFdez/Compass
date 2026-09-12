@@ -4,7 +4,7 @@
 
 Del desglose de la Fase 4 (`docs/phases/phase4/phase4.md`): extensión del golden set de la 3.4 (`analysis/golden_set.py`) con 21-26 pliegos reales más de los matches del proveedor sembrado, anotados a mano con cita textual verbatim -- mismo método, más escala. Objetivo acordado con Alan: 25 en total (21 nuevos), no 30 -- el mínimo del rango del documento de diseño, para acotar el esfuerzo de lectura manual.
 
-**Excepción al ritmo habitual de la fase, acordada explícitamente**: dado que anotar un pliego real a mano es mucho más trabajo por unidad que escribir código, esta subfase se trabaja en lotes de ~5-7 pliegos, revisados con Alan entre lote y lote, en vez de construirse entera de un tirón como el resto de subfases.
+**Anotado en lotes, no de una tanda**: leer un pliego entero y transcribir sus citas verbatim cuesta mucho más por unidad que escribir código, y un criterio de anotación equivocado arrastrado a través de los 25 no se ve hasta el final. Así que el golden set crece en lotes de ~5-7 pliegos, revisando cada uno antes de empezar el siguiente.
 
 ### Criterios de aceptación
 

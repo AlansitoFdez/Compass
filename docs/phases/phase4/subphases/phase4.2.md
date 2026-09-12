@@ -14,7 +14,7 @@ Del desglose de la Fase 4 (`docs/phases/phase4/phase4.md`): consulta a Langfuse 
 
 ### Paso 1 — Contratiempo real, sin relación con el código: trazas borradas por accidente
 
-Antes de poder agregar nada, Alan borró sin querer las trazas de la 4.1 desde el propio dashboard de Langfuse. Sin consecuencia real (son datos de observabilidad, no producción): se sustituyeron dos veces disparando análisis reales nuevos contra tenders nunca antes analizados (`040-2026-0075`, `1583900M`), servidor `uvicorn --reload` y worker Celery reales.
+Antes de poder agregar nada, las trazas de la 4.1 se borraron por error desde el propio dashboard de Langfuse. Sin consecuencia real (son datos de observabilidad, no producción): se sustituyeron dos veces disparando análisis reales nuevos contra tenders nunca antes analizados (`040-2026-0075`, `1583900M`), servidor `uvicorn --reload` y worker Celery reales.
 
 ### Paso 2 — La API correcta no es la que usé en la 4.1
 

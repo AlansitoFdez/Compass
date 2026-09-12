@@ -32,7 +32,7 @@ Decisiones tomadas en la conversación de planificación:
 - `backend/.env.example`: añadidas `DATABASE_URL=postgresql://compass:compass@localhost:5432/compass` y `REDIS_URL=redis://localhost:6379/0`, apuntando a los servicios de `docker-compose.yml`.
 - `core/config.py`: `database_url: str` y `redis_url: str` en `Settings`, **sin valor por defecto** — a diferencia de `app_env`/`log_level`, si faltan la app no arranca (fail fast).
 - **Efecto observado**: al no tener el usuario todavía un `backend/.env` real con estos dos campos, `uv run pytest` empezó a fallar incluso en `test_health.py` (que no toca la base de datos), porque `Settings` se valida como bloque único al crear la app. Comportamiento esperado y correcto — confirma que el fail-fast funciona.
-- El usuario creó su `backend/.env` local (nunca tocado por el asistente, siguiendo la convención de `CLAUDE.md`) con los mismos valores no sensibles de `.env.example`. Verificado: `uv run pytest -v` vuelve a pasar.
+- El `backend/.env` local se creó a mano, fuera del control de versiones, con los mismos valores no sensibles de `.env.example`. Verificado: `uv run pytest -v` vuelve a pasar.
 
 ### Paso 4 — Dependencias: `psycopg[binary]`, `redis` (completado)
 

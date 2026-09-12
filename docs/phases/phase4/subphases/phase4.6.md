@@ -20,7 +20,7 @@ envejecen solos) y meter el workflow igualmente aunque en CI no encuentre ningú
 
 ### Lo que se mide antes de escribir el workflow
 
-La suite corre hoy contra la base real de Alan, con el corpus de PLACSP y el perfil de
+La suite corre hoy contra la base real de desarrollo, con el corpus de PLACSP y el perfil de
 proveedor sembrados. Antes de asumir cuántos tests sobreviven a una base vacía, se mide:
 base nueva (`compass_ci`) en el mismo Postgres, `alembic upgrade head`, misma suite.
 
@@ -60,7 +60,7 @@ El cuarto fallo desaparece solo con sembrar el proveedor, y eso **sí** es repro
 CI: `providers/seed.py` lleva el perfil real escrito en el propio repo, no en la base. Es
 un paso del workflow, no un test a excluir.
 
-Los tres que quedan dependen del corpus de PLACSP persistido en la máquina de Alan, que
+Los tres que quedan dependen del corpus de PLACSP persistido en la máquina de desarrollo, que
 un runner no tiene y que no tiene sentido fabricar:
 
 - `test_golden_set_covers_exactly_the_real_etapa1_survivors` (2.6) — compara el golden

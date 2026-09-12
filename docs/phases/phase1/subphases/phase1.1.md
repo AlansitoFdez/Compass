@@ -14,7 +14,6 @@ Decisiones tomadas en la conversación de planificación:
 - Ruff con `line-length = 100` (frente al default 88 de ruff/black).
 - `uv.lock` se commitea (práctica estándar de uv para aplicaciones, no para librerías).
 
-Plan completo de implementación en `C:\Users\Alan\.claude\plans\perfecto-pues-tocar-a-subfase-reflective-stream.md`.
 
 ## Progreso
 
@@ -51,7 +50,7 @@ Plan completo de implementación en `C:\Users\Alan\.claude\plans\perfecto-pues-t
 
 - `tests/conftest.py` — fixture `client` (`TestClient(app)`), disponible automáticamente en todos los tests del directorio sin import explícito.
 - `tests/test_health.py` — `test_health_check_returns_ok`, verifica `status_code == 200` y el cuerpo exacto `{"status": "ok"}`.
-- **Desviación del plan**: al ejecutar `uv run pytest -v` apareció `StarletteDeprecationWarning: Using httpx with starlette.testclient is deprecated; install httpx2 instead`. Investigado (no era territorio conocido — Starlette 1.6.0 y este aviso son posteriores al conocimiento del asistente): `httpx` lleva sin release desde 2024 y está de facto sin mantenimiento; Pydantic ha creado `httpx2` como sucesor mantenido, y Starlette ya lo prefiere en `TestClient`. Cambiado `httpx` → `httpx2` en las dependencias de dev (`uv remove --dev httpx && uv add --dev httpx2`) antes de seguir, para no arrastrar una dependencia ya abandonada desde el primer commit del proyecto. Verificado: test sigue en verde, sin avisos.
+- **Desviación del plan**: al ejecutar `uv run pytest -v` apareció `StarletteDeprecationWarning: Using httpx with starlette.testclient is deprecated; install httpx2 instead`. Investigado (Starlette 1.6.0 y este aviso son muy recientes): `httpx` lleva sin release desde 2024 y está de facto sin mantenimiento; Pydantic ha creado `httpx2` como sucesor mantenido, y Starlette ya lo prefiere en `TestClient`. Cambiado `httpx` → `httpx2` en las dependencias de dev (`uv remove --dev httpx && uv add --dev httpx2`) antes de seguir, para no arrastrar una dependencia ya abandonada desde el primer commit del proyecto. Verificado: test sigue en verde, sin avisos.
 - Fuentes: [Starlette issue #2524](https://github.com/Kludex/starlette/issues/2524), [Starlette PR #3291](https://github.com/Kludex/starlette/pull/3291), [Starlette TestClient docs](https://starlette.dev/testclient/).
 
 ### Paso 6 — `.env.example` (completado)
