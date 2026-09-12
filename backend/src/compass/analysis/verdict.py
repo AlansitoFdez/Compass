@@ -13,7 +13,12 @@ stores, so only those two can block a bid:
   `role` is `REQUIRED_TO_BID`. A certification the pliego merely scores, or one that
   is paperwork filed with the offer, cannot exclude anyone, and treating them as
   requirements is what made four of the six analyses in the database emit a false
-  NO APTO before 5.8 (see `analysis.enums.CertificationRole`).
+  NO APTO before 5.8 (see `analysis.enums.CertificationRole`). And only those whose
+  name is a recognisable certification scheme: re-analyzing three real pliegos under
+  the new schema showed the model marking job profiles and declaraciones responsables
+  `required_to_bid`, so the code checks that claim instead of taking it
+  (`analysis.certifications`). Anything it can't recognise becomes a reservation --
+  visible to the reader, never a silent rejection.
 
 `technical_solvency.minimum_amount_eur` (cumulative amount of similar past work) has
 no counterpart on `Provider` at all -- the profile doesn't track it (see
@@ -30,6 +35,7 @@ informational, surfaced from `extraction` itself rather than duplicated here.
 import re
 import unicodedata
 
+from compass.analysis.certifications import is_formal_certification
 from compass.analysis.enums import CertificationRole, Verdict
 from compass.analysis.extraction_schema import PliegoExtraction
 from compass.analysis.schemas import VerdictReason, VerdictResult
@@ -137,15 +143,32 @@ def compute_verdict(extraction: PliegoExtraction, provider: Provider) -> Verdict
         # the provider ineligible, so neither belongs in a NO APTO.
         if certification.role is not CertificationRole.REQUIRED_TO_BID:
             continue
-        if not _certification_satisfied(certification.name, held_certifications):
-            blocking.append(
+        if _certification_satisfied(certification.name, held_certifications):
+            continue
+        if not is_formal_certification(certification.name):
+            # The model said "required" about something that isn't a recognisable
+            # certification scheme -- a job profile, a declaración responsable. Measured
+            # in 5.8, that is the common case rather than the exception, so it is
+            # surfaced instead of trusted (see `analysis.certifications`).
+            reserved.append(
                 VerdictReason(
                     detail=(
-                        f"Exigen la certificación '{certification.name}' y tu perfil no la declara."
+                        f"El pliego pide '{certification.name}' entre los requisitos, pero "
+                        "no es una certificación que tu perfil pueda declarar -- "
+                        "compruébalo a mano en la cláusula citada."
                     ),
                     citation=certification.citation,
                 )
             )
+            continue
+        blocking.append(
+            VerdictReason(
+                detail=(
+                    f"Exigen la certificación '{certification.name}' y tu perfil no la declara."
+                ),
+                citation=certification.citation,
+            )
+        )
 
     if blocking:
         return VerdictResult(verdict=Verdict.NO_APTO, reasons=blocking + reserved)

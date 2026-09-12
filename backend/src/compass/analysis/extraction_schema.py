@@ -131,9 +131,11 @@ class ExecutionDeadline(BaseModel):
 
     description: str = Field(
         description=(
-            "The base execution period as stated -- how long the contract runs before any "
-            "extension -- or a note that the PCAP defers this to the PPT/prescripciones "
-            "técnicas if it does."
+            "ONLY the base execution period: how long the contract runs before any "
+            "extension ('1 año desde la formalización', '18 meses'), or a note that the "
+            "PCAP defers this to the PPT/prescripciones técnicas if it does. Do not "
+            "describe the prórrogas here -- they have their own field below, and a "
+            "duration that silently includes them misstates what is being contracted."
         )
     )
     extensions_allowed: bool | None = Field(
@@ -222,7 +224,10 @@ class RequiredCertification(BaseModel):
     name: str = Field(
         description=(
             "The certification as the pliego names it, e.g. 'ISO 9001', "
-            "'ISO/IEC 27001', 'ENS categoría media', 'CMMI nivel 3'."
+            "'ISO/IEC 27001', 'ENS categoría media', 'CMMI nivel 3'. It must be a "
+            "certificate the COMPANY holds, issued by an independent body and producible "
+            "as a document. A person's academic degree, professional experience, or job "
+            "profile is never one of these."
         )
     )
     role: CertificationRole = Field(
@@ -258,11 +263,17 @@ class PliegoExtraction(BaseModel):
     certifications: list[RequiredCertification] = Field(
         description=(
             "Every formal quality/security certification or accreditation the pliego "
-            "names (e.g. ISO 9001, ISO 27001, ENS, CMMI), each with the role that says "
-            "why it appears -- see `RequiredCertification.role`. List a certification "
-            "even when it is only scored or only paperwork: the role is what separates "
-            "them, and omitting them loses information the reader wants. Empty list if "
-            "the pliego names no certification at all."
+            "names (e.g. ISO 9001, ISO 27001, ENS, CMMI, acreditación ENAC), each with "
+            "the role that says why it appears -- see `RequiredCertification.role`. List "
+            "one even when it is only scored or only paperwork: the role is what "
+            "separates them. "
+            "NEVER put here anything that is not a certificate held by the company: not "
+            "the technical team's profiles, job titles, academic degrees or years of "
+            "experience ('Responsable técnico', 'Grado en Ingeniería Informática', "
+            "'personal técnico adscrito'), which are staffing requirements and belong to "
+            "technical solvency; not insurance policies; not the pliego's own field "
+            "names. Empty list if the pliego names no certificate at all, which is the "
+            "common case."
         )
     )
     award_criteria: AwardCriteria

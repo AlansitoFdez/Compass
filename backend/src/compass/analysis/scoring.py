@@ -6,49 +6,11 @@ golden set as a regression gate (`regression_eval.py`), instead of duplicating t
 logic between the two scripts.
 """
 
-import re
-import unicodedata
 from dataclasses import dataclass
 
+from compass.analysis.certifications import identities as identities_of
 from compass.analysis.enums import CertificationRole
 from compass.analysis.extraction_schema import PliegoExtraction, RequiredCertification
-
-_WORD_RE = re.compile(r"[a-z0-9]+")
-# The families a PCAP actually names, and the only part of the phrase that identifies
-# one: everything around it ("o equivalente", "en vigor", "nivel medio o superior") is
-# wording two annotators would never write the same way.
-_STANDARD_RE = re.compile(
-    r"(?:ISO/?\s?IEC|ISO|UNE(?:[-\s]?EN)?|EN)\s?\d{4,5}|CMMI|ENS\b|CCN-?CERT", re.IGNORECASE
-)
-_DIGITS_RE = re.compile(r"\d{4,5}")
-
-
-def _normalized_name(name: str) -> str:
-    """A certification's name reduced to lowercase, accent-free words joined by spaces,
-    so 'ISO/IEC 27001:2013' and 'ISO IEC 27001 2013' compare equal.
-    """
-    decomposed = unicodedata.normalize("NFKD", name)
-    without_accents = "".join(c for c in decomposed if not unicodedata.combining(c))
-    return " ".join(_WORD_RE.findall(without_accents.lower()))
-
-
-def _identities(name: str) -> set[str]:
-    """What `name` actually claims, as comparable identifiers.
-
-    A standard is identified by its number, not by the family that prefixes it:
-    'ISO 27001', 'ISO/IEC 27001' and 'UNE-EN ISO 27001:2013' are the same requirement,
-    so all three reduce to `{'27001'}`. A name that matches no known family keeps its
-    whole normalized text instead of reducing to nothing -- which is the entire point,
-    see `_blocking_names`.
-    """
-    marks = _STANDARD_RE.findall(name)
-    if not marks:
-        return {_normalized_name(name)}
-    identities = set()
-    for mark in marks:
-        digits = _DIGITS_RE.search(mark)
-        identities.add(digits.group(0) if digits else _normalized_name(mark))
-    return identities
 
 
 def _blocking_names(certifications: list[RequiredCertification]) -> set[str]:
@@ -66,15 +28,17 @@ def _blocking_names(certifications: list[RequiredCertification]) -> set[str]:
     field that produced false NO APTO verdicts was passing its own regression gate,
     because what the verdict acted on and what the gate measured were not the same thing.
 
-    The regex stays, because the phrasing tolerance it bought is real -- "ISO 27000 o
-    equivalente" and "ISO27000" are the same demand. What changed is what happens when it
-    doesn't match: the name is kept whole instead of discarded, so anything the model
-    invents is counted rather than silently erased.
+    The family regex stays, because the phrasing tolerance it bought is real -- "ISO 27000
+    o equivalente" and "ISO27000" are the same demand. What changed is what happens when
+    it doesn't match: the name is kept whole instead of discarded, so anything the model
+    invents is counted rather than silently erased. It now lives in
+    `analysis.certifications`, shared with the verdict, so the thing measured here and
+    the thing acted on there cannot drift apart again.
     """
     identities: set[str] = set()
     for certification in certifications:
         if certification.role is CertificationRole.REQUIRED_TO_BID:
-            identities |= _identities(certification.name)
+            identities |= identities_of(certification.name)
     return identities
 
 
