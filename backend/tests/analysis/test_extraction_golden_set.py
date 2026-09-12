@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from compass.analysis.enums import CertificationRole
 from compass.analysis.golden_set import GOLDEN_SET
 from compass.tenders.models import Tender
 
@@ -18,12 +19,45 @@ def test_golden_set_size_matches_the_current_batch() -> None:
     assert len(GOLDEN_SET) == 25
 
 
-def test_certifications_citation_is_none_only_when_certifications_is_empty() -> None:
-    """Protects the schema's own rule: a citation exists only when there's something to cite."""
+def test_every_annotated_certification_is_one_that_can_block_a_bid() -> None:
+    """Protects what the golden set means by a certification after 5.8.
+
+    All 22 were re-read against their own pliego when the role field landed, and every
+    one of them is a condition of admission -- clause 6.4 of
+    `A41119033-2026/000065-PeAS`, clause 10.1.l) of `2545974A`, the "Habilitación" of
+    `SERV-2026000088`, the "se exige la presentación de certificado" clauses of the
+    three Red.es pliegos. If an entry ever arrives with a scored or paperwork
+    certification, it needs its own reasoning written down, not a silent label.
+    """
     for expediente, extraction in GOLDEN_SET.items():
-        has_certifications = bool(extraction.certifications)
-        has_citation = extraction.certifications_citation is not None
-        assert has_certifications == has_citation, expediente
+        for certification in extraction.certifications:
+            assert certification.role is CertificationRole.REQUIRED_TO_BID, (
+                f"{expediente}: {certification.name}"
+            )
+
+
+def test_extensions_are_answered_for_every_entry() -> None:
+    """Protects the 5.8 re-annotation from rotting back into a half-answer: a null here
+    means "this PCAP says nothing about prórrogas", which is true of exactly three
+    entries, and must stay a deliberate claim rather than a gap nobody filled.
+    """
+    unanswered = {
+        expediente
+        for expediente, extraction in GOLDEN_SET.items()
+        if extraction.execution_deadline.extensions_allowed is None
+    }
+
+    assert unanswered == {"23/2026", "003/26-SI", "015/25-SI"}
+
+
+def test_an_extension_description_exists_exactly_when_extensions_are_allowed() -> None:
+    """Protects the schema's own rule: describing prórrogas that the pliego rules out,
+    or allowing them without saying what they are, are both incoherent.
+    """
+    for expediente, extraction in GOLDEN_SET.items():
+        deadline = extraction.execution_deadline
+        has_description = deadline.extensions_description is not None
+        assert has_description == (deadline.extensions_allowed is True), expediente
 
 
 # Needs the real PLACSP corpus persisted locally, which a CI runner doesn't have --

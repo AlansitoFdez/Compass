@@ -53,7 +53,6 @@ def _extraction_with_citations(*citations: Citation | None) -> PliegoExtraction:
     (
         economic_citation,
         technical_citation,
-        certifications_citation,
         award_citation,
         guarantees_citation,
         execution_citation,
@@ -69,7 +68,6 @@ def _extraction_with_citations(*citations: Citation | None) -> PliegoExtraction:
             minimum_amount_eur=None, description="", citation=technical_citation
         ),
         certifications=[],
-        certifications_citation=certifications_citation,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[AwardCriterion(name="Precio", points=60, is_price=True)],
@@ -81,7 +79,12 @@ def _extraction_with_citations(*citations: Citation | None) -> PliegoExtraction:
             description="",
             citation=guarantees_citation,
         ),
-        execution_deadline=ExecutionDeadline(description="", citation=execution_citation),
+        execution_deadline=ExecutionDeadline(
+            description="",
+            extensions_allowed=None,
+            extensions_description=None,
+            citation=execution_citation,
+        ),
         submission_deadline=SubmissionDeadline(description="", citation=submission_citation),
         subcontracting=Subcontracting(
             allowed=True, description="", citation=subcontracting_citation
@@ -142,7 +145,7 @@ def test_verify_citation_false_for_a_page_number_out_of_range() -> None:
 
 def test_citation_faithfulness_is_one_when_no_citations_are_present() -> None:
     """Protects the vacuous case: nothing to verify isn't the same as unfaithful."""
-    extraction = _extraction_with_citations(None, None, None, None, None, None, None, None, None)
+    extraction = _extraction_with_citations(None, None, None, None, None, None, None, None)
 
     assert citation_faithfulness(extraction, PAGES) == 1.0
 
@@ -150,7 +153,7 @@ def test_citation_faithfulness_is_one_when_no_citations_are_present() -> None:
 def test_citation_faithfulness_is_one_when_every_present_citation_verifies() -> None:
     """Protects the ceiling: a fully faithful extraction scores 1.0."""
     real = Citation(clause="1", page=1, quote="Objeto del contrato")
-    extraction = _extraction_with_citations(real, real, None, None, None, None, None, None, None)
+    extraction = _extraction_with_citations(real, real, None, None, None, None, None, None)
 
     assert citation_faithfulness(extraction, PAGES) == 1.0
 
@@ -161,9 +164,7 @@ def test_citation_faithfulness_is_the_correct_fraction_with_a_mix() -> None:
     """
     real = Citation(clause="1", page=1, quote="Objeto del contrato")
     fabricated = Citation(clause="1", page=1, quote="texto que no existe en el pliego")
-    extraction = _extraction_with_citations(
-        real, fabricated, None, None, None, None, None, None, None
-    )
+    extraction = _extraction_with_citations(real, fabricated, None, None, None, None, None, None)
 
     assert citation_faithfulness(extraction, PAGES) == 0.5
 
@@ -236,9 +237,7 @@ def test_citation_report_names_the_outcome_of_every_present_citation() -> None:
     """
     real = Citation(clause="1", page=1, quote="Objeto del contrato")
     fabricated = Citation(clause="1", page=1, quote="texto que no existe en el pliego")
-    extraction = _extraction_with_citations(
-        real, fabricated, None, None, None, None, None, None, None
-    )
+    extraction = _extraction_with_citations(real, fabricated, None, None, None, None, None, None)
 
     assert citation_report(extraction, PAGES) == {
         "economic_solvency": CitationCheck.VERIFIED,
@@ -252,8 +251,6 @@ def test_citation_faithfulness_counts_a_reordered_citation_as_supported() -> Non
     failures reported 56% for an extraction that was faithful nine times out of nine.
     """
     reordered = Citation(clause="H", page=1, quote="Garantía complementaria: ☒No ☐Sí")
-    extraction = _extraction_with_citations(
-        reordered, None, None, None, None, None, None, None, None
-    )
+    extraction = _extraction_with_citations(reordered, None, None, None, None, None, None, None)
 
     assert citation_faithfulness(extraction, [CUADRO_PAGE]) == 1.0

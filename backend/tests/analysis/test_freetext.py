@@ -60,7 +60,6 @@ def _extraction(
             minimum_amount_eur=None, description="solvencia técnica", citation=technical
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[AwardCriterion(name="Precio", points=100, is_price=True)],
@@ -72,7 +71,12 @@ def _extraction(
             description="garantías",
             citation=guarantees,
         ),
-        execution_deadline=ExecutionDeadline(description="plazo de ejecución", citation=execution),
+        execution_deadline=ExecutionDeadline(
+            description="plazo de ejecución",
+            extensions_allowed=None,
+            extensions_description=None,
+            citation=execution,
+        ),
         submission_deadline=SubmissionDeadline(
             description="plazo de presentación", citation=submission
         ),

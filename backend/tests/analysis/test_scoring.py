@@ -2,20 +2,26 @@
 comparison, reused as-is in 4.4's regression gate over the full golden set.
 """
 
+from compass.analysis.enums import CertificationRole
 from compass.analysis.extraction_schema import (
     AwardCriteria,
     AwardCriterion,
-    Citation,
     EconomicSolvency,
     ExecutionDeadline,
     Guarantees,
     Lots,
     PliegoExtraction,
+    RequiredCertification,
     Subcontracting,
     SubmissionDeadline,
     TechnicalSolvency,
 )
-from compass.analysis.scoring import _cert_tokens, _nums_match, _price_points, score_extraction
+from compass.analysis.scoring import (
+    _blocking_names,
+    _nums_match,
+    _price_points,
+    score_extraction,
+)
 
 
 def _minimal_extraction(**overrides: object) -> PliegoExtraction:
@@ -30,7 +36,6 @@ def _minimal_extraction(**overrides: object) -> PliegoExtraction:
             minimum_amount_eur=None, description="", citation=None
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[AwardCriterion(name="Precio", points=60, is_price=True)],
@@ -39,7 +44,9 @@ def _minimal_extraction(**overrides: object) -> PliegoExtraction:
         guarantees=Guarantees(
             provisional_required=False, definitive_percentage=5.0, description="", citation=None
         ),
-        execution_deadline=ExecutionDeadline(description="", citation=None),
+        execution_deadline=ExecutionDeadline(
+            description="", extensions_allowed=None, extensions_description=None, citation=None
+        ),
         submission_deadline=SubmissionDeadline(description="", citation=None),
         subcontracting=Subcontracting(allowed=True, description="", citation=None),
         lots=Lots(
@@ -66,15 +73,55 @@ def test_nums_match_respects_tolerance() -> None:
     assert _nums_match(100.0, 100.6, tol=0.5) is False
 
 
-def test_cert_tokens_extracts_known_acronyms_case_insensitively() -> None:
-    """Protects the certification recall check against phrasing differences that don't
-    change the actual requirement -- "ISO 27000 o equivalente" vs "iso27000".
-    """
-    tokens = _cert_tokens(["ISO 27000 o equivalente", "certificado CCN-CERT (ENS)"])
+def _required(name: str) -> RequiredCertification:
+    """A certification the pliego demands to bid -- the only kind scoring looks at."""
+    return RequiredCertification(name=name, role=CertificationRole.REQUIRED_TO_BID, citation=None)
 
-    assert "ISO27000" in tokens
-    assert "ENS" in tokens
-    assert "CCN-CERT" in tokens
+
+def test_blocking_names_ignores_phrasing_around_a_standard() -> None:
+    """Protects the tolerance the old regex bought and 5.8 kept: the family prefix and
+    the trimmings around a standard are wording, the number is the requirement.
+    """
+    assert _blocking_names([_required("ISO 27001")]) == _blocking_names(
+        [_required("UNE-EN ISO 27001:2013 o equivalente, en vigor")]
+    )
+
+
+def test_blocking_names_keeps_a_name_that_matches_no_known_standard() -> None:
+    """Protects against the exact blindness that let false NO APTO verdicts through the
+    gate: the old helper discarded anything without an ISO/CMMI/ENS token, so real
+    garbage -- the tax-compliance certificates of `2026/20`, the literal string
+    "citation" of `1276564F` -- reduced to the empty set and scored as correct.
+    """
+    garbage = [
+        _required(
+            "Certificación positiva, expedida por la Agencia Estatal de Administración "
+            "Tributaria de hallarse al corriente en el cumplimiento de sus obligaciones "
+            "tributarias."
+        ),
+        _required("citation"),
+    ]
+
+    assert len(_blocking_names(garbage)) == 2
+
+
+def test_blocking_names_counts_only_what_can_block_a_bid() -> None:
+    """Protects the gate from measuring a field the verdict never reads: a scored or
+    paperwork certification changes no verdict, so it must change no score either.
+    """
+    certifications = [
+        _required("ISO 27001"),
+        RequiredCertification(
+            name="ISO 20000", role=CertificationRole.AWARD_CRITERION, citation=None
+        ),
+        RequiredCertification(
+            name="Declaración responsable",
+            role=CertificationRole.ADMINISTRATIVE_PAPERWORK,
+            citation=None,
+        ),
+    ]
+
+    assert _blocking_names(certifications) == {"27001"}
 
 
 def test_price_points_finds_the_is_price_criterion() -> None:
@@ -135,17 +182,10 @@ def test_score_extraction_requires_full_certification_recall() -> None:
     """Protects against a model claiming partial credit for a subset of the required
     certifications -- the golden set's `A41119033-2026/000065-PeAS` entry needs all six.
     """
-    expected = _minimal_extraction(
-        certifications=["ISO 27000", "ENS"],
-        certifications_citation=Citation(clause="6.4", page=3, quote="..."),
-    )
-    got_partial = _minimal_extraction(
-        certifications=["ISO 27000"],
-        certifications_citation=Citation(clause="6.4", page=3, quote="..."),
-    )
+    expected = _minimal_extraction(certifications=[_required("ISO 27000"), _required("ENS")])
+    got_partial = _minimal_extraction(certifications=[_required("ISO 27000")])
     got_full = _minimal_extraction(
-        certifications=["ISO 27000 o equivalente", "ENS nivel medio"],
-        certifications_citation=Citation(clause="6.4", page=3, quote="..."),
+        certifications=[_required("ISO 27000 o equivalente"), _required("ENS nivel medio")]
     )
 
     partial_checks = {c.name: c.correct for c in score_extraction(expected, got_partial)}
@@ -153,3 +193,72 @@ def test_score_extraction_requires_full_certification_recall() -> None:
 
     assert partial_checks["certifications"] is False
     assert full_checks["certifications"] is True
+
+
+def test_score_extraction_catches_a_certification_the_pliego_never_required() -> None:
+    """The regression this whole subphase exists for. `2026/20` was annotated with no
+    certifications at all and the model returned three tax-compliance certificates,
+    producing a false NO APTO -- and the gate called the field correct, because the old
+    comparison only asked whether the model had found what the annotator found.
+    """
+    expected = _minimal_extraction(certifications=[])
+    got = _minimal_extraction(
+        certifications=[
+            _required(
+                "Certificación positiva, expedida por la Agencia Estatal de Administración "
+                "Tributaria de hallarse al corriente en el cumplimiento de sus obligaciones "
+                "tributarias."
+            )
+        ]
+    )
+
+    checks = {c.name: c.correct for c in score_extraction(expected, got)}
+
+    assert checks["certifications"] is False
+
+
+def test_score_extraction_ignores_a_certification_that_only_scores_points() -> None:
+    """Protects the other direction: `INN 26 002` was rejected over an ISO/IEC 20000 the
+    pliego merely awards 6 points for. Extracting it is right -- treating it as a
+    requirement is what was wrong -- so finding it with the correct role must score clean
+    against a golden entry that demands nothing.
+    """
+    expected = _minimal_extraction(certifications=[])
+    got = _minimal_extraction(
+        certifications=[
+            RequiredCertification(
+                name="ISO/IEC 20000", role=CertificationRole.AWARD_CRITERION, citation=None
+            )
+        ]
+    )
+
+    checks = {c.name: c.correct for c in score_extraction(expected, got)}
+
+    assert checks["certifications"] is True
+
+
+def test_score_extraction_checks_whether_extensions_were_reported() -> None:
+    """Protects the 5.6 finding from recurring unmeasured: on `INN 26 002` the model
+    described "Durada del contracte: 1 any" for a contract with five prórrogas, and no
+    scored field looked at the deadline at all.
+    """
+    expected = _minimal_extraction(
+        execution_deadline=ExecutionDeadline(
+            description="1 año",
+            extensions_allowed=True,
+            extensions_description="Hasta 4 años adicionales.",
+            citation=None,
+        )
+    )
+    got = _minimal_extraction(
+        execution_deadline=ExecutionDeadline(
+            description="1 año",
+            extensions_allowed=False,
+            extensions_description=None,
+            citation=None,
+        )
+    )
+
+    checks = {c.name: c.correct for c in score_extraction(expected, got)}
+
+    assert checks["execution_deadline.extensions_allowed"] is False

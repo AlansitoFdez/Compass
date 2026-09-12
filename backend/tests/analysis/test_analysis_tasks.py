@@ -42,7 +42,6 @@ _VALID_EXTRACTION: dict[str, object] = {
     },
     "technical_solvency": {"minimum_amount_eur": None, "description": "", "citation": None},
     "certifications": [],
-    "certifications_citation": None,
     "award_criteria": {
         "total_points": 100,
         "criteria": [{"name": "Precio", "points": 60, "is_price": True}],
@@ -54,7 +53,12 @@ _VALID_EXTRACTION: dict[str, object] = {
         "description": "",
         "citation": None,
     },
-    "execution_deadline": {"description": "", "citation": None},
+    "execution_deadline": {
+        "description": "",
+        "extensions_allowed": None,
+        "extensions_description": None,
+        "citation": None,
+    },
     "submission_deadline": {"description": "", "citation": None},
     "subcontracting": {"allowed": True, "description": "", "citation": None},
     "lots": {

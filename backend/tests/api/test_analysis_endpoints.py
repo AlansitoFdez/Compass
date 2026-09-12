@@ -41,8 +41,13 @@ REAL_SHAPED_EXPEDIENTE = "TEST/EP/2026/0001 - Análisis con barras"
 _APTO_EXTRACTION: dict[str, object] = {
     "economic_solvency": {"minimum_annual_turnover_eur": None, "description": "", "citation": None},
     "technical_solvency": {"minimum_amount_eur": None, "description": "", "citation": None},
-    "certifications": ["ISO 27001"],
-    "certifications_citation": {"clause": "9", "page": 2, "quote": "Se exige ISO 27001"},
+    "certifications": [
+        {
+            "name": "ISO 27001",
+            "role": "required_to_bid",
+            "citation": {"clause": "9", "page": 2, "quote": "Se exige ISO 27001"},
+        }
+    ],
     "award_criteria": {
         "total_points": 100,
         "criteria": [{"name": "Precio", "points": 60, "is_price": True}],
@@ -54,7 +59,12 @@ _APTO_EXTRACTION: dict[str, object] = {
         "description": "",
         "citation": None,
     },
-    "execution_deadline": {"description": "", "citation": None},
+    "execution_deadline": {
+        "description": "",
+        "extensions_allowed": None,
+        "extensions_description": None,
+        "citation": None,
+    },
     "submission_deadline": {"description": "", "citation": None},
     "subcontracting": {"allowed": True, "description": "", "citation": None},
     "lots": {
@@ -244,7 +254,9 @@ async def test_get_analysis_computes_the_live_verdict_for_a_completed_analysis(
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "completed"
-        assert body["extraction"]["certifications"] == ["ISO 27001"]
+        certifications = body["extraction"]["certifications"]
+        assert [c["name"] for c in certifications] == ["ISO 27001"]
+        assert certifications[0]["role"] == "required_to_bid"
         assert body["verdict"]["verdict"] == "apto"
         assert body["verdict"]["reasons"] == []
     finally:
