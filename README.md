@@ -25,7 +25,7 @@ La primera vez, el dashboard te pide el perfil de tu empresa: a qué te dedicas,
 
 ## Cómo funciona
 
-**1. Ingesta.** El feed ATOM/CODICE de PLACSP, leído de forma incremental con una marca de agua sobre `atom:updated`, filtrado al vertical de servicios informáticos (CPV 72) y persistido con *upsert* por expediente: una licitación republicada actualiza su fila, nunca crea otra ni se borra. En la instalación de desarrollo eso son **3.583 licitaciones**.
+**1. Ingesta.** El feed ATOM/CODICE de PLACSP, leído de forma incremental con una marca de agua sobre `atom:updated`, filtrado al vertical de servicios informáticos (CPV 72) y persistido con *upsert* por expediente: una licitación republicada actualiza su fila, nunca crea otra ni se borra. En la instalación de desarrollo eso son **5.363 licitaciones**.
 
 **2. El embudo.** Tres etapas que reducen ese corpus al puñado que encaja con un proveedor concreto, y **ninguna pasa por un modelo**: filtros duros en SQL (plazo, CPV, importe, ámbito), recuperación híbrida —léxica con `tsvector` y semántica con pgvector— y fusión de los dos rankings por *Reciprocal Rank Fusion*. Es determinista y se puede auditar línea a línea.
 
@@ -43,13 +43,15 @@ El LLM no opina nunca sobre si puedes presentarte. Rellena un esquema cerrado, y
 
 ### Las citas se verifican en Python, no se creen
 
-Que un modelo escriba una cita no significa que exista. Cada cita se busca literalmente en la página que dice —normalizando sólo los espacios, porque un PDF parte las frases donde se le acaba la línea— y la ficha enseña qué proporción de las citas de ese análisis han pasado la comprobación. No es un modelo evaluando a otro: es una comparación de cadenas contra el texto del propio pliego.
+Que un modelo escriba una cita no significa que exista. Cada cita se busca en la página que dice, y la ficha enseña qué proporción de las citas de ese análisis ha pasado la comprobación. No es un modelo evaluando a otro: es una comparación contra el texto del propio pliego.
+
+La comprobación distingue **tres resultados, no dos**, y la razón es el formato de los pliegos. Un PCAP mete todo lo que decide una licitación en el «Cuadro de Características», una tabla a dos columnas, y el extractor de PDF la lee por líneas visuales: la etiqueta de la izquierda acaba dentro de la frase de la derecha, o partida alrededor de una fila de casillas. Un modelo que lee esa tabla **bien** escribe una cita que no aparece entera y seguida en ninguna parte. Así que una cita está *verificada* si aparece literal, *verificada con el orden roto* si todas sus palabras están en esa página pero no seguidas, y *sin verificar* si a la página le falta alguna. Sólo la tercera significa que el modelo escribió algo que el pliego no dice. Antes las dos primeras se contaban igual, y el pliego de la captura de arriba puntuaba 56% con las nueve citas correctas.
 
 ### Híbrido, no sólo vectorial
 
-Con el perfil sembrado, el embudo deja hoy **3.583 → 71 → 25 → 6**, y de esas 6 finales **3 las trajo únicamente el recuperador vectorial**: comparten significado con el perfil sin compartir sus palabras, así que una búsqueda por palabras clave las habría perdido enteras. Eso es exactamente por lo que hay dos recuperadores y no uno.
+Con el perfil sembrado, el embudo deja hoy **5.363 → 104 → 35 → 10**, y de esas 10 finales **6 las trajo únicamente el recuperador vectorial**: comparten significado con el perfil sin compartir sus palabras, así que una búsqueda por palabras clave las habría perdido enteras. Eso es exactamente por lo que hay dos recuperadores y no uno.
 
-Un detalle de esos números que merece contarse: la primera etapa filtraba sólo por el código de estado que publica PLACSP, y dejaba pasar 508. Pero PLACSP no mueve ese código de forma fiable al vencer el plazo — **429 de esas 508 (el 84%) tenían la fecha límite ya pasada**. Ahora la etapa exige las dos cosas, y por eso el número es tan pequeño: son las que de verdad se pueden presentar hoy.
+Un detalle de esos números que merece contarse: la primera etapa filtraba sólo por el código de estado que publica PLACSP, y hoy dejaría pasar 1.740. Pero PLACSP no mueve ese código de forma fiable al vencer el plazo — **1.636 de esas 1.740 (el 94%) tienen la fecha límite ya pasada**. Ahora la etapa exige las dos cosas, y por eso el número es tan pequeño: son las que de verdad se pueden presentar hoy.
 
 ### Qué cuesta de verdad analizar un pliego
 
@@ -57,10 +59,10 @@ Medido con [Langfuse](https://langfuse.com) sobre las trazas reales acumuladas (
 
 | Medida | Valor real |
 |---|---|
-| Análisis con extracción completada | 35 |
-| Tokens por análisis | 31.729 – 118.486 (media **60.399**) |
+| Análisis con extracción completada | 36 |
+| Tokens por análisis | 22.300 – 118.569 (media **59.341**) |
 | Coste | **0,00 €** en el 100% |
-| Tiempo de extremo a extremo | 36 – 338 s (media 159 s) |
+| Tiempo de extremo a extremo | 20 – 338 s (media 155 s) |
 
 El modelo es de razonamiento y el pliego entra completo, sin trocear: de ahí que el tiempo y el volumen de entrada varíen tanto de un pliego a otro.
 
@@ -85,7 +87,9 @@ Python 3.13 con `mypy --strict` · FastAPI async sobre Uvicorn · PostgreSQL 17 
 
 ### Limitaciones conocidas
 
-El campo de certificaciones es hoy demasiado inclusivo: el modelo mete ahí certificados que el pliego sólo *puntúa* como criterio de adjudicación, y a veces papeleo administrativo que presenta cualquier licitador. Como el veredicto trata esa lista como requisitos, puede salir un **NO APTO falso**. Está identificado, con los casos reales delante, y es lo primero de la revisión de fase.
+**Las certificaciones necesitaban saber por qué aparecen.** Un pliego las nombra en tres papeles distintos —exigidas para poder licitar, puntuadas como criterio de adjudicación, o papeleo que presenta cualquier licitador— y sólo el primero puede excluirte. El esquema no tenía dónde decirlo, así que el veredicto trataba las tres como requisitos y salían **NO APTO falsos**: cuatro de los seis análisis de la base de desarrollo los tenían. Ahora cada certificación viaja con su papel y su cita, y sólo la primera clase bloquea.
+
+Queda el límite honesto: eso arregla los análisis **nuevos**. Los que ya estaban guardados conservan lo que el modelo dijo entonces —la migración cambia la forma, no inventa lo que nadie leyó— así que un análisis anterior a este cambio sigue enseñando su veredicto de antes hasta que se vuelva a lanzar.
 
 ## Desarrollo
 
@@ -102,7 +106,7 @@ uv run celery -A compass.core.celery_app worker --pool=solo --loglevel=info
 uv run celery -A compass.core.celery_app beat --loglevel=info
 ```
 
-`uv run pytest` corre los **268 tests** contra Postgres y Redis reales; `uv run ruff check`, `uv run ruff format --check` y `uv run mypy` cierran el resto. Todo eso pasa también en [CI](.github/workflows/ci.yml) en cada push, contra los mismos contenedores de Postgres con pgvector y Redis.
+`uv run pytest` corre los **288 tests** contra Postgres y Redis reales; `uv run ruff check`, `uv run ruff format --check` y `uv run mypy` cierran el resto. Todo eso pasa también en [CI](.github/workflows/ci.yml) en cada push, contra los mismos contenedores de Postgres con pgvector y Redis.
 
 Cinco tests quedan fuera de CI (`@pytest.mark.real_corpus`): comparan el golden set y el embudo contra el corpus real de PLACSP persistido en local, y contra uno sintético no probarían nada. Los evals que llaman al modelo quedan fuera por lo mismo, y porque una corrida se come la cuota diaria del nivel gratuito.
 
