@@ -19,10 +19,30 @@ from compass.analysis.extraction_schema import (
     SubmissionDeadline,
     TechnicalSolvency,
 )
-from compass.analysis.verification import citation_faithfulness, verify_citation
+from compass.analysis.verification import (
+    CitationCheck,
+    check_citation,
+    citation_faithfulness,
+    citation_report,
+    verify_citation,
+)
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 PAGES = extract_pages((FIXTURES_DIR / "sample_pliego.pdf").read_bytes())
+
+# `pdfplumber`'s real output for the guarantees block of `040-2026-0075`, page 4, copied
+# verbatim from the parser in 5.8. Not simplified: the point of this page is that the
+# left column's label ("Garantía complementaria:") is split in two and the right
+# column's checkbox row lands between its halves, which is precisely what no
+# substring test can survive. A hand-written approximation would prove nothing.
+CUADRO_PAGE = (
+    "H. GARANTÍAS\n"
+    "Garantía provisional: ☒No ☐Sí\n"
+    "Garantía definitiva: ☒No ☐Sí\n"
+    "Garantía\n"
+    "☒No ☐Sí\n"
+    "complementaria:\n"
+)
 
 
 def _extraction_with_citations(*citations: Citation | None) -> PliegoExtraction:
@@ -146,3 +166,94 @@ def test_citation_faithfulness_is_the_correct_fraction_with_a_mix() -> None:
     )
 
     assert citation_faithfulness(extraction, PAGES) == 0.5
+
+
+def test_check_citation_verified_for_a_contiguous_quote() -> None:
+    """Protects the strongest outcome staying distinguishable from the other two: a
+    quote copied straight off its page is `VERIFIED`, not merely supported.
+    """
+    citation = Citation(clause="3", page=2, quote="Se exige la certificacion ISO 27001")
+
+    assert check_citation(citation, PAGES) is CitationCheck.VERIFIED
+
+
+def test_check_citation_reordered_when_the_parser_split_the_label_it_quotes() -> None:
+    """Protects the 5.8 finding: a model that reads a two-column Cuadro de
+    Características correctly quotes text the parser never emits contiguously, because
+    the right column's checkboxes land inside the left column's label. That is a
+    parsing artifact, not an invented quote, and it must not read as one.
+    """
+    citation = Citation(
+        clause="H",
+        page=1,
+        quote="Garantía complementaria: ☒No ☐Sí",
+    )
+
+    assert check_citation(citation, [CUADRO_PAGE]) is CitationCheck.VERIFIED_REORDERED
+
+
+def test_verify_citation_true_for_a_reordered_quote() -> None:
+    """Protects the behavior change the boolean callers see: before 5.8 this same
+    citation -- every word of it on the cited page -- counted as unfaithful.
+    """
+    citation = Citation(clause="H", page=1, quote="Garantía complementaria: ☒No ☐Sí")
+
+    assert verify_citation(citation, [CUADRO_PAGE]) is True
+
+
+def test_check_citation_unverified_when_the_page_lacks_a_word_of_the_quote() -> None:
+    """Protects what the looser rule must still catch. Taken from a real failure
+    (`1583900M`, 5.8): the model cited "3 meses" to page 1, which contains neither
+    word. Reordering can excuse a scrambled page; it cannot conjure absent text.
+    """
+    citation = Citation(clause="N.- PLAZO DE ENTREGA", page=1, quote="3 meses")
+
+    assert check_citation(citation, [CUADRO_PAGE]) is CitationCheck.UNVERIFIED
+
+
+def test_check_citation_keeps_checkbox_glyphs_as_tokens() -> None:
+    """Protects the tokenizer decision: in a Cuadro de Características the ☒/☐ glyphs
+    carry the answer, so quoting one against a page that has none is unverified --
+    dropping them as punctuation would let that pass.
+    """
+    citation = Citation(clause="H", page=1, quote="Objeto del contrato ☒")
+
+    assert check_citation(citation, PAGES) is CitationCheck.UNVERIFIED
+
+
+def test_check_citation_unverified_for_a_page_number_out_of_range() -> None:
+    """Protects the out-of-bounds page reaching the same outcome as absent text,
+    rather than crashing on the token comparison the reordered check adds.
+    """
+    citation = Citation(clause="1", page=99, quote="Objeto del contrato")
+
+    assert check_citation(citation, PAGES) is CitationCheck.UNVERIFIED
+
+
+def test_citation_report_names_the_outcome_of_every_present_citation() -> None:
+    """Protects per-field auditability: the score alone can't say *which* citation the
+    pliego doesn't support, and that is the question a reader actually has.
+    """
+    real = Citation(clause="1", page=1, quote="Objeto del contrato")
+    fabricated = Citation(clause="1", page=1, quote="texto que no existe en el pliego")
+    extraction = _extraction_with_citations(
+        real, fabricated, None, None, None, None, None, None, None
+    )
+
+    assert citation_report(extraction, PAGES) == {
+        "economic_solvency": CitationCheck.VERIFIED,
+        "technical_solvency": CitationCheck.UNVERIFIED,
+    }
+
+
+def test_citation_faithfulness_counts_a_reordered_citation_as_supported() -> None:
+    """Protects the number the README publishes from measuring the PDF's layout: on
+    `040-2026-0075` four of nine citations only matched reordered, and counting them as
+    failures reported 56% for an extraction that was faithful nine times out of nine.
+    """
+    reordered = Citation(clause="H", page=1, quote="Garantía complementaria: ☒No ☐Sí")
+    extraction = _extraction_with_citations(
+        reordered, None, None, None, None, None, None, None, None
+    )
+
+    assert citation_faithfulness(extraction, [CUADRO_PAGE]) == 1.0
