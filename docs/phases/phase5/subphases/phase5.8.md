@@ -358,40 +358,114 @@ la versión estricta de `_blocking_names` y los tests ya publicados esperaban la
 árbol de trabajo y no sobre lo commiteado; el `git status` antes de cada push es lo que lo
 habría cazado.
 
+### Paso 8 — Gastar la cuota que quedaba, y lo que enseñó
+
+Quedaban unas 10 peticiones del día. Cada análisis cuesta **una**, o dos si el nodo
+`extract` reintenta; la descarga del PCAP va contra PLACSP y no cuenta. Antes de tocar la
+base se respaldaron las seis filas a JSON, y cada reanálisis se fuerza poniendo la fila en
+`failed` para que el caché por `pdf_hash` no la salte.
+
+Lo que costó cada uno, y lo que dio:
+
+| # | Pliego | Peticiones | Resultado |
+| --- | --- | --- | --- |
+| 1 | `INN 26 002` (98 pp) | 1 | Prórrogas **arregladas**; certificaciones peor |
+| 2 | `INN 26 002`, esquema apretado | 2 (504 del proveedor + reintento) | Sin cambio en certificaciones |
+| 3 | `2026/20` (39 pp) | 2 | Agotó el tope de 300 s y su reintento |
+| 4 | `1276564F` (29 pp) | 1 | Duración base y cadena `citation`, **arregladas** |
+
+**Lo que sí quedó demostrado.** La primera corrida de `INN 26 002` contestó lo que la 5.6
+había cazado: `extensions_allowed: true` y «El contracte es podrà prorrogar fins a un màxim
+de 4 anys addicionals», donde antes se leía «Durada del contracte: 1 any» y nada más. Y en
+`1276564F` desapareció la cadena literal `citation`, la duración base salió limpia
+(«implantación… TRES MESES a partir de la formalización»), y la fidelidad subió de 67% a
+78%. El campo separado funciona: lo que no se puede contestar por omisión, se contesta.
+
+**Lo que no.** En los tres análisis que completaron, sobre tres pliegos distintos, **el
+modelo devolvió `required_to_bid` para todas y cada una de las certificaciones**. Nunca usó
+los otros dos papeles. Incluyó los cuatro perfiles de equipo de la cláusula F.3 de
+`INN 26 002` —que es «Indicació del personal tècnic», una exigencia de adscripción de
+medios con sus titulaciones— y una «Declaración responsable» que la descripción del campo
+nombra literalmente como papeleo.
+
+Entre la corrida 1 y la 2 se apretó el esquema: el nombre debe ser un certificado que tiene
+**la empresa**, y se prohíben explícitamente los perfiles, titulaciones y años de
+experiencia del personal. Mismo pliego, mismas cuatro entradas. Se deja escrito porque el
+intento fallido es parte del hallazgo: no es que el esquema estuviera mal redactado, es que
+**pedirle al modelo que clasifique no es fiable**, y seguir apretando el prompt sobre un
+único documento habría sido sobreajustar con la cuota de un sábado.
+
+### Paso 9 — El arreglo que faltaba lo hace el código, no el prompt
+
+Que el veredicto dependa de un juicio que el modelo falla contradice la regla del proyecto
+—el LLM extrae, el código decide—. Así que `analysis/certifications.py` define una sola vez
+qué cuenta como certificación formal, y `verdict.py` **comprueba la afirmación del modelo
+en vez de aceptarla**: una certificación bloquea sólo si su rol es `required_to_bid` **y**
+su nombre nombra un esquema reconocible (ISO/UNE-EN con su número, ENS, CMMI, CCN-CERT,
+ENAC). Lo que no lo sea pasa a **reserva**, con su cita, para que lo compruebe una persona.
+
+El sentido del error es deliberado, y da la vuelta a lo que `verdict.py` decía antes. Su
+docstring justificaba emparejar de forma permisiva diciendo que una certificación que falta
+bloquea entera, así que la precisión podía esperar a que hubiera evidencia de necesitarla.
+La evidencia llegó y apunta al otro lado: el fallo que este producto no se puede permitir es
+descartar en silencio una licitación que se podía ganar. Un APTO CON RESERVAS de más cuesta
+leer un pliego.
+
+`scoring.py` importa ahora la misma definición, así que lo que el veredicto hace y lo que el
+gate mide no pueden volver a separarse — que es exactamente el fallo con el que empezó esta
+subfase.
+
+**Los seis veredictos de la base, con el guardián puesto:**
+
+| expediente | antes de la 5.8 | ahora | |
+| --- | --- | --- | --- |
+| `INN 26 002` | NO APTO | **APTO CON RESERVAS** | perfiles de equipo, no certificaciones |
+| `1276564F` | NO APTO | **APTO CON RESERVAS** | una declaración responsable |
+| `2026/20` | NO APTO | **APTO CON RESERVAS** | certificados de estar al corriente |
+| `1583900M` | NO APTO | NO APTO | ISO 9001 / 14001 exigidas de verdad |
+| `0025-26` | APTO | APTO | |
+| `040-2026-0075` | APTO CON RESERVAS | APTO CON RESERVAS | |
+
+Los tres falsos NO APTO caen, el verdadero se queda, y los limpios no se mueven.
+
+**Y arregla también lo ya guardado.** El plan daba por hecho que las filas anteriores
+conservarían su veredicto equivocado hasta reanalizarlas. No hace falta: `2026/20` pasa a
+APTO CON RESERVAS **con su extracción antigua intacta**, porque el guardián mira el nombre,
+no la fecha. La migración sigue sin inventar nada y el veredicto se recalcula en cada
+lectura, así que la corrección llega sola. El apartado de limitaciones conocidas del README
+se ha reescrito con esto.
+
+`2026/20` se restauró desde el respaldo tras quedarse sin extracción por el timeout de la
+corrida 3; es su salida original del modelo, no una edición a mano.
+
 ### Estado al cerrar
 
-Los cinco gates del backend en verde sobre el árbol commiteado: **288 tests**
-(283 con la selección de CI), `ruff check`, `ruff format --check`, `mypy --strict` y
-`alembic check`. `npm run lint` y `npm run build`, limpios. La pila entera reconstruida y
-levantada, y el recorrido comprobado en pantalla.
+Los cinco gates del backend en verde sobre el árbol commiteado: **296 tests** (283 con la
+selección de CI antes del Paso 9), `ruff check`, `ruff format --check`, `mypy --strict` y
+`alembic check`. `npm run lint` y `npm run build`, limpios. Pila reconstruida, CSP servida y
+el recorrido comprobado en pantalla.
 
-Criterios 1, 3, 4, 6 y 7, cumplidos. El **2** está demostrado sobre las extracciones
-reales pero no escrito en la base, por la desviación razonada en el Paso 5.
+Criterios 1, 3, 4, 6 y 7, cumplidos. El **2** cumplido y además superado: el falso NO APTO
+desaparece en los tres casos, verificado contra la base real y sin tocar los datos.
 
-El **5 sólo a medias, y conviene decir cuál**. `uv run pytest` sale limpio en local y en
-CI, y ningún test vuelve a *afirmar* nada sobre la base ambiente. Pero
+El **5 sólo a medias, y conviene decir cuál**. `uv run pytest` sale limpio en local y en CI,
+y ningún test vuelve a *afirmar* nada sobre la base ambiente. Pero
 `test_generate_embeddings_embeds_every_tender_missing_one` sigue **actuando** sobre ella:
-`generate_embeddings` drena todo el backlog por diseño, así que ejecutarlo embebe de paso
-las licitaciones que la última ingesta dejó pendientes, y eso se confirma con un `commit()`
-que el rollback de la fixture no deshace. Es trabajo que el tic de beat haría igualmente en
-menos de quince minutos, así que no corrompe nada — pero no es lo que el criterio pedía, y
-acotarlo exigiría darle a la función un alcance que la ruta de arranque en frío necesita
-que no tenga. Queda escrito en vez de dado por hecho.
+`generate_embeddings` drena todo el backlog por diseño, así que ejecutarlo embebe de paso lo
+que la última ingesta dejó pendiente, con un `commit()` que el rollback de la fixture no
+deshace. Es trabajo que beat haría igual en quince minutos, así que no corrompe nada — pero
+no es lo que el criterio pedía, y acotarlo exigiría darle a la función un alcance que la
+ruta de arranque en frío necesita que no tenga.
 
-### Lo que queda pendiente, y cuesta una llamada por pliego
+### Lo que queda, con su precio
 
-Nada de lo anterior demuestra que **el modelo** rellene bien lo que el esquema nuevo le
-pide. Eso son dos afirmaciones distintas y sólo una está probada: el código decide bien con
-los roles correctos delante (Paso 5), y el esquema ya no admite una respuesta a medias
-sobre las prórrogas (Paso 2). Que el modelo elija `required_to_bid` frente a
-`award_criterion` en un pliego real, y que describa las prórrogas donde antes las callaba,
-exige analizar de nuevo — una petición por pliego, con el nivel gratuito en 50 al día.
+- **Que el modelo use los tres papeles.** Hoy no los usa, y el código lo suple. Mejorarlo es
+  trabajo de extracción —ejemplos en el prompt, o un campo aparte para la adscripción de
+  medios, que es la categoría que se cuela— y necesita varios pliegos para no sobreajustar:
+  una petición por intento y por pliego.
+- **Una corrida de `regression_eval`** contra los 25 del golden set, que son 25 peticiones y
+  miden de golpe los diez campos puntuables con el esquema nuevo.
+- **`freetext_eval`** sobre un par de pliegos (14 peticiones cada uno) para ver si las
+  descripciones mejoraron con la separación de prórrogas.
 
-Los candidatos están elegidos por lo que demuestran, no al azar:
-
-- **`INN 26 002`**, donde la ISO/IEC 20000 sólo puntúa 6 puntos, y cuyo plazo («1 any»)
-  esconde cinco prórrogas. Un solo análisis cubre las dos correcciones.
-- **`2026/20`**, cuyos tres certificados salen del requerimiento al adjudicatario.
-
-Con eso, y una corrida de `regression_eval` cuando la cuota lo permita, la fase queda
-cerrada del todo.
+Ninguna de las tres cambia lo que la aplicación hace hoy: son medida, no arreglo.
