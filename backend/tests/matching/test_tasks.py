@@ -49,7 +49,16 @@ async def _cleanup(session: AsyncSession) -> None:
 async def test_generate_embeddings_embeds_every_tender_missing_one(
     db_session: AsyncSession,
 ) -> None:
-    """Protects the core behavior: a NULL `title_embedding` gets populated, with the right shape."""
+    """Protects the core behavior: a NULL `title_embedding` gets populated, with the right shape.
+
+    Asserts over this test's own two rows, not over the returned count, and 5.8 is why.
+    `generate_embeddings` drains the *whole* backlog by design -- that is the behavior the
+    cold-start path depends on -- so on a machine holding the real corpus the count is
+    whatever the last ingestion happened to leave unembedded. It returned 245 the morning
+    this was found. The old `count == 2` was therefore an assertion about the ambient
+    database rather than about this function: it passed in CI, where the corpus is empty,
+    and failed for anyone actually running Compass.
+    """
     db_session.add(
         _unembedded_tender(f"{TASK_PREFIX}-1", "Mantenimiento de portal web institucional")
     )
@@ -59,11 +68,15 @@ async def test_generate_embeddings_embeds_every_tender_missing_one(
     try:
         count = await generate_embeddings(db_session)
 
-        assert count == 2
+        # Two of them are this test's; anything above that is the ambient backlog, which
+        # is not this test's business either way.
+        assert count >= 2
         result = await db_session.execute(
             select(Tender).where(Tender.expediente.like(f"{TASK_PREFIX}%"))
         )
-        for tender in result.scalars().all():
+        embedded = result.scalars().all()
+        assert len(embedded) == 2
+        for tender in embedded:
             assert tender.title_embedding is not None
             assert len(tender.title_embedding) == EMBEDDING_DIMENSIONS
     finally:

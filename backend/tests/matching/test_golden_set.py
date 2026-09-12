@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from compass.matching.golden_set import (
+    ANNOTATED_THROUGH,
     EXCLUDED_EXPEDIENTES,
     NOT_RELEVANT_EXPEDIENTES,
     RELEVANT_EXPEDIENTES,
@@ -26,7 +27,7 @@ async def test_golden_set_covers_exactly_the_real_etapa1_survivors(
     db_session: AsyncSession,
 ) -> None:
     """Protects the golden set from silently going stale: every tender the funnel ranks
-    today must be one a human actually annotated.
+    today, out of those the annotator could have seen, must be one a human labelled.
 
     Checked as containment, not equality, and the reason is worth writing down. The golden
     set was annotated by hand against the Etapa 1 survivors as they stood in 2.3. Equality
@@ -40,15 +41,24 @@ async def test_golden_set_covers_exactly_the_real_etapa1_survivors(
     miss no matter how good the ranking is. The opposite direction -- annotated tenders
     that have since closed -- is just time passing, and silently re-annotating to chase it
     would destroy the hand-made labels this whole file exists to protect.
+
+    Scoped to `ANNOTATED_THROUGH` since 5.8. Without that bound this asserted something no
+    daily ingestion could leave true: the corpus grows every night, and the first newly
+    ingested IT tender still open for bids failed it. Four had arrived by then, and the
+    failure said nothing about the golden set going stale -- only that time had passed. A
+    tender ingested *before* the snapshot and still unlabelled is the real alarm, and this
+    still raises it.
     """
     provider = await get_provider(db_session)
     assert provider is not None
     items, _total = await list_matches(db_session, provider, limit=1000, offset=0)
 
-    real_survivors = {tender.expediente for tender in items}
+    annotatable = {tender.expediente for tender in items if tender.created_at <= ANNOTATED_THROUGH}
     golden_set_population = RELEVANT_EXPEDIENTES | NOT_RELEVANT_EXPEDIENTES | EXCLUDED_EXPEDIENTES
 
-    assert real_survivors <= golden_set_population, (
-        "estas licitaciones sobreviven a Etapa 1 pero nadie las ha anotado: "
-        f"{sorted(real_survivors - golden_set_population)}"
+    unlabelled = sorted(annotatable - golden_set_population)
+
+    assert not unlabelled, (
+        "estas licitaciones ya estaban en el corpus cuando se anotó el golden set, "
+        f"sobreviven a Etapa 1 y nadie las ha anotado: {unlabelled}"
     )
