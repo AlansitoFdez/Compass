@@ -357,3 +357,41 @@ la versión estricta de `_blocking_names` y los tests ya publicados esperaban la
 `_identities`. Corregido en `0e24434`. Lo que lo dejó pasar fue ejecutar los gates sobre el
 árbol de trabajo y no sobre lo commiteado; el `git status` antes de cada push es lo que lo
 habría cazado.
+
+### Estado al cerrar
+
+Los cinco gates del backend en verde sobre el árbol commiteado: **288 tests**
+(283 con la selección de CI), `ruff check`, `ruff format --check`, `mypy --strict` y
+`alembic check`. `npm run lint` y `npm run build`, limpios. La pila entera reconstruida y
+levantada, y el recorrido comprobado en pantalla.
+
+Criterios 1, 3, 4, 6 y 7, cumplidos. El **2** está demostrado sobre las extracciones
+reales pero no escrito en la base, por la desviación razonada en el Paso 5.
+
+El **5 sólo a medias, y conviene decir cuál**. `uv run pytest` sale limpio en local y en
+CI, y ningún test vuelve a *afirmar* nada sobre la base ambiente. Pero
+`test_generate_embeddings_embeds_every_tender_missing_one` sigue **actuando** sobre ella:
+`generate_embeddings` drena todo el backlog por diseño, así que ejecutarlo embebe de paso
+las licitaciones que la última ingesta dejó pendientes, y eso se confirma con un `commit()`
+que el rollback de la fixture no deshace. Es trabajo que el tic de beat haría igualmente en
+menos de quince minutos, así que no corrompe nada — pero no es lo que el criterio pedía, y
+acotarlo exigiría darle a la función un alcance que la ruta de arranque en frío necesita
+que no tenga. Queda escrito en vez de dado por hecho.
+
+### Lo que queda pendiente, y cuesta una llamada por pliego
+
+Nada de lo anterior demuestra que **el modelo** rellene bien lo que el esquema nuevo le
+pide. Eso son dos afirmaciones distintas y sólo una está probada: el código decide bien con
+los roles correctos delante (Paso 5), y el esquema ya no admite una respuesta a medias
+sobre las prórrogas (Paso 2). Que el modelo elija `required_to_bid` frente a
+`award_criterion` en un pliego real, y que describa las prórrogas donde antes las callaba,
+exige analizar de nuevo — una petición por pliego, con el nivel gratuito en 50 al día.
+
+Los candidatos están elegidos por lo que demuestran, no al azar:
+
+- **`INN 26 002`**, donde la ISO/IEC 20000 sólo puntúa 6 puntos, y cuyo plazo («1 any»)
+  esconde cinco prórrogas. Un solo análisis cubre las dos correcciones.
+- **`2026/20`**, cuyos tres certificados salen del requerimiento al adjudicatario.
+
+Con eso, y una corrida de `regression_eval` cuando la cuota lo permita, la fase queda
+cerrada del todo.
