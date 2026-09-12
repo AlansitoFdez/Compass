@@ -66,11 +66,16 @@ reconstruyó la celda correctamente; `verify_citation` exige substring contiguo,
 falla. Y el valor extraído es correcto en los tres casos de tabla.
 
 El sesgo es sistemático y va **contra** el modelo, precisamente en las páginas que más
-pesan. Pero no todo es layout, y esa es la otra mitad del problema: en `guarantees` el
-modelo añadió una fila («Garantía complementaria: ☒No ☐Sí») que no aparece en ninguna
-página del documento. Eso sí es invención — y hoy el mismo número la mezcla con lo
-anterior, así que no distingue «el modelo se lo inventó» de «pdfplumber desordenó una
-tabla».
+pesan.
+
+> **Corrección hecha al medir, antes de tocar código.** Al escribir este plan se dio por
+> invención un cuarto caso: la fila «Garantía complementaria: ☒No ☐Sí», que no aparecía
+> entera en ninguna página. No es invención. La página 4 la contiene, partida por el
+> mismo mecanismo: `Garantía` / `☒No ☐Sí` / `complementaria:`, con la fila de casillas de
+> la columna derecha metida entre las dos mitades de la etiqueta. O sea que en
+> `040-2026-0075` **las nueve citas son fieles** y el 56% publicado es íntegramente
+> artefacto del linearizador. El caso de invención real está en otro pliego (`1583900M`,
+> ver el Paso 1), y esa es la frontera que hay que saber trazar.
 
 **C. Las descripciones se quedan cortas donde el esquema pide más.**
 
@@ -138,9 +143,9 @@ queda pendiente de una sola llamada, explícitamente marcada como tal.
 ### Criterios de aceptación
 
 1. **B:** `citation_faithfulness` distingue una cita inventada de una cita correcta que el
-   linearizador partió. Demostrado sobre los análisis reales, con los dos casos de
-   `040-2026-0075` —`subcontracting` (tabla) y `guarantees` (fila inexistente)— cayendo en
-   lados distintos.
+   linearizador partió. Demostrado sobre los análisis reales, con las cuatro citas de tabla
+   de `040-2026-0075` cayendo del lado bueno y las de `1583900M` —que cita «3 meses» a una
+   página que no contiene ninguna de las dos palabras— del otro.
 2. **A:** el falso NO APTO de `2026/20` desaparece, y `verdict.py` sólo bloquea con
    certificaciones exigidas para licitar. Verificado contra la base real, no sólo en tests.
 3. **A:** `scoring.py` deja de ser ciego a la basura: un `certifications` con papeleo donde
@@ -155,3 +160,200 @@ queda pendiente de una sola llamada, explícitamente marcada como tal.
    `alembic check`, más `npm run lint` y `npm run build`.
 
 ## Progreso
+
+### Paso 1 — Medir la fidelidad de citas antes de tocarla
+
+Recalculadas las nueve citas de los seis análisis de la base contra sus PCAP reales, bajo
+tres reglas candidatas: substring contiguo (la de hoy), subsecuencia de tokens en orden, y
+cobertura de tokens sobre la página citada. Cero llamadas al modelo: las extracciones ya
+estaban guardadas y los PDF se bajan de PLACSP.
+
+La subsecuencia ordenada se descartó con los datos delante, y por un motivo que no se veía
+antes de medir: el linearizador no sólo **intercala** texto ajeno, también **reordena**. En
+`040-2026-0075` la etiqueta «Garantía complementaria:» sale partida en dos con la fila de
+casillas en medio, así que el orden de la página (`Garantía`, `☒No ☐Sí`, `complementaria`)
+no es el de la cita (`Garantía`, `complementaria`, `☒No ☐Sí`). Ninguna regla basada en
+orden sobrevive a eso.
+
+Lo que queda es la cobertura, y como regla binaria sería demasiado laxa. Así que
+`verify_citation` deja de devolver un booleano y `check_citation` devuelve **tres**
+resultados: `VERIFIED` (aparece literal), `VERIFIED_REORDERED` (todas sus palabras están en
+esa página, pero no seguidas) y `UNVERIFIED` (a la página le falta alguna). Sólo la tercera
+significa que el modelo escribió algo que el pliego no dice. Y se quedan en clases
+separadas a propósito, porque la segunda es evidencia más débil: al ignorar el orden no
+puede distinguir `☒No ☐Sí` de `☐No ☒Sí`. `citation_report` las publica por campo.
+
+Resultado sobre los seis análisis:
+
+| expediente | antes | ahora | literales | reordenadas | sin verificar |
+| --- | --- | --- | --- | --- | --- |
+| `040-2026-0075` | 56% | **100%** | 5 | 4 | 0 |
+| `INN 26 002` | 56% | 67% | 5 | 1 | 3 |
+| `1583900M` | 22% | 44% | 2 | 2 | 5 |
+| `0025-26` | 78% | 78% | 7 | 0 | 2 |
+| `1276564F` | 67% | 67% | 6 | 0 | 3 |
+| `2026/20` | 50% | 50% | 3 | 0 | 3 |
+
+Lo importante no es que suba, es **que no sube en todas**: tres de los seis no se mueven.
+La regla no perdona, discrimina. Y sigue cazando lo que tiene que cazar — `1583900M` cita
+«3 meses» a una página 1 que no contiene ni «3» ni «meses», y en otro campo cita el texto
+de subcontratación bajo el plazo de presentación. La basura de `2026/20` que provoca el
+falso NO APTO tampoco verifica: dos señales independientes apuntando a la misma fila.
+
+El pliego de la captura del README pasa de 56% a 100%, y ese número era el que peor
+mentía: las nueve citas eran correctas y el producto publicaba un 56% como señal de
+confianza.
+
+### Paso 2 — Un solo cambio de esquema para las dos causas
+
+`certifications` pasa de `list[str]` con una cita compartida a una lista de
+`RequiredCertification`, cada una con su `role` (`CertificationRole`: exigida para licitar,
+criterio de adjudicación, o papeleo) y **su propia cita**. Desaparece
+`certifications_citation`, que era el único campo del esquema que no emparejaba un valor
+con su evidencia. `verdict.compute_verdict` sólo bloquea con el primer rol.
+
+`ExecutionDeadline` gana `extensions_allowed` (tri-estado: sí, no, o «el PCAP no lo
+aborda») y `extensions_description`. La descripción pasa a ser sólo la duración base. Un
+campo obligatorio aparte no se puede contestar por omisión, que es exactamente lo que pasó
+con «Durada del contracte: 1 any».
+
+Y `scoring.py`, que era la mitad ciega. El regex viejo (`ISO\d+|CMMI|ENS|IEC\d+|CCN-CERT`)
+**se queda**, porque la tolerancia al fraseo que compra es real: «ISO 27000 o equivalente»
+e «ISO27000» son la misma exigencia. Lo que cambia es qué pasa cuando no casa: antes el
+nombre se **descartaba**, ahora se conserva entero. Con eso, la basura que provocaba los
+falsos NO APTO deja de reducirse al conjunto vacío. Además compara por igualdad y no por
+contención —una certificación de más es justo lo que se convierte en un falso NO APTO— y
+sólo mira las de rol bloqueante, que son las únicas que el veredicto lee. Un décimo campo
+puntuable, `execution_deadline.extensions_allowed`, entra en la misma tanda.
+
+Un intento intermedio quedó por el camino y merece quedar escrito: la primera versión
+comparaba el nombre normalizado completo, lo que cambiaba una ceguera por una fragilidad
+—«ISO 27001» y «UNE-EN ISO 27001:2013 o equivalente» habrían puntuado como distintas—. Un
+estándar se identifica por su número, no por la familia que lo prefija.
+
+### Paso 3 — El golden set, re-anotado contra los PCAP y no por conversión
+
+Las 22 certificaciones de las nueve entradas anotadas se re-leyeron en su propio pliego
+antes de asignarles rol, en vez de heredar la etiqueta. Las nueve resultaron exigencias
+reales de admisión: la cláusula 6.4 de `A41119033-2026/000065-PeAS` («los licitadores
+deberán acreditar además el cumplimiento de los requisitos de solvencia técnica y
+profesional que se refieren a continuación»), la 10.1.l) de `2545974A`
+(«**Obligatoriamente** licitador deberá entregar…»), la «Habilitación» de la cláusula 12.A)
+de `SERV-2026000088`, y las cláusulas «se exige la presentación de certificado» de los tres
+pliegos de Red.es. O sea que las etiquetas humanas eran correctas: lo que el rol arregla es
+la salida del **modelo**, no este fichero.
+
+Las prórrogas salieron de las descripciones que el anotador ya había escrito («prorrogable
+hasta dos años más», «sin posibilidad de prórroga»). Cinco entradas no las mencionaban, y
+ahí se abrió el PCAP en vez de marcarlas «no se dice» — **y eso cazó dos que habrían
+quedado mal etiquetadas**: `A41119033-2026/000065-PeAS` difiere la *duración* al PPT pero
+dice en su página 2 «No se ha previsto la posibilidad de prórroga», y `2026000731` dice en
+la 16 «Dado que no se prevén prórrogas ni modificaciones». Las dos son `False`, no `None`.
+Quedan tres en `None`, que no mencionan prórrogas en ninguna página.
+
+El reparto final: 13 con prórroga, 9 sin ella, 3 sin pronunciarse.
+
+### Paso 4 — La migración: cambia la forma, no inventa lo que nadie leyó
+
+`c3f1ab90d742` reescribe el JSONB guardado. Es a mano y no autogenerada por una razón que
+conviene no olvidar: la extracción vive en una columna JSONB sin estructura declarada, así
+que un cambio de forma en `PliegoExtraction` es **invisible** para un diff de esquema — y
+sin embargo cada fila escrita antes deja de validar en cuanto la aplicación la lee, porque
+el modelo es `extra="forbid"`. Sin migración, una instalación existente responde 500 en
+cada `GET /analysis` que tenga extracción.
+
+Cada certificación migrada recibe `role = "required_to_bid"`, que es exactamente lo que el
+campo viejo decía ser. Es la conversión fiel, y conserva a propósito los veredictos
+equivocados que una extracción anterior ya producía: una migración que reetiquetara en
+silencio cambiaría veredictos sobre evidencia que nadie ha vuelto a leer. `extensions_allowed`
+queda en `null` por lo mismo — «esta extracción nunca contestó a eso» es cierto; una
+suposición se leería como una respuesta. La cita compartida va sólo al primer elemento: es
+una frase literal, y nombra como mucho a la certificación para la que se escribió.
+
+Comprobado aplicándola: los seis veredictos salen idénticos a los de antes, que es el
+criterio de que una migración fiel funciona.
+
+### Paso 5 — El criterio 2, demostrado sobre los datos reales
+
+Con los roles que cada pliego le da a sus certificaciones —leídos de las citas que el
+propio modelo dejó guardadas, y del PCAP donde hacía falta— recalculados los seis
+veredictos:
+
+| expediente | guardado | con el rol real | |
+| --- | --- | --- | --- |
+| `INN 26 002` | NO APTO | **APTO CON RESERVAS** | dos certificaciones que sólo puntúan |
+| `1276564F` | NO APTO | **APTO** | una declaración responsable, más la cadena `citation` |
+| `2026/20` | NO APTO | **APTO** | tres certificados del requerimiento al adjudicatario |
+| `1583900M` | NO APTO | NO APTO | exigencias reales (arts. 93 y 94 LCSP) |
+| `0025-26` | APTO | APTO | sin certificaciones |
+| `040-2026-0075` | APTO CON RESERVAS | APTO CON RESERVAS | sin certificaciones |
+
+Tres falsos NO APTO desaparecen y **`1583900M` sigue siendo NO APTO**, correctamente: su
+ANEXO III exige ISO 9001, ISO 27001/ENS e ISO 14001 como solvencia técnica, y el perfil
+declara dos de las tres. El arreglo discrimina; no afloja.
+
+**Una desviación del plan, y por qué.** El plan acordado decía migrar a mano los seis
+análisis guardados. No se ha hecho, y la demostración de arriba es offline. El motivo
+apareció al ir a ejecutarlo: editar a mano la salida del modelo en la base deja una base de
+demostración que enseña algo que el modelo no produjo, y de ahí salen las capturas del
+README. El límite que el plan ya reconocía —que migrar a mano no demuestra que el modelo
+rellene bien el rol— se vuelve peor si además el dashboard finge datos corregidos. Así que
+la base conserva lo que el modelo dijo, el README lo dice en sus limitaciones conocidas, y
+la corrección real llegará al reanalizar.
+
+### Paso 6 — Dos tests que afirmaban cosas sobre la base ambiente
+
+`test_generate_embeddings_embeds_every_tender_missing_one` exigía `count == 2`, pero
+`generate_embeddings` **drena todo el backlog** por diseño: devolvió 245 la mañana en que
+se encontró. Pasaba en CI, donde el corpus está vacío, y fallaba en la máquina de quien de
+verdad usa Compass. Afirma ahora sobre sus propias dos filas.
+
+`test_golden_set_covers_exactly_the_real_etapa1_survivors` fallaba con cuatro expedientes
+sin anotar, los cuatro ingeridos esa misma mañana. La anotación cubre una foto del corpus
+del 7 de septiembre, y eso vivía sólo en la prosa; ahora es `ANNOTATED_THROUGH` y la
+aserción se acota por `Tender.created_at`. Una licitación ingerida **después** de la foto no
+era anotable, así que no prueba que el golden set esté rancio; una anterior y sin etiqueta
+sí, y esa alarma sigue en pie.
+
+### Paso 7 — Lo que la documentación decía y ya no era verdad
+
+Números remedidos hoy, con el comando al lado:
+
+| Dato | Antes | Ahora | De dónde sale |
+| --- | --- | --- | --- |
+| Corpus | 3.583 | 5.363 | `GET /matches`, `funnel.total` |
+| Embudo | 3.583 → 71 → 25 → 6 | 5.363 → 104 → 35 → 10 | ídem |
+| Sólo vectorial | 3 de 6 | 6 de 10 | `GET /matches`, `lexical_rank` nulo |
+| Estado abierto con plazo vencido | 429 de 508 (84%) | 1.636 de 1.740 (94%) | consulta directa |
+| Análisis trazados | 35 | 36 | `python -m compass.analysis.cost_report` |
+| Tokens por análisis | 31.729–118.486 (60.399) | 22.300–118.569 (59.341) | ídem |
+| Tiempo | 36–338 s (159 s) | 20–338 s (155 s) | ídem |
+| Tests | 268 | 288 | `uv run pytest` |
+
+Y tres afirmaciones caducadas: el README describía la verificación de citas como una
+comparación literal a secas (ahora cuenta los tres resultados y por qué), su apartado de
+limitaciones conocidas anunciaba el fallo de `certifications` como pendiente, y
+`matching/repository.py` decía que la Etapa 2 era «a later subphase» y atribuía a la 5.4 el
+filtro de fecha viva que hizo la 5.3.
+
+**La CSP, escrita en vez de aplazada otra vez.** El comentario de `next.config.ts` la
+difería «a la decisión de despliegue de la 5.4», que cerró sin ella. La 5.4 sí resolvió lo
+que bloqueaba —dónde está la API para el navegador—, así que la política se escribe a
+partir de `NEXT_PUBLIC_API_URL`. Con su límite dicho en el propio comentario: `script-src`
+tiene que admitir `'unsafe-inline'` porque Next arranca la hidratación con scripts en
+línea, así que esto no detiene una inyección que ya haya conseguido meter un script; lo que
+detiene es el paso siguiente —cargar código de otro origen, o mandar algo a uno—, que es el
+riesgo real de una aplicación cuyo trabajo es renderizar texto de PDF ajenos.
+
+Verificado levantando la pila entera con las imágenes reconstruidas: la cabecera viaja, la
+portada renderiza con su embudo y su tipografía, y la ficha de `2026/20` enseña el análisis
+completo con las etiquetas de rol y la cita por certificación.
+
+### El incidente de CI
+
+Los commits `94e4e92` a `4a8b260` salieron en rojo. Al partir el commit del esquema en
+código y tests, la reescritura de `scoring.py` se quedó sin añadir al índice: HEAD llevaba
+la versión estricta de `_blocking_names` y los tests ya publicados esperaban la de
+`_identities`. Corregido en `0e24434`. Lo que lo dejó pasar fue ejecutar los gates sobre el
+árbol de trabajo y no sobre lo commiteado; el `git status` antes de cada push es lo que lo
+habría cazado.
