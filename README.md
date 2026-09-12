@@ -87,9 +87,11 @@ Python 3.13 con `mypy --strict` · FastAPI async sobre Uvicorn · PostgreSQL 17 
 
 ### Limitaciones conocidas
 
-**Las certificaciones necesitaban saber por qué aparecen.** Un pliego las nombra en tres papeles distintos —exigidas para poder licitar, puntuadas como criterio de adjudicación, o papeleo que presenta cualquier licitador— y sólo el primero puede excluirte. El esquema no tenía dónde decirlo, así que el veredicto trataba las tres como requisitos y salían **NO APTO falsos**: cuatro de los seis análisis de la base de desarrollo los tenían. Ahora cada certificación viaja con su papel y su cita, y sólo la primera clase bloquea.
+**Qué puede rechazarte, y quién decide que puede.** Un pliego nombra certificaciones en tres papeles —exigidas para licitar, puntuadas como criterio de adjudicación, o papeleo que presenta cualquier licitador— y sólo el primero excluye. El esquema no tenía dónde decirlo, así que el veredicto trataba las tres como requisitos y salían **NO APTO falsos**: cuatro de los seis análisis de la base de desarrollo los tenían. Ahora cada certificación viaja con su papel y su cita.
 
-Queda el límite honesto: eso arregla los análisis **nuevos**. Los que ya estaban guardados conservan lo que el modelo dijo entonces —la migración cambia la forma, no inventa lo que nadie leyó— así que un análisis anterior a este cambio sigue enseñando su veredicto de antes hasta que se vuelva a lanzar.
+Pero el papel lo rellena el modelo, y **medido sobre tres pliegos reales, no lo rellena bien**: devolvió «exigida para licitar» en todos los casos, incluidos cuatro perfiles de equipo («Responsable técnico del proyecto») y una declaración responsable. Así que el código no se fía: una certificación sólo bloquea si además es un esquema reconocible —ISO, UNE-EN, ENS, CMMI, CCN-CERT, ENAC—. Lo que no lo es aparece como **reserva**, con su cláusula citada, para que lo compruebes tú. Un APTO CON RESERVAS de más cuesta leer un pliego; un NO APTO de más cuesta un contrato que nunca llegaste a ver.
+
+Es el mismo principio que el resto del proyecto: el modelo extrae, el código decide. Aquí decide incluso sobre lo que el modelo afirma de sí mismo.
 
 ## Desarrollo
 
