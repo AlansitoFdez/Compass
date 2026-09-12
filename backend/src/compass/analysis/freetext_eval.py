@@ -27,7 +27,9 @@ and why -- are what let a person open the pliego and tell whether the judge was 
 
 import argparse
 import asyncio
+import io
 import math
+import sys
 from dataclasses import dataclass, field
 from typing import cast
 
@@ -65,6 +67,13 @@ DEFAULT_JUDGE_MODEL = "nex-agi/nex-n2.5-pro:free"
 # A judge call reasons over ~3 pages of clause text on a free-tier queue; a stuck request
 # would otherwise hang the run with nothing to show for the quota already spent.
 JUDGE_TIMEOUT_SECONDS = 300.0
+
+# RAGAS defaults to 1024 (`InstructorModelArgs`), and its own docstring warns that isn't
+# enough for a model that reasons before answering. It isn't: on the second pliego of the
+# first real run, 5 of 7 descriptions came back as "output is incomplete due to a
+# max_tokens length limit" -- the reasoning ate the budget and the JSON was truncated
+# mid-object. Every one of those still cost a request.
+JUDGE_MAX_TOKENS = 4096
 
 # Roughly what one pliego costs: 7 descriptions, 2 calls each, minus whatever the pliego
 # doesn't address. Printed in `--help` so the budget is visible before spending it.
@@ -279,6 +288,13 @@ def _report(results: list[DocumentResult], requests_made: int) -> None:
 
 
 async def _main() -> None:
+    # Everything this prints -- descriptions, claims, the judge's reasons -- is Spanish or
+    # Catalan prose, and a Windows console defaults to cp1252, where every accent comes
+    # out as a replacement character. The point of printing the reasons is that a person
+    # reads them against the pliego, so they have to survive the terminal.
+    if isinstance(sys.stdout, io.TextIOWrapper):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--limit",
@@ -307,7 +323,7 @@ async def _main() -> None:
             timeout=JUDGE_TIMEOUT_SECONDS, event_hooks={"request": [counter]}
         ),
     )
-    llm = llm_factory(args.judge_model, client=openai_client)
+    llm = llm_factory(args.judge_model, client=openai_client, max_tokens=JUDGE_MAX_TOKENS)
     metric = Faithfulness(llm=llm)
 
     print(f"Judge: {args.judge_model}; evaluating {len(analyses)} pliego(s)\n")
