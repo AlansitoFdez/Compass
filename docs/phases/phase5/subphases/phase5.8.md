@@ -438,6 +438,40 @@ se ha reescrito con esto.
 `2026/20` se restauró desde el respaldo tras quedarse sin extracción por el timeout de la
 corrida 3; es su salida original del modelo, no una edición a mano.
 
+### Paso 10 — Lo que las capturas del README destaparon
+
+Recapturadas con Edge en modo *headless*, porque las de la 5.7 ya contradecían al texto:
+enseñaban el embudo `3.583 → 71 → 25 → 6` junto a un README que dice `5.363 → 104 → 35 →
+10`, y una fila «CERTIFICACIONES EXIGIDAS / Ninguna» que la pantalla ya no escribe así.
+
+**Y al mirarlas apareció un hueco que ningún test iba a dar.** La ficha seguía marcando
+**56%** de fidelidad en el pliego de la captura — el mismo que el Paso 1 había medido en
+100%. El motivo: `citation_faithfulness` es una **columna**, escrita una vez al analizar, y
+no se recalcula al leer como sí hace el veredicto. Así que el arreglo de la verificación no
+llegaba solo a lo ya guardado, y el README acababa explicando los tres resultados encima de
+una captura que enseñaba el número de la regla vieja.
+
+Recalculadas las seis filas contra sus PCAP (cero cuota: sólo descarga y comparación en
+Python):
+
+| expediente | antes | ahora | |
+| --- | --- | --- | --- |
+| `040-2026-0075` | 56% | **100%** | 4 citas reordenadas de 8 |
+| `1583900M` | 22% | **44%** | 2 de 9 |
+| `0025-26` | 78% | **75%** | baja, y es correcto |
+| `INN 26 002`, `1276564F`, `2026/20` | — | igual | sin citas de tabla |
+
+El caso de `0025-26` merece la explicación porque va hacia abajo: su extracción traía
+`certifications: []` **con** una cita, que el esquema anterior permitía y la verificación
+contaba. Al pasar cada certificación a llevar la suya, una lista vacía no tiene ninguna, así
+que esa cita desaparece del cálculo — numerador y denominador a la vez, 7/9 pasa a 6/8. Una
+cita que no acompañaba a ningún valor no debía puntuar.
+
+Queda escrito que esto se hizo con un script de un solo uso sobre la base de desarrollo. Una
+instalación que ya tuviera análisis guardados vería el número viejo hasta reanalizar: la
+columna no se puede recalcular al leer sin volver a descargar el PDF en cada lectura, y eso
+es un coste que una ficha no debe pagar.
+
 ### Estado al cerrar
 
 Los cinco gates del backend en verde sobre el árbol commiteado: **296 tests** (283 con la
