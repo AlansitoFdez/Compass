@@ -14,6 +14,13 @@ from compass.analysis.enums import CertificationRole
 from compass.analysis.extraction_schema import PliegoExtraction, RequiredCertification
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
+# The families a PCAP actually names, and the only part of the phrase that identifies
+# one: everything around it ("o equivalente", "en vigor", "nivel medio o superior") is
+# wording two annotators would never write the same way.
+_STANDARD_RE = re.compile(
+    r"(?:ISO/?\s?IEC|ISO|UNE(?:[-\s]?EN)?|EN)\s?\d{4,5}|CMMI|ENS\b|CCN-?CERT", re.IGNORECASE
+)
+_DIGITS_RE = re.compile(r"\d{4,5}")
 
 
 def _normalized_name(name: str) -> str:
@@ -25,26 +32,50 @@ def _normalized_name(name: str) -> str:
     return " ".join(_WORD_RE.findall(without_accents.lower()))
 
 
+def _identities(name: str) -> set[str]:
+    """What `name` actually claims, as comparable identifiers.
+
+    A standard is identified by its number, not by the family that prefixes it:
+    'ISO 27001', 'ISO/IEC 27001' and 'UNE-EN ISO 27001:2013' are the same requirement,
+    so all three reduce to `{'27001'}`. A name that matches no known family keeps its
+    whole normalized text instead of reducing to nothing -- which is the entire point,
+    see `_blocking_names`.
+    """
+    marks = _STANDARD_RE.findall(name)
+    if not marks:
+        return {_normalized_name(name)}
+    identities = set()
+    for mark in marks:
+        digits = _DIGITS_RE.search(mark)
+        identities.add(digits.group(0) if digits else _normalized_name(mark))
+    return identities
+
+
 def _blocking_names(certifications: list[RequiredCertification]) -> set[str]:
-    """The certifications that can actually fail a bid, normalized for comparison.
+    """The certifications that can actually fail a bid, reduced to comparable identifiers.
 
     Only `REQUIRED_TO_BID` ones, because those are exactly what `verdict.compute_verdict`
     blocks on -- scoring anything else would measure a field the verdict never reads.
 
-    Until 5.8 this scored a regex over the raw strings (`ISO\\d+|CMMI|ENS|IEC\\d+|
-    CCN-CERT`), and that made the gate blind to the failure mode that mattered. The
-    garbage a real extraction put in this field -- "Certificación positiva, expedida por
-    la Agencia Estatal de Administración Tributaria...", and in one case the literal
-    string "citation" -- contains no such token, so it reduced to the empty set; against
-    a golden-set entry annotated `[]` the comparison then said **correct**. The field
-    that produced false NO APTO verdicts was passing its own regression gate, because
-    what the verdict acted on and what the gate measured were not the same thing.
+    Until 5.8 this ran a regex (`ISO\\d+|CMMI|ENS|IEC\\d+|CCN-CERT`) over the raw strings
+    and **kept only what matched**, which made the gate blind to the failure mode that
+    mattered. The garbage a real extraction put in this field -- "Certificación positiva,
+    expedida por la Agencia Estatal de Administración Tributaria...", and in one case the
+    literal string "citation" -- contains no such token, so it reduced to the empty set;
+    against a golden-set entry annotated `[]` the comparison then said **correct**. The
+    field that produced false NO APTO verdicts was passing its own regression gate,
+    because what the verdict acted on and what the gate measured were not the same thing.
+
+    The regex stays, because the phrasing tolerance it bought is real -- "ISO 27000 o
+    equivalente" and "ISO27000" are the same demand. What changed is what happens when it
+    doesn't match: the name is kept whole instead of discarded, so anything the model
+    invents is counted rather than silently erased.
     """
-    return {
-        _normalized_name(certification.name)
-        for certification in certifications
-        if certification.role is CertificationRole.REQUIRED_TO_BID
-    }
+    identities: set[str] = set()
+    for certification in certifications:
+        if certification.role is CertificationRole.REQUIRED_TO_BID:
+            identities |= _identities(certification.name)
+    return identities
 
 
 def _price_points(extraction: PliegoExtraction) -> float | None:
