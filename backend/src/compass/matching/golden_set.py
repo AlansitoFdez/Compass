@@ -19,6 +19,29 @@ platform implementations -- are excluded from the set entirely rather than force
 an uncertain annotation is worse than no annotation for a set meant to measure precision.
 """
 
+from datetime import UTC, datetime
+
+ANNOTATED_THROUGH = datetime(2026, 9, 7, tzinfo=UTC)
+"""The corpus snapshot these labels cover: every tender ingested on or before this date.
+
+Recorded as a constant in 5.8, because leaving it only in the prose above turned into a
+test that could not stay green. `test_golden_set_covers_exactly_the_real_etapa1_survivors`
+asserted that every live Etapa 1 survivor carried a label -- true the day it was written,
+and false from the first daily ingestion that brought in an IT tender still open for bids.
+Four of them had arrived by 5.8 (`2026-074`, `2026-P154`, `2026/CTT_01/000105`,
+`45/26 NEG`), all ingested that same morning, and the suite had been failing on the
+developer's machine ever since while passing in CI, where the corpus is empty.
+
+A tender ingested after this date was never annotatable, so it is not evidence of a stale
+golden set; one ingested before it and still unlabelled is. Scoping the assertion by
+`Tender.created_at` keeps the second alarm and drops the first.
+
+The one thing this doesn't fix: `embedding_eval.py` ranks whatever Etapa 1 returns today,
+so newer unlabelled tenders do push annotated ones down and depress its recall@k. That
+script is the one-off from 2.4 whose numbers are already published; re-scoping it would
+silently change what those numbers mean, so it stays as it is and this note says why.
+"""
+
 RELEVANT_EXPEDIENTES: frozenset[str] = frozenset(
     {
         "INN 26 002",
