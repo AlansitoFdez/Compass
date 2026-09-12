@@ -13,6 +13,8 @@ comparing this extraction against a `Provider` in plain Python.
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from compass.analysis.enums import CertificationRole
+
 
 class Citation(BaseModel):
     """Where an extracted value comes from in the pliego -- what 3.5 verifies against the
@@ -113,14 +115,41 @@ class Guarantees(BaseModel):
 
 
 class ExecutionDeadline(BaseModel):
-    """Plazo de ejecución."""
+    """Plazo de ejecución, con las prórrogas separadas de la duración base.
+
+    Split in 5.8. A single free-text field let the model answer half the question and
+    look complete doing it: on `INN 26 002` it wrote "Durada del contracte: 1 any" with a
+    correct, verbatim citation, for a contract the same pliego extends with five
+    prórrogas. Nothing caught it -- the quote verified, the nine scored fields don't look
+    at the deadline, and only the free-text eval (5.6) noticed. The tender's own numbers
+    gave it away: 10.679 € of budget against 52.954 € of estimated value, and the
+    difference is exactly the extensions. A separate, required field can't be answered by
+    omission.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     description: str = Field(
         description=(
-            "Execution period as stated -- duration and any extensions, or a note that "
-            "the PCAP defers this to the PPT/prescripciones técnicas if it does."
+            "The base execution period as stated -- how long the contract runs before any "
+            "extension -- or a note that the PCAP defers this to the PPT/prescripciones "
+            "técnicas if it does."
+        )
+    )
+    extensions_allowed: bool | None = Field(
+        description=(
+            "Whether the pliego provides for prórrogas. True if it does, false if it "
+            "states there are none ('no procede prórroga', 'sin posibilidad de "
+            "prórroga'), null ONLY if the PCAP doesn't address extensions at all (e.g. it "
+            "defers the whole deadline to the PPT). Do not leave this null because the "
+            "extensions are merely inconvenient to find."
+        )
+    )
+    extensions_description: str | None = Field(
+        description=(
+            "The extensions as stated -- how many, how long each, and the maximum total "
+            "duration including them, summarized in Spanish. Null when "
+            "extensions_allowed is not true."
         )
     )
     citation: Citation | None = Field(
@@ -178,6 +207,45 @@ class Lots(BaseModel):
     )
 
 
+class RequiredCertification(BaseModel):
+    """One certification the pliego names, with the role that decides whether it blocks.
+
+    Carries its own citation. Until 5.8 the whole list shared a single
+    `certifications_citation` -- the only field in this schema that didn't pair a value
+    with the evidence for it, and the one that produced wrong verdicts. A per-item
+    citation means every blocking claim can be checked against the exact clause that
+    makes it, the same way every other field already could.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(
+        description=(
+            "The certification as the pliego names it, e.g. 'ISO 9001', "
+            "'ISO/IEC 27001', 'ENS categoría media', 'CMMI nivel 3'."
+        )
+    )
+    role: CertificationRole = Field(
+        description=(
+            "Why it appears in the pliego. 'required_to_bid' ONLY when holding it is a "
+            "condition of admission or part of the solvencia técnica demanded of every "
+            "bidder -- if the bid is valid without it, it is not this. "
+            "'award_criterion' when the pliego scores it ('se otorgarán N puntos por "
+            "disponer de...'). 'administrative_paperwork' for anything every bidder "
+            "files with its offer or that only the proposed awardee is asked for: DEUC, "
+            "declaraciones responsables, certificados de estar al corriente con Hacienda "
+            "o la Seguridad Social, documentación del requerimiento previo a la "
+            "adjudicación."
+        )
+    )
+    citation: Citation | None = Field(
+        description=(
+            "The clause that names this certification. Null only if the pliego names it "
+            "with no locatable clause at all."
+        )
+    )
+
+
 class PliegoExtraction(BaseModel):
     """The full closed extraction for one pliego -- the code decides the verdict from
     this, never the model.
@@ -187,19 +255,15 @@ class PliegoExtraction(BaseModel):
 
     economic_solvency: EconomicSolvency
     technical_solvency: TechnicalSolvency
-    certifications: list[str] = Field(
+    certifications: list[RequiredCertification] = Field(
         description=(
-            "Formal quality/security certifications or accreditations the provider must "
-            "already hold (e.g. ISO 9001, ISO 27001, ENS, CMMI). Do NOT include generic "
-            "bidding paperwork or administrative declarations submitted with the offer "
-            "itself (DEUC/Documento Europeo Único de Contratación, declaraciones "
-            "responsables, declaraciones de protección de datos) -- those aren't "
-            "certifications a provider holds in advance, every bidder fills them out. "
-            "Empty list if no formal certification is required."
+            "Every formal quality/security certification or accreditation the pliego "
+            "names (e.g. ISO 9001, ISO 27001, ENS, CMMI), each with the role that says "
+            "why it appears -- see `RequiredCertification.role`. List a certification "
+            "even when it is only scored or only paperwork: the role is what separates "
+            "them, and omitting them loses information the reader wants. Empty list if "
+            "the pliego names no certification at all."
         )
-    )
-    certifications_citation: Citation | None = Field(
-        description="Null only if the pliego requires no certifications at all."
     )
     award_criteria: AwardCriteria
     guarantees: Guarantees

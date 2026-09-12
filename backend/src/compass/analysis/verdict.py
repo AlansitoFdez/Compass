@@ -9,7 +9,11 @@ Only two fields of `PliegoExtraction` compare against something `Provider` actua
 stores, so only those two can block a bid:
 
 - `economic_solvency.minimum_annual_turnover_eur` against `Provider.annual_revenue`.
-- `certifications` against `Provider.certifications`.
+- `certifications` against `Provider.certifications` -- but only those whose
+  `role` is `REQUIRED_TO_BID`. A certification the pliego merely scores, or one that
+  is paperwork filed with the offer, cannot exclude anyone, and treating them as
+  requirements is what made four of the six analyses in the database emit a false
+  NO APTO before 5.8 (see `analysis.enums.CertificationRole`).
 
 `technical_solvency.minimum_amount_eur` (cumulative amount of similar past work) has
 no counterpart on `Provider` at all -- the profile doesn't track it (see
@@ -26,7 +30,7 @@ informational, surfaced from `extraction` itself rather than duplicated here.
 import re
 import unicodedata
 
-from compass.analysis.enums import Verdict
+from compass.analysis.enums import CertificationRole, Verdict
 from compass.analysis.extraction_schema import PliegoExtraction
 from compass.analysis.schemas import VerdictReason, VerdictResult
 from compass.providers.models import Provider
@@ -127,15 +131,19 @@ def compute_verdict(extraction: PliegoExtraction, provider: Provider) -> Verdict
         )
 
     held_certifications = provider.certifications or []
-    for required_certification in extraction.certifications:
-        if not _certification_satisfied(required_certification, held_certifications):
+    for certification in extraction.certifications:
+        # Only an admission condition can block. A scored certification changes how many
+        # points the offer gets, and paperwork is filed by whoever bids -- neither makes
+        # the provider ineligible, so neither belongs in a NO APTO.
+        if certification.role is not CertificationRole.REQUIRED_TO_BID:
+            continue
+        if not _certification_satisfied(certification.name, held_certifications):
             blocking.append(
                 VerdictReason(
                     detail=(
-                        f"Exigen la certificación '{required_certification}' y tu perfil "
-                        "no la declara."
+                        f"Exigen la certificación '{certification.name}' y tu perfil no la declara."
                     ),
-                    citation=extraction.certifications_citation,
+                    citation=certification.citation,
                 )
             )
 

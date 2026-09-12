@@ -7,16 +7,44 @@ logic between the two scripts.
 """
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
-from compass.analysis.extraction_schema import PliegoExtraction
+from compass.analysis.enums import CertificationRole
+from compass.analysis.extraction_schema import PliegoExtraction, RequiredCertification
 
-CERT_TOKEN_RE = re.compile(r"ISO\s?\d{4,5}|CMMI|ENS\b|IEC\s?\d+|CCN-?CERT", re.IGNORECASE)
+_WORD_RE = re.compile(r"[a-z0-9]+")
 
 
-def _cert_tokens(certifications: list[str]) -> set[str]:
-    joined = " | ".join(certifications)
-    return {m.group(0).upper().replace(" ", "") for m in CERT_TOKEN_RE.finditer(joined)}
+def _normalized_name(name: str) -> str:
+    """A certification's name reduced to lowercase, accent-free words joined by spaces,
+    so 'ISO/IEC 27001:2013' and 'ISO IEC 27001 2013' compare equal.
+    """
+    decomposed = unicodedata.normalize("NFKD", name)
+    without_accents = "".join(c for c in decomposed if not unicodedata.combining(c))
+    return " ".join(_WORD_RE.findall(without_accents.lower()))
+
+
+def _blocking_names(certifications: list[RequiredCertification]) -> set[str]:
+    """The certifications that can actually fail a bid, normalized for comparison.
+
+    Only `REQUIRED_TO_BID` ones, because those are exactly what `verdict.compute_verdict`
+    blocks on -- scoring anything else would measure a field the verdict never reads.
+
+    Until 5.8 this scored a regex over the raw strings (`ISO\\d+|CMMI|ENS|IEC\\d+|
+    CCN-CERT`), and that made the gate blind to the failure mode that mattered. The
+    garbage a real extraction put in this field -- "Certificación positiva, expedida por
+    la Agencia Estatal de Administración Tributaria...", and in one case the literal
+    string "citation" -- contains no such token, so it reduced to the empty set; against
+    a golden-set entry annotated `[]` the comparison then said **correct**. The field
+    that produced false NO APTO verdicts was passing its own regression gate, because
+    what the verdict acted on and what the gate measured were not the same thing.
+    """
+    return {
+        _normalized_name(certification.name)
+        for certification in certifications
+        if certification.role is CertificationRole.REQUIRED_TO_BID
+    }
 
 
 def _price_points(extraction: PliegoExtraction) -> float | None:
@@ -43,17 +71,17 @@ class FieldCheck:
 
 
 def score_extraction(expected: PliegoExtraction, got: PliegoExtraction) -> list[FieldCheck]:
-    """The 9 objectively-checkable subfields -- the numeric/boolean/list data a verdict
+    """The 10 objectively-checkable subfields -- the numeric/boolean/list data a verdict
     (3.7) actually computes from, not the free-text descriptions (see phase3.4.md for
     why those aren't scored mechanically).
     """
-    expected_cert_tokens = _cert_tokens(expected.certifications)
-    got_cert_tokens = _cert_tokens(got.certifications)
-    certifications_correct = (
-        expected_cert_tokens.issubset(got_cert_tokens)
-        if expected_cert_tokens
-        else not got_cert_tokens
-    )
+    expected_certifications = _blocking_names(expected.certifications)
+    got_certifications = _blocking_names(got.certifications)
+    # Set equality, not containment. Containment was the other half of the blindness:
+    # it only asked "did the model find what the annotator found", never "did it demand
+    # something the pliego doesn't", and an extra blocking certification is precisely
+    # what turns into a false NO APTO.
+    certifications_correct = expected_certifications == got_certifications
 
     return [
         FieldCheck(
@@ -77,8 +105,15 @@ def score_extraction(expected: PliegoExtraction, got: PliegoExtraction) -> list[
         FieldCheck(
             "certifications",
             certifications_correct,
-            sorted(expected_cert_tokens),
-            sorted(got_cert_tokens),
+            sorted(expected_certifications),
+            sorted(got_certifications),
+        ),
+        FieldCheck(
+            "execution_deadline.extensions_allowed",
+            expected.execution_deadline.extensions_allowed
+            == got.execution_deadline.extensions_allowed,
+            expected.execution_deadline.extensions_allowed,
+            got.execution_deadline.extensions_allowed,
         ),
         FieldCheck(
             "award_criteria.total_points",

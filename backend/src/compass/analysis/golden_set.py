@@ -50,12 +50,40 @@ expedientes. Garantías, lotes and the submission deadline live exclusively in t
 latter, so those three fields are genuinely `None` for all three entries -- not a
 missed citation, just outside the document this project ingests.
 
+**Re-annotated in 5.8 for the schema change, against the PCAPs and not by inference.**
+Two fields gained a required answer, and both were filled by reading the documents again
+rather than by converting what was already written:
+
+- `certifications` now carries a `role` per item. All 22 across the nine annotated
+  entries came back `REQUIRED_TO_BID`, each confirmed in its own pliego -- clause 6.4 of
+  `A41119033-2026/000065-PeAS` ("los licitadores deberán acreditar además el cumplimiento
+  de los requisitos de solvencia técnica y profesional que se refieren a continuación"),
+  clause 10.1.l) of `2545974A` ("Obligatoriamente licitador deberá entregar..."), clause
+  12.A) "Habilitación" of `SERV-2026000088`, and the "se exige la presentación de
+  certificado" clauses of the three Red.es pliegos. So the human labels were right all
+  along; what the role field fixes is the *model's* output, not this file's.
+- Each certification carries its own citation now, but only the first item of each list
+  actually has one: the pre-5.8 annotation wrote a single citation per list, and that
+  quote names only one certification. The rest are `None` rather than borrowing a quote
+  that doesn't mention them. Citations aren't scored (`scoring.score_extraction`
+  compares names and roles), so this costs the gate nothing.
+- `execution_deadline` split into base duration plus `extensions_allowed` /
+  `extensions_description`. Where the existing annotation stated the extensions, the
+  split is a re-reading of it; where it said nothing, the PCAP was re-opened rather than
+  marked unknown -- and that caught two entries that would have been labelled wrong.
+  `A41119033-2026/000065-PeAS` defers the *duration* to the PPT but states on page 2 "No
+  se ha previsto la posibilidad de prórroga", and `2026000731` says on page 16 "Dado que
+  no se prevén prórrogas ni modificaciones". Both are `False`, not `None`. The three that
+  remain `None` mention prórrogas nowhere at all (`23/2026`, and the two Red.es pliegos
+  whose Condiciones Generales are a separate document, as noted above).
+
 Annotated directly from the PCAP text (`compass.analysis.document.extract_pages`
 against the tender's real `pcap_url`), not from a summary -- every `Citation.quote`
 below is copied verbatim from the pliego. The 3.4 batch was downloaded 2026-09-09; the
 4.3 batch, 2026-09-11.
 """
 
+from compass.analysis.enums import CertificationRole
 from compass.analysis.extraction_schema import (
     AwardCriteria,
     AwardCriterion,
@@ -65,6 +93,7 @@ from compass.analysis.extraction_schema import (
     Guarantees,
     Lots,
     PliegoExtraction,
+    RequiredCertification,
     Subcontracting,
     SubmissionDeadline,
     TechnicalSolvency,
@@ -97,7 +126,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -128,8 +156,10 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="Vigencia máxima de 2 años desde la formalización, prorrogable; la "
-            "prestación del servicio tiene un máximo de 4 años incluyendo prórrogas.",
+            description="Vigencia máxima de 2 años desde la formalización.",
+            extensions_allowed=True,
+            extensions_description="Prorrogable; la prestación del servicio tiene un máximo de 4 "
+            "años incluyendo prórrogas.",
             citation=Citation(
                 clause="10.1",
                 page=11,
@@ -204,21 +234,45 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[
-            "CMMI nivel 3 o superior",
-            "ISO 9000 o equivalente",
-            "ISO 14000 o equivalente",
-            "ISO 20000 o equivalente",
-            "ISO 27000 o equivalente",
-            "ENS nivel medio/alto (certificado CCN-CERT)",
+            RequiredCertification(
+                name="CMMI nivel 3 o superior",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=Citation(
+                    clause="6.4",
+                    page=3,
+                    quote="Certificado expedido por organismo independiente, conforme a las "
+                    "normas\nrelativas a la certificación, que acredite que el "
+                    "empresario cumple con "
+                    "la\ncertificación de Modelo de Madurez de Capacidades de Integración "
+                    "(CMMI)\nnivel 3 o superior",
+                ),
+            ),
+            RequiredCertification(
+                name="ISO 9000 o equivalente",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=None,
+            ),
+            RequiredCertification(
+                name="ISO 14000 o equivalente",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=None,
+            ),
+            RequiredCertification(
+                name="ISO 20000 o equivalente",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=None,
+            ),
+            RequiredCertification(
+                name="ISO 27000 o equivalente",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=None,
+            ),
+            RequiredCertification(
+                name="ENS nivel medio/alto (certificado CCN-CERT)",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=None,
+            ),
         ],
-        certifications_citation=Citation(
-            clause="6.4",
-            page=3,
-            quote="Certificado expedido por organismo independiente, conforme a las "
-            "normas\nrelativas a la certificación, que acredite que el empresario cumple con "
-            "la\ncertificación de Modelo de Madurez de Capacidades de Integración "
-            "(CMMI)\nnivel 3 o superior",
-        ),
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -246,6 +300,8 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
         ),
         execution_deadline=ExecutionDeadline(
             description="No se fija en el PCAP: remite al Pliego de Prescripciones Técnicas.",
+            extensions_allowed=False,
+            extensions_description=None,
             citation=Citation(
                 clause="14.1",
                 page=10,
@@ -312,7 +368,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -343,7 +398,9 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
         ),
         execution_deadline=ExecutionDeadline(
             description="Duración de tres años desde la formalización; implantación del "
-            "servicio en un plazo máximo de tres meses; prorrogable hasta dos años más.",
+            "servicio en un plazo máximo de tres meses.",
+            extensions_allowed=True,
+            extensions_description="Prorrogable hasta dos años más.",
             citation=Citation(
                 clause="9ª",
                 page=5,
@@ -421,7 +478,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[AwardCriterion(name="Precio", points=100, is_price=True)],
@@ -447,7 +503,9 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
         execution_deadline=ExecutionDeadline(
             description="Cuatro meses desde el 30 de agosto de 2026 o el día siguiente a la "
             "formalización; el contrato se extingue en todo caso el 30 de diciembre de "
-            "2026. No procede prórroga.",
+            "2026.",
+            extensions_allowed=False,
+            extensions_description=None,
             citation=Citation(
                 clause="17",
                 page=9,
@@ -514,19 +572,46 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[
-            "Certificado cumplimiento del ENS en categoría ALTA",
-            "Certificado ISO 20000",
-            "Certificado ISO 27001",
-            "Certificado ISO 27017",
-            "Certificado ISO 27018",
-            "Certificado ISO 22301",
-            "Certificación ISO 50001",
+            RequiredCertification(
+                name="Certificado cumplimiento del ENS en categoría ALTA",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=Citation(
+                    clause="10.1.l)",
+                    page=7,
+                    quote="Certificado cumplimiento del ENS en categoría ALTA del licitador.",
+                ),
+            ),
+            RequiredCertification(
+                name="Certificado ISO 20000",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=None,
+            ),
+            RequiredCertification(
+                name="Certificado ISO 27001",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=None,
+            ),
+            RequiredCertification(
+                name="Certificado ISO 27017",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=None,
+            ),
+            RequiredCertification(
+                name="Certificado ISO 27018",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=None,
+            ),
+            RequiredCertification(
+                name="Certificado ISO 22301",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=None,
+            ),
+            RequiredCertification(
+                name="Certificación ISO 50001",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=None,
+            ),
         ],
-        certifications_citation=Citation(
-            clause="10.1.l)",
-            page=7,
-            quote="Certificado cumplimiento del ENS en categoría ALTA del licitador.",
-        ),
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -558,8 +643,10 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="Vigencia de un año desde la firma del contrato, prorrogable por un "
-            "año más por acuerdo del órgano de contratación.",
+            description="Vigencia de un año desde la firma del contrato.",
+            extensions_allowed=True,
+            extensions_description="Prorrogable por un año más por acuerdo del órgano de "
+            "contratación.",
             citation=Citation(
                 clause="8",
                 page=5,
@@ -637,7 +724,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -674,9 +760,10 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="Desde el día siguiente de la firma del contrato hasta el 30 de "
-            "diciembre de 2026, con posible prórroga con un preaviso general de dos "
-            "meses.",
+            description="Desde el día siguiente de la firma del contrato hasta el 30 de diciembre "
+            "de 2026.",
+            extensions_allowed=True,
+            extensions_description="Posible prórroga, con un preaviso general de dos meses.",
             citation=Citation(
                 clause="H",
                 page=2,
@@ -749,7 +836,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -786,8 +872,10 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="Duración inicial de un año desde la formalización del contrato (o "
-            "la fecha que se determine en el documento de formalización).",
+            description="Duración inicial de un año desde la formalización del contrato "
+            "(o la fecha que se determine en el documento de formalización).",
+            extensions_allowed=None,
+            extensions_description=None,
             citation=Citation(
                 clause="5",
                 page=10,
@@ -861,7 +949,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -906,9 +993,11 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="12 meses desde el 1 de enero de 2027 o desde la formalización si "
-            "fuera posterior. Prórroga prevista hasta un máximo de 36 meses, renovada "
-            "anualmente.",
+            description="12 meses desde el 1 de enero de 2027 o desde la formalización si fuera "
+            "posterior.",
+            extensions_allowed=True,
+            extensions_description="Prórroga prevista hasta un máximo de 36 meses en total, "
+            "renovada anualmente.",
             citation=Citation(
                 clause="22",
                 page=14,
@@ -980,7 +1069,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -1013,8 +1101,10 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="24 meses desde el 1 de diciembre de 2026 (o desde la "
-            "formalización si fuera posterior), prorrogable hasta 24 meses más.",
+            description="24 meses desde el 1 de diciembre de 2026 (o desde la formalización si "
+            "fuera posterior).",
+            extensions_allowed=True,
+            extensions_description="Prorrogable hasta 24 meses más.",
             citation=Citation(
                 clause="8",
                 page=58,
@@ -1085,7 +1175,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -1122,8 +1211,10 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="Duración inicial de 3 meses, con dos posibles prórrogas de 12 meses "
-            "cada una (hasta 27 meses en total).",
+            description="Duración inicial de 3 meses.",
+            extensions_allowed=True,
+            extensions_description="Dos posibles prórrogas de 12 meses cada una, hasta 27 meses en "
+            "total.",
             citation=Citation(
                 clause="2.1",
                 page=7,
@@ -1195,12 +1286,17 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
                 "principal del contrato",
             ),
         ),
-        certifications=["Esquema Nacional de Seguridad (ENS)"],
-        certifications_citation=Citation(
-            clause="4.A.2",
-            page=48,
-            quote="El ENS actúa como condición mínima de acceso y ejecución.",
-        ),
+        certifications=[
+            RequiredCertification(
+                name="Esquema Nacional de Seguridad (ENS)",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=Citation(
+                    clause="4.A.2",
+                    page=48,
+                    quote="El ENS actúa como condición mínima de acceso y ejecución.",
+                ),
+            ),
+        ],
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -1229,8 +1325,10 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="36 meses de mantenimiento desde la implantación, más 2 meses para "
-            "la implantación; sin posibilidad de prórroga.",
+            description="36 meses de mantenimiento desde la implantación, más 2 meses para la "
+            "implantación.",
+            extensions_allowed=False,
+            extensions_description=None,
             citation=Citation(
                 clause="3",
                 page=47,
@@ -1293,7 +1391,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             citation=None,
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -1340,9 +1437,10 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             citation=None,
         ),
         execution_deadline=ExecutionDeadline(
-            description="4 años desde la notificación de la Resolución de Adjudicación; 3 "
-            "meses para el suministro y puesta en funcionamiento inicial. Sin "
-            "posibilidad de prórroga.",
+            description="4 años desde la notificación de la Resolución de Adjudicación; 3 meses "
+            "para el suministro y puesta en funcionamiento inicial.",
+            extensions_allowed=False,
+            extensions_description=None,
             citation=Citation(
                 clause="3",
                 page=29,
@@ -1421,7 +1519,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -1450,8 +1547,10 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="14 meses desde la formalización, con hitos parciales a los 3 meses "
-            "(40% del importe) y 14 meses (60% del importe). Sin posibilidad de prórroga.",
+            description="14 meses desde la formalización, con hitos parciales a los 3 meses (40% "
+            "del importe) y 14 meses (60% del importe).",
+            extensions_allowed=False,
+            extensions_description=None,
             citation=Citation(
                 clause="14",
                 page=33,
@@ -1526,7 +1625,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -1558,6 +1656,8 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
         execution_deadline=ExecutionDeadline(
             description="Periodo de ejecución máxima de 8 meses, con hitos consecutivos "
             "(análisis y diseño, migración y publicación, configuración del visor, etc.).",
+            extensions_allowed=False,
+            extensions_description=None,
             citation=Citation(
                 clause="6.1",
                 page=17,
@@ -1633,7 +1733,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -1669,8 +1768,9 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="Duración inicial de un año desde la formalización, prorrogable "
-            "conforme al art. 29.2 LCSP.",
+            description="Duración inicial de un año desde la formalización.",
+            extensions_allowed=True,
+            extensions_description="Prorrogable conforme al art. 29.2 LCSP.",
             citation=Citation(
                 clause="10.1",
                 page=11,
@@ -1749,7 +1849,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -1780,7 +1879,9 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
         execution_deadline=ExecutionDeadline(
             description="Duración inicial de 20 meses desde la fecha del acuerdo de "
             "aceptación, con inicio previsto el 1 de octubre de 2026 y fin el 31 de mayo "
-            "de 2028; no prorrogable.",
+            "de 2028.",
+            extensions_allowed=False,
+            extensions_description=None,
             citation=Citation(
                 clause="3",
                 page=5,
@@ -1860,12 +1961,17 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
                 "valor medio anual del contrato que se licita.",
             ),
         ),
-        certifications=["Esquema Nacional de Seguridad (ENS)"],
-        certifications_citation=Citation(
-            clause="12.A)",
-            page=43,
-            quote="Certificación ENS (Esquema Nacional de Seguridad) nivel medio o alto",
-        ),
+        certifications=[
+            RequiredCertification(
+                name="Esquema Nacional de Seguridad (ENS)",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=Citation(
+                    clause="12.A)",
+                    page=43,
+                    quote="Certificación ENS (Esquema Nacional de Seguridad) nivel medio o alto",
+                ),
+            ),
+        ],
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -1897,8 +2003,9 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="Duración de dos años desde la formalización del contrato, sin "
-            "posibilidad de prórroga.",
+            description="Duración de dos años desde la formalización del contrato.",
+            extensions_allowed=False,
+            extensions_description=None,
             citation=Citation(
                 clause="4",
                 page=40,
@@ -1978,7 +2085,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -2010,9 +2116,11 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="Duración de 1 año, con inicio previsto el 16 de septiembre de "
-            "2026 (o el día siguiente a la formalización, si fuera posterior); prorrogable "
-            "hasta dos años más en prórrogas sucesivas de un año.",
+            description="Duración de 1 año, con inicio previsto el 16 de septiembre de 2026 (o el "
+            "día siguiente a la formalización, si fuera posterior).",
+            extensions_allowed=True,
+            extensions_description="Prorrogable hasta dos años más, en prórrogas sucesivas de un "
+            "año.",
             citation=Citation(
                 clause="D",
                 page=5,
@@ -2087,7 +2195,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -2128,8 +2235,10 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="Duración de 1 año desde la formalización, prorrogable hasta 4 "
-            "años adicionales conforme al art. 29.2 LCSP.",
+            description="Duración de 1 año desde la formalización.",
+            extensions_allowed=True,
+            extensions_description="Prorrogable hasta 4 años adicionales conforme al art. 29.2 "
+            "LCSP.",
             citation=Citation(
                 clause="C",
                 page=5,
@@ -2212,19 +2321,24 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
                 "SETENTA Y NUEVE MIL SETENTA EUROS (79.070,00 €),",
             ),
         ),
-        certifications=["Esquema Nacional de Seguridad (ENS), categoría media o superior"],
-        certifications_citation=Citation(
-            clause="E",
-            page=43,
-            quote="Declaración responsable, firmada electrónicamente por el "
-            "representante legal de la empresa licitante,\nindicando que está en "
-            "posesión y, en caso de resultar seleccionado para participar en este "
-            "acuerdo\nHabilitación\nmarco, aportará: Certificación de Conformidad con "
-            "el Esquema Nacional de Seguridad referida a sus\nempresarial\nsistemas de "
-            "información, incluidos los aportados por terceros, que dan soporte a los "
-            "servicios objeto\ndel contrato, en la Categoría MEDIA o superior, conforme "
-            "al RD 311/2022 de 3 de mayo.",
-        ),
+        certifications=[
+            RequiredCertification(
+                name="Esquema Nacional de Seguridad (ENS), categoría media o superior",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=Citation(
+                    clause="E",
+                    page=43,
+                    quote="Declaración responsable, firmada electrónicamente por el "
+                    "representante legal de la empresa licitante,\nindicando que está en "
+                    "posesión y, en caso de resultar seleccionado para participar en este "
+                    "acuerdo\nHabilitación\nmarco, aportará: Certificación de Conformidad con "
+                    "el Esquema Nacional de Seguridad referida a sus\nempresarial\nsistemas de "
+                    "información, incluidos los aportados por terceros, que dan soporte a los "
+                    "servicios objeto\ndel contrato, en la Categoría MEDIA o superior, conforme "
+                    "al RD 311/2022 de 3 de mayo.",
+                ),
+            ),
+        ],
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -2264,8 +2378,9 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="Plazo de ejecución de 5 meses desde la formalización del "
-            "contrato, con posibilidad de una prórroga de 2 meses ya prevista.",
+            description="Plazo de ejecución de 5 meses desde la formalización del contrato.",
+            extensions_allowed=True,
+            extensions_description="Una prórroga de 2 meses, ya prevista en el pliego.",
             citation=Citation(
                 clause="K",
                 page=49,
@@ -2342,17 +2457,22 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
                 "contrato.",
             ),
         ),
-        certifications=["Acreditación ENAC para la certificación de la norma UNE-EN ISO 22301"],
-        certifications_citation=Citation(
-            clause="F)",
-            page=7,
-            quote="Acreditación ENAC (o entidad de acreditación equivalente) para la\n"
-            "certificación de la NORMA UNE EN ISO 22301. Las empresas\nlicitadoras que se "
-            "presenten deberán estar acreditadas en España por\nparte de la Entidad "
-            "Nacional de Acreditación (ENAC), u otra entidad de\nacreditación equivalente "
-            "para la certificación de la NORMA UNE EN ISO\n22301, para garantizar la "
-            "aceptación de los certificados emitidos a nivel\nnacional e internacional.",
-        ),
+        certifications=[
+            RequiredCertification(
+                name="Acreditación ENAC para la certificación de la norma UNE-EN ISO 22301",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=Citation(
+                    clause="F)",
+                    page=7,
+                    quote="Acreditación ENAC (o entidad de acreditación equivalente) para la\n"
+                    "certificación de la NORMA UNE EN ISO 22301. Las empresas\nlicitadoras que se "
+                    "presenten deberán estar acreditadas en España por\nparte de la Entidad "
+                    "Nacional de Acreditación (ENAC), u otra entidad de\nacreditación equivalente "
+                    "para la certificación de la NORMA UNE EN ISO\n22301, para garantizar la "
+                    "aceptación de los certificados emitidos a nivel\nnacional e internacional.",
+                ),
+            ),
+        ],
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -2390,7 +2510,9 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="Duración de 3 años, prorrogable una única vez hasta 2 años más.",
+            description="Duración de 3 años.",
+            extensions_allowed=True,
+            extensions_description="Prorrogable una única vez, hasta 2 años más.",
             citation=Citation(
                 clause="E)",
                 page=6,
@@ -2474,7 +2596,6 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[],
-        certifications_citation=None,
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -2507,8 +2628,9 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         execution_deadline=ExecutionDeadline(
-            description="Duración de 12 meses desde la fecha indicada en el contrato; "
-            "sin prórrogas previstas.",
+            description="Duración de 12 meses desde la fecha indicada en el contrato.",
+            extensions_allowed=False,
+            extensions_description=None,
             citation=Citation(
                 clause="11",
                 page=3,
@@ -2583,19 +2705,26 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[
-            "ISO 20000 (gestión de servicios TI) o norma EN ISO equivalente",
-            "ISO/IEC 15504-SPICE Nivel 3 (madurez de ingeniería del software) o "
-            "certificación equivalente",
+            RequiredCertification(
+                name="ISO 20000 (gestión de servicios TI) o norma EN ISO equivalente",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=Citation(
+                    clause="3.2.b)",
+                    page=13,
+                    quote="Dado el objeto del contrato, se exige la presentación de "
+                    "certificado expedido\npor organismo independiente conforme a la s normas "
+                    "europeas relativas a la\ncertificación, que acredite que el empresario "
+                    "cumple con el sistema de gestión de la\ncalidad contenido en la norma ISO "
+                    "20.000, como mínimo, o norma EN ISO\nequivalente.",
+                ),
+            ),
+            RequiredCertification(
+                name="ISO/IEC 15504-SPICE Nivel 3 (madurez de ingeniería del software) o "
+                "certificación equivalente",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=None,
+            ),
         ],
-        certifications_citation=Citation(
-            clause="3.2.b)",
-            page=13,
-            quote="Dado el objeto del contrato, se exige la presentación de "
-            "certificado expedido\npor organismo independiente conforme a la s normas "
-            "europeas relativas a la\ncertificación, que acredite que el empresario "
-            "cumple con el sistema de gestión de la\ncalidad contenido en la norma ISO "
-            "20.000, como mínimo, o norma EN ISO\nequivalente.",
-        ),
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -2631,6 +2760,8 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
         ),
         execution_deadline=ExecutionDeadline(
             description="Duración de 48 meses desde la formalización del contrato.",
+            extensions_allowed=None,
+            extensions_description=None,
             citation=Citation(
                 clause="5",
                 page=19,
@@ -2695,15 +2826,20 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
                 "excluidos.",
             ),
         ),
-        certifications=["ISO 9001 (gestión de la calidad) o norma EN ISO equivalente"],
-        certifications_citation=Citation(
-            clause="3.2.b)",
-            page=11,
-            quote="b) Dado el objeto del contrato, se exige la presentación de "
-            "certificado expedido por\norganismo independiente conforme a las normas "
-            "europeas relativas a la\ncertificación, que acredite que el empresario "
-            "cumple con la norma EN ISO 9001,\no equivalente.",
-        ),
+        certifications=[
+            RequiredCertification(
+                name="ISO 9001 (gestión de la calidad) o norma EN ISO equivalente",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=Citation(
+                    clause="3.2.b)",
+                    page=11,
+                    quote="b) Dado el objeto del contrato, se exige la presentación de "
+                    "certificado expedido por\norganismo independiente conforme a las normas "
+                    "europeas relativas a la\ncertificación, que acredite que el empresario "
+                    "cumple con la norma EN ISO 9001,\no equivalente.",
+                ),
+            ),
+        ],
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -2733,9 +2869,10 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             citation=None,
         ),
         execution_deadline=ExecutionDeadline(
-            description="Duración de 24 meses desde la formalización, prorrogable "
-            "(obligatoriamente para el contratista) por un periodo adicional de 24 "
-            "meses.",
+            description="Duración de 24 meses desde la formalización.",
+            extensions_allowed=True,
+            extensions_description="Prorrogable, obligatoriamente para el contratista, por un "
+            "periodo adicional de 24 meses.",
             citation=Citation(
                 clause="5",
                 page=16,
@@ -2803,18 +2940,26 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             ),
         ),
         certifications=[
-            "ISO 9001 (gestión de la calidad) o certificación equivalente",
-            "ISO 27001 (gestión de la seguridad de la información) o certificación equivalente",
+            RequiredCertification(
+                name="ISO 9001 (gestión de la calidad) o certificación equivalente",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=Citation(
+                    clause="3.2.b)",
+                    page=13,
+                    quote="b) Dado el objeto del contrato, se exige la presentación de "
+                    "certificado\nexpedido por organismo independiente conforme a las "
+                    "normas europeas relativas a\nla certificación, que acredite que el "
+                    "empresario cumple con la norma EN ISO 9001,\no certificación "
+                    "equivalente.",
+                ),
+            ),
+            RequiredCertification(
+                name="ISO 27001 (gestión de la seguridad de la información) o certificación "
+                "equivalente",
+                role=CertificationRole.REQUIRED_TO_BID,
+                citation=None,
+            ),
         ],
-        certifications_citation=Citation(
-            clause="3.2.b)",
-            page=13,
-            quote="b) Dado el objeto del contrato, se exige la presentación de "
-            "certificado\nexpedido por organismo independiente conforme a las "
-            "normas europeas relativas a\nla certificación, que acredite que el "
-            "empresario cumple con la norma EN ISO 9001,\no certificación "
-            "equivalente.",
-        ),
         award_criteria=AwardCriteria(
             total_points=100,
             criteria=[
@@ -2869,8 +3014,10 @@ GOLDEN_SET: dict[str, PliegoExtraction] = {
             citation=None,
         ),
         execution_deadline=ExecutionDeadline(
-            description="Duración de 36 meses desde el día siguiente a la "
-            "formalización del contrato.",
+            description="Duración de 36 meses desde el día siguiente a la formalización del "
+            "contrato.",
+            extensions_allowed=None,
+            extensions_description=None,
             citation=Citation(
                 clause="5",
                 page=19,

@@ -143,7 +143,6 @@ class CitationField:
 CITATION_FIELDS: tuple[CitationField, ...] = (
     CitationField("economic_solvency", lambda e: e.economic_solvency.citation),
     CitationField("technical_solvency", lambda e: e.technical_solvency.citation),
-    CitationField("certifications", lambda e: e.certifications_citation),
     CitationField("award_criteria", lambda e: e.award_criteria.citation),
     CitationField("guarantees", lambda e: e.guarantees.citation),
     CitationField("execution_deadline", lambda e: e.execution_deadline.citation),
@@ -160,6 +159,12 @@ def citation_report(extraction: PliegoExtraction, pages: list[str]) -> dict[str,
     genuinely doesn't address that point, so there is nothing to verify and no outcome
     to report.
 
+    Certifications are reported one by one, keyed `certifications[<name>]`. Since 5.8
+    each one carries its own citation instead of the whole list sharing a single one, so
+    a bid blocked over a certification can be traced to the exact clause that demands it
+    -- and a claim the pliego doesn't support shows up against that certification alone,
+    not smeared across the rest.
+
     Args:
         extraction: A validated model output.
         pages: Per-page extracted text for the same pliego.
@@ -172,6 +177,10 @@ def citation_report(extraction: PliegoExtraction, pages: list[str]) -> dict[str,
         citation = field.citation_of(extraction)
         if citation is not None:
             report[field.name] = check_citation(citation, pages)
+    for certification in extraction.certifications:
+        if certification.citation is not None:
+            key = f"certifications[{certification.name}]"
+            report[key] = check_citation(certification.citation, pages)
     return report
 
 
