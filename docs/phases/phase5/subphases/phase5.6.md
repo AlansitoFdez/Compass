@@ -138,3 +138,60 @@ llamada condenada gastó tres peticiones HTTP**, porque el SDK reintenta dos vec
 cuenta. Contar las llamadas que hace el script habría dicho «1» mientras la cuota bajaba de
 tres en tres. Los reintentos del SDK quedan en uno: el 429 que este script encuentra de
 verdad es el tope diario, y ése no lo arregla ningún reintento.
+
+### La primera corrida real: 14 peticiones para 7 descripciones
+
+`INN 26 002`, 98 páginas, las 7 descripciones con cita. Fidelidad media **86%**, 11 de 12
+afirmaciones sostenidas por las páginas citadas, y **14 peticiones exactas** — el
+presupuesto de 2 por muestra, ya no deducido del código sino medido. Con 50 al día, y
+descontando lo que cuesta un análisis, caben **tres pliegos**.
+
+### El criterio 5: el juez rechazó una afirmación, y tenía razón
+
+La única que suspendió fue el plazo de ejecución. El modelo extrajo, con cita literal
+correcta, «Durada del contracte: 1 any». El juez la rechazó así:
+
+> El contexto indica que el PBL corresponde a 1 any, pero también incluye cuatro
+> prórrogas, por lo que no se puede inferir que la duración total del contrato sea
+> únicamente de 1 año.
+
+Comprobado a mano contra las páginas 3 y 4 del PCAP: el cuadro de características lista
+«PBL, (1 any)» y debajo «Pròrroga 1», «Pròrroga 2»... Y los números del propio anuncio lo
+confirman sin necesidad de leer nada más: presupuesto 10.679 € frente a un valor estimado
+de 52.954 €. **Esa diferencia son las prórrogas.**
+
+Así que el juez acertó, y encontró algo que ninguna comprobación mecánica podía encontrar.
+La cita verifica —`verify_citation` la da por buena, porque la frase está literalmente en
+esa página—, los nueve campos puntuables no miran el plazo, y sin embargo lo que el
+dashboard le enseña al proveedor («Durada del contracte: 1 any») se queda corto en la
+decisión que más pesa: un contrato de un año y otro de un año más cinco prórrogas no valen
+lo mismo. El esquema ya pide «duration **and any extensions**»; el modelo obedeció a medias
+y nadie lo estaba midiendo.
+
+Eso es exactamente el hueco que esta subfase decía cubrir, encontrado en la primera corrida.
+
+### El segundo pliego enseñó un fallo del propio eval
+
+`1276564F`: 5 de 7 descripciones fallaron con *«the output is incomplete due to a
+max_tokens length limit»*. No es del pliego ni del modelo de extracción: RAGAS fija
+`max_tokens=1024` por defecto (`InstructorModelArgs`) y su propio docstring avisa de que no
+basta para un modelo que razona antes de responder. El razonamiento se come el
+presupuesto y el JSON llega cortado a media llave — **gastando una petición cada vez**.
+
+Con `max_tokens=4096`, el mismo pliego puntúa 6 de 7: **60 de 60 afirmaciones sostenidas**.
+Queda una, `guarantees.description`, que sigue truncando: las descripciones de este pliego
+son largas de verdad (una sola dio 20 afirmaciones atómicas), y a más afirmaciones, más
+JSON de veredictos. El botón para subirlo está ahí (`JUDGE_MAX_TOKENS`) y no se ha subido
+más sin poder comprobarlo: la cuota del día se acabó.
+
+### Lo que costó el día, contado
+
+42 de las 50 peticiones: 3 en la corrida en seco contra la cuota agotada, 1 en el análisis
+del criterio 4 de la 5.5, 14 en el primer pliego, 11 en el segundo antes del arreglo y 13
+después. Dos pliegos evaluados, 13 descripciones puntuadas, 71 afirmaciones juzgadas.
+
+### Estado al cerrar
+
+268 tests en verde, `ruff`, `ruff format --check` y `mypy --strict` limpios.
+
+Criterios 1, 2, 3, 4 y 6, cumplidos. El 5 también, y con un hallazgo de producto delante.
